@@ -1,0 +1,77 @@
+{
+  "name": "nus-desktop",
+  "version": "0.1.0",
+  "description": "Nūs: the semester organizer that runs on your own AI, on your own machine.",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "tour": "electron . --tour",
+    "test:db": "node --test src/db.test.js",
+    "dist": "electron-builder --win",
+    "test": "node --test src/*.test.js companion/test/*.test.js"
+  },
+  "build": {
+    "appId": "com.nus.desktop",
+    "productName": "Nus",
+    "copyright": "Copyright 2026 Pranav Desu",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "renderer/**/*",
+      "companion/**/*",
+      "package.json",
+      "!**/*.test.js",
+      "!docs/**",
+      "!companion/test/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Nus-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "Nus-Portable.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Nus"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "Pranav Desu",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/potlakai/nus-desktop.git" },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
+    "pdf-parse": "^1.1.1",
+    "sql.js": "^1.14.1"
+  },
+  "devDependencies": {
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
+  }
+}

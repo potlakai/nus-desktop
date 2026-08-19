@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
+  <title>Nūs</title>
+  <link rel="stylesheet" href="styles.css?v=atlas-12" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail">
+      <div class="brand-block">
+        <div class="statue-lockup"><img src="assets/nus-statue-mark.png" alt="" /></div>
+        <div><div class="wordmark">Nūs</div><div class="brand-sub">semester intelligence</div></div>
+      </div>
+
+      <nav class="nav" id="nav" aria-label="Primary"></nav>
+
+      <div class="rail-spacer"></div>
+      <section class="rail-signal" aria-label="Companion connection">
+        <div class="signal-head"><span class="status-dot"></span><strong>One Nūs system</strong></div>
+        <p>The desktop brain now feeds your Companion.</p>
+        <div class="signal-route"><span>Desk</span><i></i><span>Companion</span></div>
+      </section>
+      <button class="rail-storage" id="rail-storage" data-view="settings" type="button" title="Local database size. Everything stays on this device.">
+        <span class="rail-storage-head">Storage<b id="rail-storage-value">0 KB</b></span>
+        <span class="rail-storage-track"><i id="rail-storage-bar"></i></span>
+      </button>
+      <button class="rail-profile" data-view="settings" type="button">
+        <span class="avatar" id="rail-avatar">N</span><span><strong id="rail-name">You</strong><small id="rail-mode">Local profile</small></span><span class="profile-more">•••</span>
+      </button>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div><p id="eyebrow" class="eyebrow"></p><h1 id="view-title">Your semester, in focus.</h1></div>
+        <div class="top-actions">
+          <button id="import-primary" class="quiet-button" type="button">Import</button>
+          <button id="add-task" class="quiet-button" type="button">+ Smart task</button>
+          <div class="topbar-ask"><input id="global-ask" placeholder="Ask Nūs anything…" /><button id="global-ask-go" class="primary-button" type="button">✦</button></div>
+        </div>
+      </header>
+      <div id="global-answer" class="global-answer hidden"></div>
+
+      <section id="view-today" class="view active">
+        <section id="nus-hero" class="nus-hero constellation">
+          <div id="hero-field" class="hero-field" role="img" aria-label="Your semester as a constellation around the Nūs Knot">
+            <div id="hero-stars" class="hero-stars" aria-hidden="true"></div>
+            <svg id="hero-edges" class="hero-edges" aria-hidden="true"></svg>
+            <div id="hero-nodes" class="hero-nodes"></div>
+            <div class="hero-knot-wrap">
+              <div id="hero-orb" class="hero-orb"><canvas id="hero-knot"></canvas></div>
+              <div class="hero-knot-label">Nūs</div>
+            </div>
+          </div>
+          <div id="hero-chips" class="hero-chips"></div>
+          <p id="brief-copy" class="hero-brief">Reading your semester…</p>
+          <div class="hero-ask"><input id="ask-input" placeholder="Tell Nūs what changed, what you need, or what to handle…" /><button id="ask-go" class="hero-go" type="button">✦</button></div>
+          <p class="hero-hint">Try: "Push the calc homework to Friday" or "What should I start tonight?"</p>
+          <div id="hero-bubbles" class="hero-bubbles hidden"></div>
+          <div id="nus-proposal" class="nus-proposal hidden"></div>
+          <div id="ask-answer" class="hero-answer hidden"></div>
+        </section>
+        <div class="today-layout">
+          <div class="today-main">
+            <section class="dash-card"><div class="section-head"><div><div class="section-kicker">Three moves</div><h2>Start here</h2></div></div><div id="today-list" class="moves-list"></div></section>
+            <section class="dash-card"><div class="section-head"><div><div class="section-kicker">Your list</div><h2 id="todo-heading">Today's moves</h2></div><button id="todo-open" class="text-button" type="button">Open Smart tasks</button></div><div id="todo-list" class="todo-list"></div></section>
+            <section class="dash-card"><div class="section-head"><div><div class="section-kicker">Connections</div><h2>Wired in</h2></div></div><div id="connections-row" class="connections-row"></div></section>
+            <section class="dash-card"><div class="section-head"><div><div class="section-kicker">What Nūs is doing</div><h2>Recent actions</h2></div><button id="view-history" class="text-button" type="button">View history</button></div><div id="activity-feed" class="activity-feed"></div></section>
+            <section class="dash-card"><div class="section-head"><div><div class="section-kicker">Inbox brief</div><h2>Worth attention</h2></div></div><div id="inbox-brief" class="inbox-brief"></div></section>
+          </div>
+          <aside class="pulse-column">
+            <section id="mini-calendar" class="pulse-block mini-cal"></section>
+            <section id="gpa-pulse" class="pulse-block"></section>
+            <section id="risk-pulse" class="pulse-block"></section>
+            <section id="system-pulse" class="routine-block"></section>
+          </aside>
+        </div>
+      </section>
+
+      <section id="view-calendar" class="view">
+        <div class="calendar-shell">
+          <div class="calendar-main panel-surface">
+            <div class="calendar-toolbar"><button id="cal-prev" class="icon-button">‹</button><div><div class="section-kicker">Month</div><h2 id="calendar-label"></h2></div><button id="cal-next" class="icon-button">›</button><button id="cal-today" class="text-button">Today</button></div>
+            <div id="calendar-grid" class="calendar-grid"></div>
+          </div>
+          <aside class="agenda panel-surface"><div class="section-kicker">Selected day</div><h2 id="agenda-label">Today</h2><div id="agenda-list"></div></aside>
+        </div>
+      </section>
+
+      <section id="view-tasks" class="view">
+        <div class="tasks-layout">
+          <section class="task-capture panel-surface">
+            <div class="section-kicker">From pressure to motion</div><h2>Give Nūs the outcome.</h2>
+            <p>It will create a small, reviewable path. Nothing runs or gets scheduled without your confirmation.</p>
+            <label class="inline-field"><span>What needs to get done?</span><input id="task-title" placeholder="Study for the linear algebra midterm" /></label>
+            <div class="capture-row"><input id="task-due" type="date" /><input id="task-minutes" type="number" min="15" step="15" value="60" aria-label="Estimated minutes" /><button id="task-create" class="primary-button">Break it down</button></div>
+          </section>
+          <section class="task-board">
+            <div class="section-head"><div><div class="section-kicker">Smart list</div><h2>Open commitments</h2></div><span id="task-count" class="count-chip"></span></div>
+            <div id="task-list" class="task-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-brain" class="view brain-view">
+        <div class="brain-top"><div><div class="section-kicker">Your semester map</div><h2>Your courses, work, and sources. Drag to arrange, zoom for detail.</h2></div><div class="brain-controls"><div class="zoom-control"><button id="zoom-out" class="zoom-step" type="button" aria-label="Zoom out">−</button><span id="zoom-label">100%</span><button id="zoom-in" class="zoom-step" type="button" aria-label="Zoom in">+</button></div><button id="brain-fit" class="quiet-button">Center map</button><span>Drag canvas · scroll to zoom · drag nodes to arrange</span></div></div>
+        <div id="brain-stage" class="brain-stage"><div id="brain-world" class="brain-world"><svg id="brain-edges" aria-hidden="true"></svg><div id="brain-nodes"></div></div><div class="brain-atmosphere" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><button class="altitude-toggle" data-altitude="sources" type="button"><i>⌄</i>Knowledge</button></div>
+      </section>
+
+      <section id="view-automations" class="view">
+        <div class="automation-hero"><div><div class="section-kicker">Quiet leverage</div><h2>Nūs notices the loop before it becomes busywork.</h2><p>Suggestions are evidence-backed. You approve every recurring rule.</p></div><button id="new-automation" class="primary-button">+ New rule</button></div>
+        <div id="automation-suggestions" class="suggestion-strip"></div>
+        <div id="automation-list" class="automation-list"></div>
+      </section>
+
+      <section id="view-integrations" class="view">
+        <div class="integration-intro"><div><div class="section-kicker">Bring your world</div><h2>Connect the semester. Import the life around it.</h2><p>Local imports work now. Live services show the exact requirement before you connect.</p></div><span class="privacy-pill">Local by default</span></div>
+        <div id="integration-grid" class="integration-grid"></div>
+      </section>
+
+      <section id="view-email" class="view">
+        <div class="email-layout">
+          <section class="email-connect panel-surface">
+            <div class="section-kicker">Outlook</div>
+            <h2>Draft to your professor. You click send.</h2>
+            <p id="outlook-status">Checking Outlook connection…</p>
+            <div class="email-actions">
+              <button id="outlook-connect" class="primary-button">Connect Outlook</button>
+              <button id="outlook-refresh-style" class="quiet-button" disabled>Refresh writing style</button>
+            </div>
+            <p class="sheet-note" id="outlook-note">Connecting is read-only: Nūs reads your inbox for the daily brief and learns your writing tone. It never sends anything on its own. Drafting works even without connecting, and any draft can open straight into Gmail.</p>
+            <div id="style-summary" class="style-summary"></div>
+            <div class="email-accounts">
+              <div class="section-kicker">Gmail and your addresses</div>
+              <p class="sheet-note">Gmail needs no connection: add the addresses you send from, pick the one to use, and Open in Gmail launches a filled-in compose signed in as that account. Two university addresses stay separate, so nothing ever goes out from the wrong one.</p>
+              <div id="email-account-list" class="email-account-list"></div>
+              <div class="email-account-add">
+                <input id="email-account-input" type="email" placeholder="you@utdallas.edu" autocomplete="off" />
+                <button id="email-account-save" class="quiet-button" type="button">Add address</button>
+              </div>
+            </div>
+          </section>
+          <section class="email-draft panel-surface">
+            <div class="section-kicker">Professor email</div>
+            <h2>What help do you need?</h2>
+            <div class="draft-form">
+              <label class="field"><span>Course</span><select id="draft-course"></select></label>
+              <label class="field"><span>Professor name</span><input id="draft-prof-name" placeholder="Dr. Rivera" /></label>
+              <label class="field"><span>Professor email</span><input id="draft-prof-email" type="email" placeholder="name@utdallas.edu" /></label>
+              <label class="field"><span>Preferred address (from syllabus)</span><input id="draft-pref-name" placeholder="Dr. Rivera / Professor Rivera / etc." /></label>
+              <label class="field"><span>Class &amp; section</span><input id="draft-section" placeholder="COSC 1437.001" /></label>
+              <label class="field"><span>Kind of help</span><select id="draft-help-type">
+                <option value="extension">Extension request</option>
+                <option value="missing-attendance">Missed class</option>
+                <option value="grade-question">Grade question</option>
+                <option value="office-hours">Office hours appointment</option>
+                <option value="concept-help">Concept help</option>
+                <option value="other">Other</option>
+              </select></label>
+              <label class="field"><span>Your name (for the signature)</span><input id="draft-student-name" placeholder="How you sign emails" /></label>
+              <label class="field"><span>Excuse / context (optional)</span><input id="draft-excuse" placeholder="Flu, family event, etc. Be honest." /></label>
+              <label class="field"><span>Extra notes</span><textarea id="draft-notes" rows="3" placeholder="Anything Nūs should weave in"></textarea></label>
+            </div>
+            <div class="sheet-actions"><span id="draft-status"></span><button id="draft-fill" class="quiet-button" type="button">✦ Ask Nūs to fill this</button><button id="draft-generate" class="primary-button">Draft email</button></div>
+            <div id="draft-output" class="draft-output hidden">
+              <div class="draft-output-head"><strong>Review the draft. Edit freely. Nothing sends until you click send.</strong><button id="draft-copy" class="quiet-button">Copy</button></div>
+              <textarea id="draft-body" rows="14"></textarea>
+              <div class="sheet-actions"><label class="draft-from"><span>From</span><select id="draft-from"></select></label><button id="draft-gmail" class="quiet-button" type="button">Open in Gmail</button><button id="draft-send" class="primary-button">Send via Outlook</button></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-semester" class="view"><div id="gpa" class="semester-hero"></div><section class="semester-body"><div class="section-head"><div><div class="section-kicker">Course lanes</div><h2>Pressure across the semester</h2></div><div class="semester-key"><span>Now</span><i></i><span>Finals</span></div></div><div id="radar-grid" class="course-lanes"></div></section></section>
+
+      <section id="view-sources" class="view knowledge-view">
+        <div class="knowledge-layout">
+          <aside class="knowledge-sidebar panel-surface">
+            <div class="kb-head"><div class="section-kicker">Knowledge</div></div>
+            <input id="kb-search" class="kb-search" type="search" placeholder="Search sources and courses…" aria-label="Search knowledge" />
+            <div id="kb-tree" class="kb-tree"></div>
+            <button id="source-import" class="primary-button kb-upload" type="button">Import a source</button>
+          </aside>
+          <div id="knowledge-stage" class="brain-stage knowledge-stage">
+            <div id="memory-list" class="kb-detail"></div>
+            <div class="brain-watermark distant"><img src="assets/nus-statue-mark.png" alt="" /></div>
+            <button class="altitude-toggle" data-altitude="brain" type="button"><i>⌃</i>Semester map</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-companion" class="view">
+        <div class="companion-panel">
+          <section class="dash-card companion-live">
+            <div class="section-head"><div><div class="section-kicker">On-screen agent</div><h2 id="companion-state-title">Companion</h2></div><span id="companion-state-badge" class="status-badge">Checking</span></div>
+            <p id="companion-state-copy" class="companion-copy">The Nūs Knot floats over your screen, listens on request, and answers from your briefing packs. It ships inside Nūs, so there is nothing else to install.</p>
+            <div class="companion-actions">
+              <button id="companion-show" class="primary-button" type="button">Show overlay</button>
+              <button id="companion-hide" class="quiet-button" type="button">Hide overlay</button>
+              <button id="companion-tutorial" class="quiet-button" type="button">Replay Knot tutorial</button>
+              <button id="companion-knot" class="quiet-button" type="button">Hide Knot mark</button>
+              <button id="companion-capture" class="quiet-button" type="button">Start listening</button>
+              <button id="companion-power" class="danger-button" type="button">Turn off Companion</button>
+            </div>
+            <p class="companion-hint">The Companion stays on your desktop after you close this window, and the hotkeys keep working: <b>Ctrl+Shift+Space</b> hide or show · <b>Ctrl+Shift+K</b> hide just the Knot · <b>Ctrl+Shift+X</b> panic (stop and vanish). Bring it back from the tray icon any time. Turning it off removes it completely, releases the hotkeys, and it stays off until you turn it back on here.</p>
+          </section>
+          <section class="dash-card companion-chat">
+            <div class="section-head"><div><div class="section-kicker">Chat</div><h2>Ask Nūs anything, in a thread</h2></div></div>
+            <div id="chat-thread" class="chat-thread"><div class="empty-state">Ask about deadlines, or tell Nūs to add a task, move a date, or draft an email. It talks it through and confirms before it touches anything.</div></div>
+            <div class="chat-composer">
+              <input id="chat-input" type="text" placeholder="Ask anything, or tell Nūs what to handle…" autocomplete="off" />
+              <button id="chat-send" class="primary-button" type="button">Send</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-history" class="view">
+        <div class="history-layout">
+          <aside class="history-sidebar">
+            <input id="history-search" class="history-search" type="search" placeholder="Search every session…" autocomplete="off" />
+            <div id="history-sessions" class="history-sessions"></div>
+          </aside>
+          <div id="history-detail" class="history-detail"><div class="history-empty">Select a session to read its transcript.</div></div>
+        </div>
+      </section>
+
+      <section id="view-settings" class="view">
+        <div class="settings-grid">
+          <section class="settings-nav panel-surface"><div class="settings-statue"><img src="assets/nus-statue-mark.png" alt="" /></div><h2 id="settings-name">Local</h2><p id="settings-email">Not signed in</p><button class="settings-link active" type="button" data-card="auth-card">Account</button><button class="settings-link" type="button" data-card="bridge-card">Companion</button><button class="settings-link" type="button" data-card="sync-card">Cloud sync</button><button class="settings-link" type="button" data-card="storage-card">Data</button></section>
+          <div class="settings-stack">
+            <section class="setting-card" id="auth-card">
+              <div>
+                <div class="section-kicker">Account</div>
+                <h3 id="auth-title">Sign in to Nūs</h3>
+                <p id="auth-copy">Google or email. Local mode stays available if you skip sign-in.</p>
+                <div id="auth-form" class="auth-form">
+                  <label class="field"><span>Email</span><input id="auth-email" type="email" placeholder="you@utdallas.edu" /></label>
+                  <label class="field"><span>Password</span><input id="auth-password" type="password" placeholder="Minimum 8 characters" /></label>
+                  <div class="sheet-actions"><button id="auth-login" class="primary-button">Sign in</button><button id="auth-signup" class="quiet-button">Create account</button></div>
+                  <div class="auth-divider"><span>or</span></div>
+                  <button id="auth-google" class="quiet-button">Continue with Google</button>
+                </div>
+                <div id="auth-signedin" class="auth-signedin hidden">
+                  <p>Signed in as <strong id="auth-user-email"></strong>.</p>
+                  <button id="auth-logout" class="quiet-button">Sign out</button>
+                </div>
+              </div>
+              <span id="auth-badge" class="status-badge">Local</span>
+            </section>
+            <section class="setting-card" id="bridge-card"><div><div class="section-kicker">Companion</div><h3 id="bridge-title">Checking shared context…</h3><p id="bridge-copy">The overlay reads a minimal semester snapshot, never the database file.</p></div><span id="bridge-badge" class="status-badge">Checking</span></section>
+            <section class="setting-card" id="sync-card">
+              <div>
+                <div class="section-kicker">Cloud sync</div>
+                <h3>Visible, opt-in, revocable</h3>
+                <p>Syncs the same bounded snapshot your Companion reads (next moves, courses, open tasks, automations). Not the full database. Off by default. Turn it on to keep your semester state across devices.</p>
+                <div class="sync-row"><label class="switch"><input id="sync-toggle" type="checkbox" /><span class="slider"></span></label><span id="sync-label">Cloud sync is off</span></div>
+                <div class="sheet-actions"><span id="sync-status"></span><button id="sync-delete" class="quiet-button">Delete my cloud data</button></div>
+              </div>
+              <span id="sync-badge" class="status-badge">Off</span>
+            </section>
+            <section class="setting-card" id="ai-card">
+              <div>
+                <div class="section-kicker">AI provider</div>
+                <h3 id="ai-title">Checking for an AI provider…</h3>
+                <p id="ai-copy">Nūs uses your own AI to read syllabi. Claude Code is detected automatically; otherwise paste an Anthropic API key. The key is encrypted on this device and never leaves it except to call Anthropic.</p>
+                <div id="ai-key-form" class="auth-form hidden">
+                  <label class="field"><span>Anthropic API key</span><input id="ai-key" type="password" placeholder="sk-ant-…" autocomplete="off" /></label>
+                  <div class="sheet-actions"><span id="ai-test-result"></span><div><button id="ai-key-save" class="primary-button">Save key</button><button id="ai-test" class="quiet-button">Test</button><button id="ai-key-clear" class="quiet-button hidden">Remove key</button></div></div>
+                </div>
+              </div>
+              <span id="ai-badge" class="status-badge">Checking</span>
+            </section>
+            <section class="setting-card" id="companion-ai-card">
+              <div>
+                <div class="section-kicker">Companion AI key</div>
+                <h3 id="companion-ai-title">The on-screen Knot needs its own key</h3>
+                <p id="companion-ai-copy">The desktop app uses Claude (above). The Companion overlay, which sees your screen and listens, runs on its own provider so live answers stay fast and cheap. Paste a Google Gemini key here (free tier at aistudio.google.com/apikey) and the Knot starts working immediately. It is encrypted on this device. You can also set it from the Knot's own gear icon.</p>
+                <div class="auth-form">
+                  <label class="field"><span>Gemini API key</span><input id="companion-ai-key" type="password" placeholder="AIza…" autocomplete="off" /></label>
+                  <div class="sheet-actions"><span id="companion-ai-result"></span><div><button id="companion-ai-save" class="primary-button" type="button">Save key</button><button id="companion-ai-clear" class="quiet-button hidden" type="button">Remove key</button></div></div>
+                </div>
+              </div>
+              <span id="companion-ai-badge" class="status-badge">Checking</span>
+            </section>
+            <section class="setting-card"><div><div class="section-kicker">Walkthrough</div><h3>Replay the tour</h3><p>Step through Nūs again with the Companion narrating alongside. Nothing you have imported is touched.</p><div class="sheet-actions"><span></span><button id="replay-tour" class="quiet-button" type="button">Replay the walkthrough</button></div></div><span class="status-badge">Anytime</span></section>
+            <section class="setting-card" id="gpa-scale-card">
+              <div style="width:100%">
+                <div class="section-kicker">GPA scale</div>
+                <h3>Your school's grading scale</h3>
+                <p>Every school maps percentages to GPA differently. Verify this table against your syllabus or registrar. Nūs uses it for every projection and never guesses.</p>
+                <div class="sheet-actions" style="justify-content:flex-start;gap:8px;min-height:0;margin-top:10px"><select id="gpa-preset" class="quiet-button"><option value="">Preset…</option><option value="plus-minus">Standard 4.0 with +/−</option><option value="whole-letter">Whole letters only</option></select><button id="gpa-scale-add" class="text-button">+ Add row</button></div>
+                <table class="review-table" style="margin-top:8px;max-width:420px"><thead><tr><th>Letter</th><th>Min %</th><th>GPA points</th><th></th></tr></thead><tbody id="gpa-scale-rows"></tbody></table>
+                <div class="sheet-actions"><span id="gpa-scale-status"></span><button id="gpa-scale-save" class="primary-button">Save scale</button></div>
+              </div>
+            </section>
+            <section class="setting-card" id="storage-card">
+              <div>
+                <div class="section-kicker">Storage</div>
+                <h3 id="storage-title">Measuring…</h3>
+                <p id="storage-copy">Everything Nūs knows lives in one local database you can back up, export, or delete.</p>
+                <div class="projection-track" style="max-width:420px;margin-top:10px"><i id="storage-bar" style="width:0%"></i></div>
+              </div>
+              <span id="storage-badge" class="status-badge">Local</span>
+            </section>
+            <section class="setting-card"><div><div class="section-kicker">Privacy</div><h3>Device-first knowledge</h3><p>Imports stay on this computer. The only external call is syllabus reading through the AI provider you configure above, and only when you import.</p></div><span class="status-badge good">On device</span></section>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="vault-scrim" class="scrim hidden"><section class="composer-sheet review-sheet" role="dialog" aria-modal="true">
+    <div class="sheet-head"><div><div class="section-kicker">Preview before writing</div><h2>Upload to your Jarvis vault</h2></div><button id="vault-cancel" class="icon-button">×</button></div>
+    <p class="sheet-note">Nūs will create one new markdown file. Nothing existing is changed or deleted. This is exactly what gets written:</p>
+    <p class="vault-target"><span id="vault-dir" class="vault-dir"></span><span id="vault-filename" class="vault-filename"></span></p>
+    <pre id="vault-body" class="vault-body"></pre>
+    <div class="sheet-actions"><span id="vault-warn" class="vault-warn"></span><button id="vault-confirm" class="primary-button">Write to vault</button></div>
+  </section></div>
+
+  <div id="task-scrim" class="scrim hidden"><section class="composer-sheet" role="dialog" aria-modal="true"><div class="sheet-head"><div><div class="section-kicker">Smart capture</div><h2>Add a task</h2></div><button id="task-close" class="icon-button">×</button></div><label class="field"><span>Outcome</span><input id="modal-task-title" placeholder="Finish the lab report" /></label><div class="field-grid"><label class="field"><span>Due</span><input id="modal-task-due" type="date" /></label><label class="field"><span>Minutes</span><input id="modal-task-minutes" type="number" value="60" min="15" step="15" /></label></div><p class="sheet-note">Nūs will suggest five small steps. You can change or complete each one.</p><div class="sheet-actions"><span id="task-status"></span><button id="modal-task-save" class="primary-button">Create path</button></div></section></div>
+
+  <div id="automation-scrim" class="scrim hidden"><section class="composer-sheet" role="dialog" aria-modal="true"><div class="sheet-head"><div><div class="section-kicker">Local rule</div><h2>Create an automation</h2></div><button id="automation-close" class="icon-button">×</button></div><label class="field"><span>Task to create</span><input id="automation-title" placeholder="Weekly calculus review" /></label><div class="field-grid"><label class="field"><span>Repeat</span><select id="automation-trigger"><option value="weekly">Every week</option><option value="daily">Every day</option></select></label><label class="field"><span>Minutes</span><input id="automation-minutes" type="number" value="45" min="15" step="15" /></label></div><p class="sheet-note">This alpha supports one safe action: creating a local task. It cannot message, submit, or publish for you.</p><div class="sheet-actions"><span></span><button id="automation-save" class="primary-button">Create rule</button></div></section></div>
+
+  <div id="syllabus-scrim" class="scrim hidden"><section class="composer-sheet review-sheet" role="dialog" aria-modal="true">
+    <div class="sheet-head"><div><div class="section-kicker">Review extraction</div><h2 id="review-heading">Check what Nūs read</h2></div><button id="review-close" class="icon-button">×</button></div>
+    <p class="sheet-note">Nothing is saved until you confirm. Edit anything that looks wrong. Nūs never invents dates or weights, but syllabi are messy. GPA projections use the grading scale in Settings; verify it against this syllabus once.</p>
+    <div class="field-grid"><label class="field"><span>Course name</span><input id="rev-course-name" /></label><label class="field"><span>Code</span><input id="rev-course-code" placeholder="COSC 1437" /></label></div>
+    <div class="field-grid"><label class="field"><span>Credit hours</span><input id="rev-course-hours" type="number" min="0" step="0.5" /></label><label class="field"><span>Term</span><input id="rev-course-term" placeholder="Fall 2026" /></label></div>
+    <div class="review-block"><div class="section-kicker">Grade weights</div><table class="review-table"><thead><tr><th>Category</th><th>Weight %</th><th></th></tr></thead><tbody id="rev-weights"></tbody></table><button id="rev-add-weight" class="text-button">+ Add weight</button></div>
+    <div class="review-block"><div class="section-kicker">Assignments &amp; deadlines</div><table class="review-table"><thead><tr><th>Title</th><th>Due date</th><th>Category</th><th></th></tr></thead><tbody id="rev-assignments"></tbody></table><button id="rev-add-assignment" class="text-button">+ Add assignment</button></div>
+    <div class="sheet-actions"><span id="rev-status"></span><button id="rev-confirm" class="primary-button">Confirm &amp; save</button></div>
+    <datalist id="rev-category-options"></datalist>
+  </section></div>
+
+
+  <div id="onboard-scrim" class="onboard-scrim hidden">
+    <section class="onboard-card"><div class="onboard-brand"><img src="assets/nus-statue-mark.png" alt="" /><span>Nūs</span></div><button id="onboard-skip" class="skip-button">Skip</button><div id="onboard-content"></div><div class="onboard-footer"><div id="onboard-dots" class="onboard-dots"></div><div><button id="onboard-back" class="quiet-button">Back</button><button id="onboard-next" class="primary-button">Continue</button></div></div></section>
+  </div>
+
+  <div id="coach-scrim" class="coach-scrim hidden"></div>
+  <section id="coach-card" class="coach-card hidden" role="dialog" aria-label="Walkthrough">
+    <button id="coach-close" class="coach-close" type="button" aria-label="Close the walkthrough">×</button>
+    <div id="coach-step" class="section-kicker"></div>
+    <h3 id="coach-title"></h3>
+    <p id="coach-body"></p>
+    <div id="coach-actions" class="coach-actions"></div>
+    <div class="coach-footer"><div id="coach-dots" class="onboard-dots"></div><div><button id="coach-back" class="quiet-button" type="button">Back</button><button id="coach-next" class="primary-button" type="button">Next</button></div></div>
+  </section>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="../companion/renderer/knot3d.js?v=atlas-12"></script>
+  <script src="app.js?v=atlas-12"></script>
+</body>
+</html>

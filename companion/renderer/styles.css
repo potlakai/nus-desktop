@@ -1,0 +1,832 @@
+/* Nūs Companion. The animated Nūs Knot anchors a smoked answer sheet in the
+   bottom-left corner; state (idle/listening/thinking/ready) drives its motion. */
+
+:root {
+  --accent: #90A5FF;            /* light variant of --knot-accent, text/dots */
+  --accent-hi: #C4CFFF;
+  --accent-ink: #111425;
+  --live: #D94B43;
+  --marble: #F3F0E8;
+  --stone: #AAA59C;
+  --cobalt: #506CFF;            /* unified with --knot-accent */
+
+  --tx-1: rgba(255,255,255,0.95);
+  --tx-2: rgba(255,255,255,0.90);
+  --tx-mut: rgba(255,255,255,0.40);
+  --ic: rgba(255,255,255,0.85);
+
+  --bd-hair: rgba(255,255,255,0.12);
+  --bd-strong: rgba(255,255,255,0.20);
+  --fill-1: rgba(255,255,255,0.04);
+  --fill-2: rgba(255,255,255,0.06);
+
+  --r-panel: 16px;
+  --r-16: 12px;
+  --r-8: 7px;
+  --r-pill: 999px;
+  --r-keycap: 6px;
+
+  --font: -apple-system, 'SF Pro Text', 'SF Pro Display', system-ui, 'Segoe UI', sans-serif;
+  --mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, monospace;
+  
+  --text-zoom: 1;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;               /* Electron transparent window */
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ============================ Layout ============================ */
+/* Transparent window: no in-page background. You see your real screen behind the tiles.
+   Empty areas are made click-through from the renderer so they don't block your screen. */
+#app {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;             /* everything hugs the bottom-left corner */
+  padding: 0 0 14px 22px;
+  pointer-events: none;                  /* only the actual UI blocks; gaps pass through */
+}
+#stack { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; max-height: 100%; }
+#toolbar, #panel-wrap, #settings-scrim, #onboard-scrim { pointer-events: auto; }
+#toolbar { -webkit-app-region: drag; }   /* the orb row is the window's drag handle */
+.no-drag, button, input, textarea { -webkit-app-region: no-drag; }
+
+/* ============================ The orb ============================ */
+#toolbar { display: inline-flex; align-items: center; gap: 8px; padding: 4px; }
+
+#orb {
+  position: relative;
+  width: 64px; height: 64px;
+  border: none; padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+#orb:active { transform: scale(0.94); }
+#live-dot {
+  position: absolute; top: 3px; right: 3px; z-index: 4;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.25), 0 0 8px rgba(34,197,94,0.6);
+  animation: pulse 2s infinite;
+}
+#live-dot.off { background: rgba(255,255,255,0.28); box-shadow: none; animation: none; }
+
+/* Satellite controls: slide out of the orb on hover. */
+#orb-controls {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 4px 6px;
+  border-radius: var(--r-pill);
+  background: rgba(20,22,28,0.80);
+  border: 1px solid var(--bd-hair);
+  opacity: 0; transform: translateX(-8px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+#toolbar:hover #orb-controls { opacity: 1; transform: none; pointer-events: auto; }
+#orb-controls button {
+  width: 28px; height: 28px;
+  border: none; background: transparent; color: #fff; cursor: pointer;
+  border-radius: var(--r-8);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 140ms ease;
+}
+#orb-controls button:hover { background: rgba(255,255,255,0.10); }
+#stop-btn.active { color: #ff6b6b; }
+.tb-grip {
+  -webkit-app-region: drag;
+  color: var(--tx-mut); font-size: 12px; letter-spacing: -2px;
+  padding: 0 6px 0 2px; cursor: grab; user-select: none;
+}
+
+/* ============================ Tiles ============================ */
+#panel-wrap { position: relative; width: min(440px, 92vw); }
+button:focus { outline: none; }
+
+.glass {
+  background: rgba(20,22,28,0.72); /* re-skinned by the unified layer below */
+  border: 1px solid var(--bd-hair);
+  border-radius: var(--r-panel);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10);
+}
+#panel { display: flex; flex-direction: column; gap: 10px; }
+#panel.collapsed { display: none; }
+
+.tile {
+  border-radius: 18px;
+  padding: 14px 16px;
+  animation: tileIn 240ms cubic-bezier(0.22,1,0.36,1);
+}
+/* The response tile exists only when it has something to say. */
+#tile-response:has(#messages:empty) { display: none; }
+
+/* ============================ Messages ============================ */
+#messages { display: flex; flex-direction: column; overflow-y: auto; max-height: 50vh; }
+.user-bubble {
+  align-self: flex-end;
+  max-width: 75%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 16px 16px 4px 16px;
+  padding: 9px 14px;
+  font-size: 15px; font-weight: 500; line-height: 1.35;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  animation: fadeUp 200ms ease both;
+}
+.ai-text {
+  color: var(--tx-1);
+  font-size: calc(16px * var(--text-zoom)); font-weight: 400; line-height: 1.5; letter-spacing: -0.01em;
+  text-align: left; margin: 14px 0 2px;
+  -webkit-user-select: text; user-select: text;
+}
+.ai-text.small { font-size: calc(14px * var(--text-zoom)); line-height: 1.55; }
+.ai-text .w { display: inline; opacity: 0; animation: fadeUp 180ms ease forwards; }
+.ai-text ul { margin: 8px 0; padding-left: 20px; }
+.ai-text li { margin: 4px 0; }
+.ai-text pre {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: calc(13px * var(--text-zoom)); line-height: 1.5;
+  margin: 12px 0;
+}
+.ai-text code { font-family: var(--mono); font-size: 0.92em; }
+.ai-text p code { background: rgba(255,255,255,0.10); padding: 1px 5px; border-radius: 5px; }
+.ai-caret { display:inline-block; width:7px; height:1.05em; vertical-align:-2px; background: var(--accent); border-radius:1px; animation: blink 1s step-end infinite; margin-left: 2px; }
+.status-line { color: var(--tx-mut); font-size: 13px; margin: 10px 0 2px; }
+#nus-status { display: none; margin: 8px 0 2px; padding: 8px 12px; border-radius: 10px;
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.30);
+  color: rgba(255,255,255,0.75); font-size: 12.5px; line-height: 1.45; -webkit-user-select: text; user-select: text; }
+#nus-status.show { display: block; animation: fadeUp 200ms ease both; }
+
+/* ============================ Action row ============================ */
+#action-row, #action-row-2 {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 2px;
+  white-space: nowrap;
+}
+/* Rehearsal row sits under the live row, dimmed so the live row reads first. */
+#action-row-2 { margin-top: 2px; opacity: 0.72; }
+#action-row-2:hover { opacity: 1; }
+/* A rehearsal in progress must be unmistakable, so it can never be confused
+   with a real call. */
+#spar-btn.sparring { color: #ffd479; background: rgba(255, 212, 121, 0.12); }
+.act {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--tx-2); font-size: 13px; font-weight: 500; font-family: var(--font);
+  padding: 4px 6px; border-radius: 8px;
+  transition: background 140ms ease, color 140ms ease;
+}
+.act .ic { display: inline-flex; color: var(--ic); }
+.act:hover { color: #fff; background: rgba(255,255,255,0.06); }
+.act:active { transform: translateY(0.5px); }
+.act:disabled { opacity: 0.5; cursor: default; }
+.sep { color: rgba(255,255,255,0.35); font-size: 14px; margin: 0 2px; }
+
+/* ============================ Composer ============================ */
+#composer {
+  margin-top: 14px;
+  background: var(--fill-1);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--r-16);
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+#composer.focused { border-color: rgba(80,108,255,0.55); box-shadow: 0 0 0 3px rgba(80,108,255,0.16); }
+/* Grid-stack the placeholder and the textarea: the cell grows to fit whichever
+   is taller, so a wrapping placeholder pushes the Smart row down instead of
+   overlapping it (the old absolute placeholder painted over the buttons). */
+#input-area { display: grid; min-height: 22px; }
+#placeholder {
+  grid-area: 1 / 1; pointer-events: none;
+  color: var(--tx-mut); font-size: 15px; line-height: 22px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px;
+}
+#placeholder.hidden { display: none; }
+.keycap {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 5px; margin: 0 1px;
+  border-radius: var(--r-keycap);
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.16);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.25), 0 1px 0 rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.85); font-size: 12px; font-weight: 600; line-height: 1;
+}
+#input {
+  grid-area: 1 / 1;
+  width: 100%; border: none; outline: none; resize: none;
+  background: transparent; color: var(--tx-1);
+  font-family: var(--font); font-size: 15px; line-height: 22px;
+  max-height: 140px; overflow-y: auto;
+  -webkit-user-select: text; user-select: text;
+}
+#composer-bottom { display: flex; align-items: center; gap: 8px; }
+.spacer { flex: 1; }
+.smart-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: var(--r-pill);
+  border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.05);
+  color: var(--tx-2); font-size: 13px; font-weight: 500; font-family: var(--font);
+  cursor: pointer; transition: all 140ms ease;
+}
+.smart-pill .ic { display: inline-flex; color: var(--ic); }
+.smart-pill:hover { background: rgba(255,255,255,0.09); }
+.smart-pill.on { border-color: rgba(255,255,255,0.5); color: #FFFFFF; background: rgba(255,255,255,0.10); }
+.smart-pill.on .ic { color: #FFFFFF; }
+.more-btn {
+  width: 28px; height: 28px; border-radius: var(--r-8);
+  border: none; background: transparent; color: rgba(255,255,255,0.7);
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  transition: background 140ms ease;
+}
+.more-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+#send-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.40);
+  transition: transform 140ms ease, filter 140ms ease;
+}
+#send-btn:hover { filter: brightness(1.08); transform: scale(1.05); }
+#send-btn:active { transform: scale(0.96); }
+#send-btn.busy { opacity: 0.6; pointer-events: none; }
+
+/* ============================ Settings ============================ */
+#settings-scrim {
+  position: fixed; inset: 0; z-index: 20;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
+}
+#settings-scrim.hidden { display: none; }
+/* The panel is taller than the screen once every section is open, so it caps at
+   the viewport and scrolls its own body. Without this the lower half, Done
+   included, sits off the bottom of the display with no way to reach it. */
+#settings {
+  width: min(440px, 92vw);
+  max-height: min(86vh, 760px);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  -webkit-app-region: no-drag;
+}
+.s-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex: 0 0 auto; }
+.s-title { font-size: 17px; font-weight: 600; color: var(--tx-1); }
+.s-close { border: none; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: var(--r-pill); cursor: pointer; }
+.s-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.s-body::-webkit-scrollbar { width: 8px; }
+.s-body::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(255,255,255,.16); }
+.s-label { color: var(--tx-2); font-size: 13px; font-weight: 600; margin-top: 8px; }
+/* Everything past the provider and its key is folded away: the panel opens on
+   the one decision that matters instead of a wall of fields. */
+.s-note { margin: 2px 0 4px; color: var(--tx-mut); font-size: 11px; line-height: 1.5; }
+.s-note b { color: var(--tx-2); font-weight: 600; }
+.s-more { margin-top: 10px; border: 1px solid rgba(255,255,255,.10); border-radius: var(--r-8); background: rgba(255,255,255,.03); }
+.s-more > summary { padding: 10px 12px; color: var(--tx-2); font-size: 12.5px; font-weight: 600; cursor: pointer; list-style: none; }
+.s-more > summary::-webkit-details-marker { display: none; }
+.s-more > summary::after { content: '+'; float: right; color: var(--tx-mut); font-size: 15px; line-height: 1; }
+.s-more[open] > summary::after { content: '\2212'; }
+.s-more > summary:hover { color: var(--tx-1); }
+.s-more > *:not(summary) { margin-left: 12px; margin-right: 12px; }
+.s-more > *:last-child { margin-bottom: 12px; }
+.s-hint { color: var(--tx-mut); font-weight: 400; font-size: 11px; margin-left: 6px; }
+.s-seg { display: flex; gap: 6px; }
+.s-seg button { flex: 1; padding: 8px; border-radius: var(--r-8); border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); color: var(--tx-2); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 140ms ease; }
+.s-seg button.on { border-color: var(--accent); color: #fff; background: rgba(255,255,255,0.16); }
+.s-field { display: flex; align-items: center; gap: 10px; }
+.s-field span { width: 78px; color: var(--tx-mut); font-size: 12px; }
+.s-field input { flex: 1; padding: 8px 10px; border-radius: var(--r-8); border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.25); color: var(--tx-1); font-size: 13px; font-family: var(--font); outline: none; }
+.s-field input:focus { border-color: var(--accent); }
+.s-textarea { box-sizing: border-box; width: 100%; min-height: 112px; padding: 8px 10px; resize: vertical; border: 1px solid rgba(255,255,255,0.14); border-radius: var(--r-8); background: rgba(0,0,0,0.25); color: var(--tx-1); font: 13px/1.45 var(--font); outline: none; }
+.s-textarea:focus { border-color: var(--accent); }
+.s-resume-actions { display: flex; align-items: center; justify-content: space-between; }
+.s-resume-actions button { border: 0; border-radius: var(--r-pill); padding: 5px 10px; background: rgba(255,255,255,0.08); color: var(--tx-2); font: 12px var(--font); cursor: pointer; }
+.s-resume-actions button:hover { color: #fff; background: rgba(255,255,255,0.14); }
+.s-shortcut { display: flex; align-items: center; gap: 8px; }
+.s-shortcut > span { width: 78px; color: var(--tx-mut); font-size: 12px; }
+.shortcut-record, .shortcut-reset {
+  border-radius: var(--r-8); font-family: var(--font); cursor: pointer;
+  transition: all 140ms ease;
+}
+.shortcut-record {
+  flex: 1; min-height: 34px; padding: 7px 10px;
+  border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.25);
+  color: var(--tx-1); font-size: 12px; font-weight: 600;
+}
+.shortcut-record:hover { border-color: rgba(255,255,255,0.28); }
+.shortcut-record.recording { border-color: var(--accent); background: rgba(255,255,255,0.12); color: #EDEDEF; }
+.shortcut-reset {
+  padding: 7px 10px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04); color: var(--tx-mut); font-size: 12px;
+}
+.shortcut-reset:hover { background: rgba(255,255,255,0.08); color: var(--tx-2); }
+.shortcut-hint { min-height: 15px; margin-left: 88px; color: var(--tx-mut); font-size: 11px; line-height: 1.35; }
+.shortcut-hint.error { color: #ff9d8f; }
+.shortcut-hint.success { color: #78dba0; }
+.s-status { color: var(--tx-mut); font-size: 12px; margin-top: 10px; min-height: 16px; }
+
+/* ============================ Onboarding / tutorial ============================ */
+#onboard-scrim { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(0,0,0,0.45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+#onboard-scrim.hidden { display: none; }
+#onboard { width: min(470px, 93vw); padding: 26px 28px 18px; text-align: center; -webkit-app-region: no-drag; animation: overlayIn 240ms cubic-bezier(0.22,1,0.36,1); }
+.ob-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; }
+.ob-dots span { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.20); transition: all 220ms ease; }
+.ob-dots span.on { background: var(--accent); width: 20px; border-radius: 4px; }
+.ob-icon { display: flex; justify-content: center; margin-bottom: 14px; font-size: 34px; line-height: 1; }
+.ob-title { font-size: 20px; font-weight: 700; color: var(--tx-1); margin-bottom: 10px; letter-spacing: -0.01em; }
+.ob-body { font-size: 14px; line-height: 1.6; color: var(--tx-2); text-align: left; -webkit-user-select: text; user-select: text; }
+.ob-body strong { color: #fff; font-weight: 600; }
+.ob-body .kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 6px; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.16); font-size: 12px; font-weight: 600; color: #fff; }
+.ob-body ul { padding-left: 18px; margin: 8px 0; }
+.ob-body li { margin: 6px 0; }
+.ob-body .hl { color: #FFFFFF; font-weight: 600; }
+.ob-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.ob-buttons:empty { display: none; }
+.ob-buttons button { flex: 1; min-width: 150px; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.40); background: rgba(255,255,255,0.14); color: #EDEDEF; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 140ms ease; }
+.ob-buttons button:hover { background: rgba(255,255,255,0.24); }
+.ob-actions { display: flex; align-items: center; margin-top: 22px; }
+.ob-ghost { border: none; background: transparent; color: var(--tx-mut); font-size: 13px; font-weight: 500; cursor: pointer; padding: 8px 10px; border-radius: 8px; }
+.ob-ghost:hover { color: #fff; background: rgba(255,255,255,0.06); }
+.ob-primary { border: none; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 600; padding: 9px 22px; border-radius: 999px; cursor: pointer; transition: filter 140ms ease; }
+.ob-primary:hover { filter: brightness(1.08); }
+
+/* ============================ Animations ============================ */
+@keyframes overlayIn { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes tileIn { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(34,197,94,0.25), 0 0 8px rgba(34,197,94,0.6); } 50% { box-shadow: 0 0 0 6px rgba(34,197,94,0), 0 0 8px rgba(34,197,94,0.3); } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+@keyframes blink { 0%,50% { opacity: 1; } 50.01%,100% { opacity: 0; } }
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  #panel, .tile, .user-bubble, .ai-text .w { animation: none !important; opacity: 1 !important; transform: none !important; }
+  #live-dot { animation: none !important; }
+}
+
+/* ============================ Marble Signal overrides ============================ */
+.preview-mode body { background: #b9b6af; }
+#toolbar { gap: 8px; }
+#orb {
+  width: 58px;
+  height: 64px;
+  border-radius: 12px;
+  filter: drop-shadow(0 10px 16px rgba(0,0,0,.45));
+  transition: transform 160ms ease, filter 160ms ease;
+}
+#orb:hover { filter: drop-shadow(0 12px 22px rgba(0,0,0,.58)); }
+.nus-link-status { margin: 0 0 14px; padding: 10px 11px; border: 1px solid rgba(255,255,255,.1); border-radius: 9px; color: rgba(245,246,252,.55); background: rgba(255,255,255,.03); font-size: 10px; }
+.nus-link-status.linked { border-color: rgba(82,211,164,.3); color: #92dfbf; background: rgba(48,147,111,.08); }
+/* These rows carry a sentence, not a short field label, so they must not
+   inherit .s-field's fixed 78px label column: that squeezed them to one word
+   per line and made the panel unreadable. */
+.nus-share-field { align-items: start; }
+.nus-share-field span { width: auto; flex: 1 1 auto; min-width: 0; max-width: 315px; }
+.nus-share-field small { display: block; margin-top: 4px; color: rgba(245,246,252,.42); font-size: 9px; line-height: 1.45; }
+
+#live-dot { top: 2px; right: 1px; width: 8px; height: 8px; background: var(--live); box-shadow: 0 0 0 3px rgba(217,75,67,.22), 0 0 8px rgba(217,75,67,.65); }
+#live-dot.off { opacity: 0; background: var(--live); box-shadow: none; }
+
+#capture-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 9px;
+  border: 1px solid rgba(217,75,67,.42); border-radius: 8px;
+  background: rgba(35,17,17,.9); color: #ffd9d5;
+  
+  font-size: 9px; font-weight: 720; letter-spacing: .07em; text-transform: uppercase;
+}
+#capture-chip.off { display: none; }
+.capture-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff655b; box-shadow: 0 0 7px rgba(255,101,91,.72); animation: captureBlink 1.2s ease-in-out infinite; }
+#capture-clock { color: rgba(255,217,213,.52); font-variant-numeric: tabular-nums; }
+
+#orb-controls { border-radius: 10px; background: rgba(16,16,18,.88); }
+#toolbar:has(#capture-chip:not(.off)) #orb-controls { opacity: 1; transform: none; pointer-events: auto; }
+#stop-btn.active { color: #ff766c; background: rgba(217,75,67,.13); }
+
+.glass {
+  background: linear-gradient(145deg, rgba(17,17,19,.92), rgba(10,10,11,.84));
+  border-color: rgba(243,240,232,.14);
+  box-shadow: 0 20px 65px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.tile { border-radius: 13px; }
+#tile-response { border-left: 2px solid var(--cobalt); }
+.user-bubble { border-radius: 10px 10px 3px 10px; }
+#action-row, #action-row-2 { gap: 4px; }
+.sep { display: none; }
+.act { padding: 6px 8px; border: 1px solid transparent; border-radius: 7px; font-size: 12px; }
+.act:hover { border-color: rgba(243,240,232,.1); background: rgba(243,240,232,.06); }
+#composer { border-radius: 11px; background: rgba(243,240,232,.035); }
+#send-btn { border-radius: 8px; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 5px 14px rgba(49,92,255,.22); }
+.s-close, .ob-primary { border-radius: 8px; }
+
+@keyframes captureBlink { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* Knot hidden (Ctrl+Shift+K): the mark disappears, every hotkey still works. */
+#toolbar.knot-hidden #knot-shell { display: none; }
+
+/* ============================ Nūs Knot Bloom ============================ */
+/* The Knot is the only persistent surface. Its command capsule blooms on
+   hover/focus and stays present while Nūs is active or the sheet is open. */
+#toolbar {
+  position: relative;
+  /* #stack clips overflow, and it is only as wide as this toolbar. The bloom is
+     absolutely positioned inside the shell and reaches 88 + 420 + padding, so
+     anything narrower than that slices the capsule's right edge off. Keep this
+     >= the bloom's right edge whenever the bloom's width or offset changes. */
+  min-width: min(520px, calc(100vw - 24px));
+  min-height: 78px;
+  padding: 3px;
+  gap: 0;
+  align-items: flex-end;
+}
+
+#knot-shell {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
+}
+
+#orb {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  bottom: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: visible;
+  background:
+    radial-gradient(circle at 34% 27%, rgba(255,255,255,.10), transparent 36%),
+    radial-gradient(circle at 50% 56%, rgba(49,92,255,.13), transparent 66%),
+    rgba(8,10,20,.86);
+  border: 1px solid rgba(242,239,230,.18);
+  box-shadow:
+    0 16px 38px rgba(0,0,0,.52),
+    inset 0 1px 0 rgba(255,255,255,.09),
+    inset 0 -12px 24px rgba(0,0,0,.26);
+  filter: none;
+  isolation: isolate;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1), border-color 220ms ease, box-shadow 220ms ease;
+}
+#orb:hover,
+#knot-shell:focus-within #orb {
+  transform: translateY(-2px) scale(1.035);
+  border-color: rgba(242,239,230,.34);
+  box-shadow: 0 20px 48px rgba(0,0,0,.58), 0 0 32px rgba(57,87,230,.18), inset 0 1px 0 rgba(255,255,255,.14);
+  filter: none;
+}
+#orb:active { transform: scale(.96); }
+
+.nus-knot {
+  position: absolute;
+  inset: 7px;
+  width: 58px;
+  height: 58px;
+  overflow: visible;
+  filter: drop-shadow(0 4px 7px rgba(0,0,0,.52));
+}
+.knot-thread,
+.knot-orbit {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#orb { --knot-accent: #506CFF; --knot-accent-soft: rgba(68,94,255,.58); }
+#orb.busy { --knot-accent: #5F73FF; --knot-accent-soft: rgba(95,115,255,.72); }
+#orb.listening { --knot-accent: #69E2CF; --knot-accent-soft: rgba(105,226,207,.72); }
+#orb.spar { --knot-accent: #D9A758; --knot-accent-soft: rgba(217,167,88,.65); }
+.knot-thread { stroke-width: 5.1; }
+.knot-shadow { stroke: #0A0D19; stroke-width: 7.4; opacity: .94; }
+.knot-cream {
+  stroke: #F0EDE3;
+  stroke-dasharray: 54 10 32 7;
+  animation: knotFlow 8.8s linear infinite;
+}
+.knot-blue {
+  stroke: var(--knot-accent, #506CFF);
+  stroke-width: 4.3;
+  stroke-dasharray: 38 9 17 7;
+  animation: knotFlowReverse 7.4s linear infinite;
+  filter: drop-shadow(0 0 5px var(--knot-accent-soft, rgba(68,94,255,.58)));
+  transition: stroke .8s ease, filter .8s ease;
+}
+.knot-glint {
+  stroke: rgba(255,255,255,.78);
+  stroke-width: 1.35;
+  stroke-dasharray: 8 12;
+  animation: knotFlow 4.6s linear infinite;
+}
+.knot-orbit { transform-origin: 44px 44px; }
+.orbit-a {
+  stroke: rgba(239,237,230,.12);
+  stroke-width: .9;
+  stroke-dasharray: 2 8;
+  animation: knotSpin 18s linear infinite;
+}
+.orbit-b {
+  stroke: rgba(80,108,255,.20);
+  stroke-width: .8;
+  stroke-dasharray: 1 10;
+  animation: knotSpinReverse 13s linear infinite;
+}
+.knot-core {
+  fill: #F3F0E8;
+  stroke: var(--knot-accent, rgba(80,108,255,.72));
+  transition: stroke .8s ease;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 6px rgba(255,255,255,.46));
+  animation: knotCore 3.2s ease-in-out infinite;
+}
+.knot-halo {
+  transition: border-color .8s ease, opacity .6s ease;
+  position: absolute;
+  z-index: -1;
+  inset: -7px;
+  border: 1px solid rgba(76,101,255,.13);
+  border-radius: 50%;
+  opacity: .56;
+  animation: knotBreathe 4.8s ease-in-out infinite;
+}
+.knot-halo::before,
+.knot-halo::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(242,239,230,.08);
+  border-radius: 50%;
+}
+.knot-halo::after { inset: -6px; border-color: rgba(80,108,255,.08); }
+
+#knot-bloom {
+  position: absolute;
+  z-index: 4;
+  left: 88px;
+  bottom: 1px;
+  width: 420px;
+  /* Never clip at the window edge, whatever the zoom level: 100vw tracks the
+     real window width in CSS pixels, minus the knot offset and a margin. */
+  max-width: calc(100vw - 124px);
+  min-height: 70px;
+  padding: 10px 11px 9px 22px;
+  border-radius: 12px 18px 18px 12px;
+  background: linear-gradient(145deg, rgba(18,20,31,.95), rgba(8,10,18,.91));
+  border: 1px solid rgba(242,239,230,.13);
+  box-shadow: 0 18px 42px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.07);
+  opacity: 0;
+  transform: translateX(-18px) scaleX(.84);
+  transform-origin: left center;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 240ms cubic-bezier(.2,.8,.2,1), border-color 180ms ease, left 240ms ease;
+}
+#knot-shell:hover #knot-bloom,
+#knot-shell:focus-within #knot-bloom,
+#toolbar.panel-open #knot-bloom,
+#toolbar[data-knot-state='listening'] #knot-bloom,
+#toolbar[data-knot-state='thinking'] #knot-bloom {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+/* One size in every state: the capsule never grows or shifts, so it can never
+   outgrow the window. The live chip gets its space from its own row instead. */
+.knot-bloom-head,
+.knot-bloom-foot { display: flex; align-items: center; }
+/* Two rows, always: status + live chip on top, controls beneath. Nothing wraps
+   and nothing grows, so the capsule keeps one height and can never push up into
+   the panel above it or out past the window edge. */
+.knot-bloom-head { min-height: 25px; justify-content: space-between; gap: 10px; flex-wrap: nowrap; }
+.knot-bloom-foot { margin-top: 6px; gap: 7px; flex-wrap: nowrap; }
+.knot-copy { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.knot-copy strong {
+  color: #F3F0E8;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: .055em;
+  white-space: nowrap;
+}
+.knot-copy span {
+  color: rgba(243,240,232,.43);
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.knot-state-row { display: inline-flex; align-items: center; gap: 3px; flex: 1; }
+.knot-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(243,240,232,.52);
+  font: 600 9px/1 var(--font);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+.knot-state i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 7px currentColor; }
+.knot-state:hover { color: #F3F0E8; background: rgba(255,255,255,.055); }
+.knot-state.active { color: #90A5FF; border-color: rgba(84,108,255,.24); background: rgba(49,92,255,.10); }
+.knot-state[data-knot-state='listening'].active { color: #69E2CF; border-color: rgba(105,226,207,.22); background: rgba(105,226,207,.075); }
+.knot-state[data-knot-state='thinking'].active { color: #C3C9FF; border-color: rgba(140,150,255,.32); background: rgba(140,150,255,.10); }
+
+#knot-bloom #orb-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 0 0 0 4px;
+  border: 0;
+  border-left: 1px solid rgba(255,255,255,.09);
+  border-radius: 0;
+  background: transparent;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  backdrop-filter: none;
+}
+#knot-bloom #orb-controls button { width: 25px; height: 25px; }
+#knot-bloom .tb-grip { padding-left: 4px; }
+
+#knot-bloom #capture-chip {
+  height: 23px;
+  padding: 0 7px;
+  border-radius: 7px;
+  font-size: 8px;
+  background: rgba(35,17,17,.72);
+  flex: 0 0 auto;
+}
+/* A compact waveform: the chip has to stay narrow enough that the whole head
+   row fits on one line next to the status copy. */
+#knot-bloom #capture-chip .voice-wave { max-width: 58px; }
+#knot-bloom #capture-chip.off { display: none; }
+
+#orb.listening {
+  border-color: rgba(105,226,207,.38);
+  box-shadow: 0 18px 44px rgba(0,0,0,.56), 0 0 30px rgba(105,226,207,.16), inset 0 1px 0 rgba(255,255,255,.12);
+}
+#orb.listening .knot-blue { animation-duration: 2.8s; }
+#orb.listening .knot-halo { border-color: rgba(105,226,207,.36); animation-duration: 1.5s; }
+#orb.busy .knot-cream { animation-duration: 2.1s; }
+#orb.busy .knot-blue { animation-duration: 1.55s; }
+#orb.busy .nus-knot { animation: knotTilt 2.4s ease-in-out infinite; }
+#orb.busy .knot-halo { opacity: .95; border-color: rgba(80,108,255,.42); animation-duration: 1.2s; }
+
+
+#live-dot { top: 7px; right: 6px; width: 7px; height: 7px; }
+#live-dot.off { opacity: 0; }
+
+@keyframes knotFlow { to { stroke-dashoffset: -103; } }
+@keyframes knotFlowReverse { to { stroke-dashoffset: 92; } }
+@keyframes knotSpin { to { transform: rotate(360deg); } }
+@keyframes knotSpinReverse { to { transform: rotate(-360deg); } }
+@keyframes knotCore { 0%,100% { opacity: .68; transform: scale(.88); transform-origin: 44px 44px; } 50% { opacity: 1; transform: scale(1.16); transform-origin: 44px 44px; } }
+@keyframes knotBreathe { 0%,100% { transform: scale(.94); opacity: .28; } 50% { transform: scale(1.07); opacity: .72; } }
+@keyframes knotTilt { 0%,100% { transform: rotate(-1deg) scale(.98); } 50% { transform: rotate(2deg) scale(1.035); } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Tiered, not a blanket kill: transforms stop, the mark keeps a slow
+     opacity breathe so it never looks dead. */
+  .knot-orbit, .knot-halo, #orb.busy .nus-knot { animation: none !important; }
+  .knot-thread, .knot-core { animation-duration: 18s !important; }
+  #knot-canvas.knot-static { animation: knotStaticBreathe 7s ease-in-out infinite; }
+  #knot-bloom { transition: opacity 120ms ease !important; transform: none !important; }
+}
+@keyframes knotStaticBreathe { 0%,100% { opacity: .82; } 50% { opacity: 1; } }
+
+
+/* ===================== Unified Knot system (final layer) ===================== */
+/* One material for every surface, taken from the bloom capsule. */
+.glass {
+  background: linear-gradient(150deg, rgba(18,20,31,.95), rgba(8,10,18,.92));
+  border: 1px solid rgba(242,239,230,.13);
+  border-radius: 18px;
+  box-shadow: 0 18px 42px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.07);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.tile { border-radius: 18px; }
+#tile-response { border-left: 2px solid var(--cobalt); }
+
+/* The 3D knot canvas fills the orb; the SVG stays as no-canvas fallback. */
+#knot-canvas { position: absolute; inset: -22px; width: calc(100% + 44px); height: calc(100% + 44px); pointer-events: none; }
+#orb.k3d .nus-knot, #orb.k3d .knot-halo { display: none; }
+/* Integrated on any desktop: no plate, no border, no drop shadow. The knot
+   floats; states speak through a soft glow instead of a dark disc. */
+#orb.k3d { background: transparent; border-color: transparent; box-shadow: none; overflow: visible; }
+#orb.k3d:hover, #knot-shell:focus-within #orb.k3d { border-color: transparent; box-shadow: 0 0 26px rgba(80,108,255,.20); }
+#orb.k3d.listening { box-shadow: 0 0 26px rgba(105,226,207,.24); }
+#orb.k3d.busy { box-shadow: 0 0 28px rgba(140,150,255,.26); }
+
+/* Mode clusters: labeled, breathing room, no dot separators. */
+.mode-cluster { margin-bottom: 4px; }
+.cluster-kicker { margin: 2px 0 6px 2px; color: rgba(240,237,227,.38); font: 700 8.5px/1 var(--font, inherit); letter-spacing: .18em; text-transform: uppercase; }
+#action-row, #action-row-2 { display: flex; flex-wrap: wrap; gap: 4px; }
+.act { padding: 8px 11px; border-radius: 9px; }
+.sep { display: none; }
+
+/* Bloom-up: tiles grow out of the Knot. */
+.tile { transform-origin: 14% 100%; }
+@keyframes tileIn { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+/* Stem: a light thread connecting the Knot to the tiles above it. */
+#panel-wrap::after {
+  content: '';
+  position: absolute;
+  left: 34px;
+  bottom: -10px;
+  width: 2px;
+  height: 10px;
+  background: linear-gradient(to top, var(--cobalt), transparent);
+  opacity: .55;
+}
+
+/* The Knot can never be pushed off-screen. */
+#stack { justify-content: flex-end; overflow: hidden; }
+#panel-wrap { min-height: 0; }
+#messages { max-height: min(50vh, calc(100vh - 340px)); }
+
+/* State chips read as an indicator: the truth lit, the rest quiet. */
+.knot-state { opacity: .5; transition: opacity .3s ease, color .3s ease, border-color .3s ease; }
+.knot-state.active { opacity: 1; color: var(--accent); }
+.knot-state:hover { opacity: .85; }
+
+/* Drag region: only the Knot shell moves the window; the invisible toolbar
+   band no longer exists as a click surface. */
+#toolbar { -webkit-app-region: no-drag; }
+#knot-shell { -webkit-app-region: drag; }
+#knot-shell button, #knot-bloom { -webkit-app-region: no-drag; }
+.tb-grip { -webkit-app-region: drag; cursor: grab; }
+
+/* ===== Tutorial in the Knot's own language ===== */
+#onboard-scrim { display: flex; align-items: flex-end; justify-content: flex-start; padding: 0 0 132px 14px; background: rgba(0,0,0,.28); }
+#onboard { width: min(430px, 92vw); text-align: left; padding: 20px 22px 14px; }
+#onboard::after { /* stem down toward the Knot */
+  content: ''; position: absolute; left: 33px; bottom: -26px; width: 2px; height: 26px;
+  background: linear-gradient(to bottom, var(--cobalt), transparent); opacity: .6;
+}
+#onboard { position: relative; }
+.ob-icon { font-size: 0; }
+.ob-knot { width: 40px; height: 40px; }
+.ob-knot path { stroke: var(--accent); stroke-width: 6; stroke-linecap: round; opacity: .9; }
+#ob-icon[data-state='listening'] .ob-knot path { stroke: #69E2CF; }
+#ob-icon[data-state='thinking'] .ob-knot path { stroke: #5F73FF; }
+#ob-icon[data-state='ready'] .ob-knot path { stroke: #AEB4FF; }
+.ob-title { text-align: left; font-size: 17px; }
+.ob-dots { justify-content: flex-start; }
+/* Highlight the element a step teaches. */
+.ob-target { outline: 2px solid var(--cobalt); outline-offset: 4px; border-radius: 14px; box-shadow: 0 0 24px rgba(80,108,255,.35); }
+/* While the tutorial runs, hold the bloom open so steps can point at it. */
+#toolbar.tour-open #knot-bloom { opacity: 1; transform: none; pointer-events: auto; }
+
+/* Desktop link tick in the bloom head */
+#desktop-link { font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #7fd4b4; opacity: .9; }
+#desktop-link.off { color: #6a7086; opacity: .55; }
+
+/* ===== Voice wave: proof the mic is hearing you ===== */
+.voice-wave { display: inline-flex; align-items: center; gap: 1.5px; height: 16px; max-width: 96px; overflow: hidden; }
+.voice-wave i { display: block; width: 2px; height: 100%; border-radius: 1px; background: linear-gradient(to top, var(--knot-accent, #506CFF), #9FE8D8); transform: scaleY(.08); transform-origin: center; opacity: .3; transition: none; }
+#capture-chip.mic-error .voice-wave i { background: var(--live); }
+#capture-chip.mic-error .capture-dot { background: var(--live); animation: none; }
+
+/* ===== Companion theme unification =====
+   Every remaining surface picks up the same tokens as the Knot bloom, so the
+   settings sheet, tutorial, status line and tiles read as one product. */
+#settings, #onboard, .tile, #nus-status {
+  background: linear-gradient(150deg, rgba(18,20,31,.96), rgba(8,10,18,.93));
+  border: 1px solid rgba(242,239,230,.13);
+  color: var(--tx-1);
+}
+#nus-status { border-radius: 12px; padding: 9px 12px; font-size: 11.5px; color: var(--tx-2); }
+#settings { border-radius: 18px; }
+.s-label, .cluster-kicker, .knot-copy strong { letter-spacing: .12em; text-transform: uppercase; }
+.s-label { font-size: 8.5px; color: rgba(240,237,227,.42); font-weight: 700; }
+.s-field { border-radius: 10px; }
+.s-field input[type="text"], .s-field input[type="password"], .s-field select, #settings input, #settings select {
+  border: 1px solid rgba(242,239,230,.14); border-radius: 9px; background: rgba(255,255,255,.05); color: var(--tx-1);
+}
+.s-field input:focus, #settings input:focus, #settings select:focus { outline: none; border-color: rgba(80,108,255,.6); box-shadow: 0 0 0 2px rgba(80,108,255,.2); }
+.act, .smart-pill, .more-btn, .ob-primary, .ob-ghost, .s-close { transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.act:hover, .smart-pill:hover, .more-btn:hover { background: rgba(255,255,255,.07); border-color: rgba(242,239,230,.18); }
+.ob-primary { background: var(--cobalt); color: #fff; border: 0; }
+.ob-primary:hover { background: #6478ff; }
+.user-bubble { background: var(--cobalt); color: #fff; }
+.ai-caret { background: var(--knot-accent, var(--cobalt)); }
