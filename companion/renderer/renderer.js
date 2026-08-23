@@ -882,7 +882,8 @@
     syncPlaceholder();
     const st = await nus.captureState();
     syncCaptureUi(st.active);
-    if (!settings.onboarded) showOnboard();
+    // First-run: the dashboard tour opens this tutorial at its Companion step
+    // (or the student clicks the mark). Popping it on landing stole the welcome.
 
   })();
 })();

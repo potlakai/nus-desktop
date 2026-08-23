@@ -16,7 +16,7 @@ const ai = require('./ai');
 const assistant = require('./assistant');
 const vaultNotes = require('./vault-notes');
 const { initAutoUpdate } = require('./updater');
-const { findProtocolUrl, registerProtocolClient, routeProtocolUrl } = require('./protocol');
+const { findProtocolUrl, registerProtocolClient, routeProtocolUrl, dataDirFromArgv, friendlySignInError } = require('./protocol');
 const { installCrashHandlers } = require('./crash');
 const { createQuitGuard } = require('./quit-guard');
 const { createLicense } = require('./license');
@@ -28,7 +28,7 @@ const RENDERER_PREFERENCE_KEYS = new Set(['gpa_scale', 'brain_viewport', 'brain_
 if (SMOKE && process.env.NUS_SMOKE_DATA_DIR) app.setPath('userData', path.resolve(process.env.NUS_SMOKE_DATA_DIR));
 // An isolated profile for first-run tests and screenshots. Only honoured when
 // set explicitly, so a normal launch never wanders off the real userData.
-else if (process.env.NUS_DATA_DIR) app.setPath('userData', path.resolve(process.env.NUS_DATA_DIR));
+else if (dataDirFromArgv()) app.setPath('userData', path.resolve(dataDirFromArgv()));
 const crashHandlers = installCrashHandlers(app, dialog);
 
 let gcalCache = [];
@@ -94,7 +94,7 @@ async function processProtocolUrl(url) {
   catch (error) { result = { error: error.message || 'The sign-in service could not be reached.' }; }
   if (result.error) {
     crashHandlers.record('oauth-callback-failed', new Error(result.error));
-    dialog.showErrorBox('Nūs sign-in did not finish', `${result.error}\n\nTry Sign in with Google again.`);
+    dialog.showErrorBox('Nūs sign-in did not finish', friendlySignInError(result.error));
     showDesktopWindow();
     return result;
   }

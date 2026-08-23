@@ -1,6 +1,6 @@
 {
   "name": "nus-desktop",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Nūs: the semester organizer that runs on your own AI, on your own machine.",
   "main": "src/main.js",
   "private": true,
