@@ -43,9 +43,20 @@ async function connect() {
   const codeVerifier = randomString(64);
   secrets.setSecret('gcal_pkce_verifier', codeVerifier);
   const authUrl = buildAuthUrl(redirectPort, state, codeVerifier);
-  shell.openExternal(authUrl);
   return new Promise((resolve) => {
+    let timeout = null;
+    let settled = false;
+    let callbackInProgress = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      secrets.deleteSecret('gcal_pkce_verifier');
+      if (server.listening) { try { server.close(); } catch {} }
+      resolve(result);
+    };
     const server = http.createServer(async (req, res) => {
+      if (settled || callbackInProgress) { res.writeHead(204); res.end(); return; }
       const url = new URL(req.url, `http://${REDIRECT_HOST}:${redirectPort}`);
       const code = url.searchParams.get('code');
       const returnedState = url.searchParams.get('state');
@@ -55,22 +66,23 @@ async function connect() {
         ? '<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>Returning to Nus...</h2><p>You can close this tab.</p></body></html>'
         : '<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>Auth failed</h2><p>Missing or mismatched code. Try again from Nus.</p></body></html>');
       if (!ok) {
-        server.close();
-        resolve({ error: 'OAuth state mismatch or no code returned.' });
+        finish({ error: 'OAuth state mismatch or no code returned.' });
         return;
       }
+      callbackInProgress = true;
       try {
         const token = await exchangeCode(code, codeVerifier);
         storeToken(token);
-        server.close();
-        resolve({ connected: true });
+        finish({ connected: true });
       } catch (e) {
-        server.close();
-        resolve({ error: `Token exchange failed: ${e.message}` });
+        finish({ error: `Token exchange failed: ${e.message}` });
       }
     });
-    server.listen(redirectPort, REDIRECT_HOST, () => {
-      setTimeout(() => { try { server.close(); } catch {} resolve({ error: 'Google sign-in did not come back. If Google showed a consent-screen or redirect error, check the OAuth client is type "Desktop app" and the consent screen is published.' }); }, 180000);
+    server.on('error', (error) => finish({ error: `Could not start the Google sign-in callback: ${error.message}` }));
+    server.listen(redirectPort, REDIRECT_HOST, async () => {
+      try { await shell.openExternal(authUrl); }
+      catch (error) { finish({ error: `Could not open Google sign-in: ${error.message}` }); return; }
+      timeout = setTimeout(() => finish({ error: 'Google sign-in did not come back. If Google showed a consent-screen or redirect error, check the OAuth client is type "Desktop app" and the consent screen is published.' }), 180000);
     });
   });
 }

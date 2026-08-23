@@ -1,5 +1,5 @@
 // One-way outbox: copilot -> Nūs desktop brain. Opt-in (reportToNus setting).
-// Appends bounded event records to %APPDATA%\Nus\companion-events.json so the
+// Appends bounded event records to <userData>/companion-events.json so the
 // desktop app can ingest what the overlay saw and answered. Mirror of
 // nus-context.js, pointed the other direction.
 const fs = require('fs');
@@ -8,12 +8,12 @@ const path = require('path');
 const MAX_EVENTS = 40;
 const MAX_TEXT = 4000;
 
-function outboxFile(appDataDir) {
-  return path.join(appDataDir, 'Nus', 'companion-events.json');
+function outboxFile(baseDir) {
+  return path.join(baseDir, 'companion-events.json');
 }
 
-function appendEvent(appDataDir, event) {
-  const file = outboxFile(appDataDir);
+function appendEvent(baseDir, event) {
+  const file = outboxFile(baseDir);
   let events = [];
   try {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));

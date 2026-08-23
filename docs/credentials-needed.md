@@ -1,12 +1,12 @@
-# Credentials needed for Nūs v0.3
+# Credentials needed for Nūs v0.2
 
 > Create these three credentials and paste them into `src/config.js` (or the
 > in-app Settings → Connections screen when shipped). Nothing sends anywhere
 > until you run the app yourself.
 
-## 1. Supabase (account creation + opt-in cloud sync)
+## 1. Supabase (account creation + subscription identity)
 
-**Why:** Google OAuth + email/password login. Local SQLite stays source of truth; Supabase auth = identity only. Cloud sync of the bounded snapshot is opt-in and revocable.
+**Why:** Google OAuth + email/password login. Local SQLite stays the source of truth; Supabase holds identity and subscription status only.
 
 **Steps:**
 1. Go to https://supabase.com → sign in → New Project.
@@ -25,7 +25,7 @@
    };
    ```
 
-**Where data goes:** only auth metadata (email, user id) by default. The bounded semester snapshot syncs to a Supabase row keyed by your user id ONLY if you toggle "Cloud sync" on in Settings. "Delete my cloud data" removes that row. We never sync the full SQLite DB.
+**Where data goes:** only auth metadata (email and user id) plus subscription status. This build does not upload courses, tasks, imports, chats, or Companion content.
 
 ---
 
@@ -96,4 +96,4 @@ If you want to seed the email-writing style from your AiME docs (`notes/drive-im
 - All OAuth tokens live in Electron `safeStorage` (OS keychain on macOS, DPAPI on Windows, libsecret on Linux). Never in SQLite, never in plaintext files, never in the repo.
 - `src/config.js` holds client IDs and (for Google) a client secret. This file is in `.gitignore` by convention. If you ever push this repo, confirm `src/config.js` is ignored.
 - No email is ever sent without your explicit click on a reviewed draft. No background sending.
-- No hidden collection. Cloud sync of the bounded snapshot is a visible toggle, off by default, with a "Delete my cloud data" button.
+- No hidden content collection. Cross-device content sync is not available in this build.

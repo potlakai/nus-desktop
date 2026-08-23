@@ -1,0 +1,22 @@
+{
+  "version": "5",
+  "remote": {
+    "https://esm.sh/@supabase/supabase-js@2.49.4": "d52c4d06946766d328fdd0ac2e007f52bb6d2ef7ce6103ad9f0f57d92b73e978",
+    "https://esm.sh/stripe@17.7.0?target=deno": "ddb041a98d12c5cbe22086fd01d57a240125505520a7fcfded79a7f207975486"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@anthropic-ai/sdk@0.120",
+        "npm:@google/genai@^2.18.0",
+        "npm:@supabase/supabase-js@^2.112.3",
+        "npm:electron-builder@^26.15.3",
+        "npm:electron-updater@^6.8.9",
+        "npm:electron@^43.4.0",
+        "npm:openai@^7.5.0",
+        "npm:pdf-parse@^1.1.1",
+        "npm:sql.js@^1.14.1"
+      ]
+    }
+  }
+}

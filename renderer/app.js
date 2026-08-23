@@ -1,7 +1,20 @@
 const isPreview = !window.nus;
-const api = window.nus || createPreviewApi();
+const previewApi = isPreview ? createPreviewApi() : null;
+if (previewApi) Object.assign(previewApi, {
+  licenseStatus: async () => ({ plan: 'free', isPro: false, source: 'preview', usage: { syllabusImports: { used: 1, limit: 3 }, questions: { used: 2, limit: 10 }, companionMs: { used: 180000, limit: 1200000 } } }),
+  licenseRefresh: async () => previewApi.licenseStatus(),
+  licenseCheckout: async () => ({ error: 'checkout_unavailable' }),
+  licensePortal: async () => ({ error: 'portal_unavailable' }),
+  licenseTrack: async () => true,
+  onLicenseChanged: () => {},
+  onLicenseLimit: () => {},
+  onLicenseActivated: () => {},
+  onLicenseReturn: () => {},
+});
+const api = window.nus || previewApi;
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+const reducedMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const state = {
   data: { courses: [], assignments: [], tasks: [], sources: [], integrations: [], automations: [], repeated_signals: [], preferences: {}, ranked: [], gpa: { courses: [], overall: null } },
@@ -35,7 +48,21 @@ function dayDistance(value) { if (!value) return null; return Math.floor((new Da
 function relativeDue(value) { const days = dayDistance(value); if (days === null) return 'No date'; if (days < 0) return `${Math.abs(days)}d overdue`; if (days === 0) return 'Due today'; if (days === 1) return 'Due tomorrow'; return `Due in ${days} days`; }
 function shortDate(value) { return value ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined,{month:'short',day:'numeric'}) : 'Open'; }
 function prettyDate(value) { return new Date(`${value}T12:00:00`).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}); }
+// A failed save must be visible for as long as it is true, so this is a bar
+// that stays up rather than a toast that fades. Cleared only when a later save
+// actually succeeds.
+function renderSaveState(state) {
+  const banner = $('#save-banner');
+  if (!banner) return;
+  if (!state || state.ok) { banner.hidden = true; return; }
+  $('#save-banner-text').textContent = state.message || 'Nūs is not able to save to disk right now.';
+  banner.hidden = false;
+}
+
 function showToast(message) { const toast = $('#toast'); toast.textContent = message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.classList.remove('show'), 3200); }
+
+api.onSaveState?.(renderSaveState);
+api.saveState?.().then(renderSaveState).catch(() => {});
 
 async function load() {
   state.data = await api.getState();
@@ -108,7 +135,34 @@ $('#nav').addEventListener('click', (event) => {
 $$('[data-altitude]').forEach((button) => button.addEventListener('click', () => setView(button.dataset.altitude)));
 
 // The rail-profile button and any other stray [data-view] outside the nav.
-$$('.workspace [data-view], .rail-profile[data-view]').forEach((button) => button.addEventListener('click', () => setView(button.dataset.view)));
+$$('.workspace [data-view]').forEach((button) => button.addEventListener('click', () => setView(button.dataset.view)));
+// The account chip: the dots open a small menu, anywhere else opens Settings.
+const railMenu = $('#rail-menu');
+function closeRailMenu() { railMenu?.classList.add('hidden'); }
+$('.rail-profile')?.addEventListener('click', (event) => {
+  if (event.target.closest('#rail-more')) { railMenu.classList.toggle('hidden'); return; }
+  closeRailMenu();
+  setView('settings');
+});
+railMenu?.addEventListener('click', async (event) => {
+  const item = event.target.closest('[data-menu]'); if (!item) return;
+  closeRailMenu();
+  if (item.dataset.menu === 'signout') { $('#auth-logout')?.click(); return; }
+  focusSettingsCard(item.dataset.menu === 'plan' ? 'license-card' : 'auth-card');
+});
+document.addEventListener('click', (event) => { if (!event.target.closest('.rail-profile') && !event.target.closest('#rail-menu')) closeRailMenu(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeRailMenu(); });
+function focusSettingsCard(id) {
+  setView('settings');
+  $$('.settings-link').forEach((l) => l.classList.toggle('active', l.dataset.card === id));
+  const card = document.getElementById(id);
+  if (!card) return;
+  requestAnimationFrame(() => {
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    card.classList.add('flash');
+    setTimeout(() => card.classList.remove('flash'), 1200);
+  });
+}
 
 function renderAll() {
   renderToday();
@@ -123,6 +177,7 @@ function renderAll() {
   renderIntegrations();
   renderAutomations();
   renderAuthState();
+  renderLicenseState();
   if (state.view === 'brain') renderBrain();
   if (state.view === 'email') renderEmail();
 }
@@ -133,7 +188,7 @@ function renderToday() {
   const urgent = ranked.filter((item) => item.days_left !== null && item.days_left <= 2);
   const overdue = ranked.filter((item) => item.days_left < 0);
   $('#brief-copy').textContent = next
-    ? `${urgent.length ? `${urgent.length} item${urgent.length === 1 ? '' : 's'} need attention.` : 'Your near-term load is calm.'} ${next.title} is the clearest next move.`
+    ? `${urgent.length ? `${urgent.length} item${urgent.length === 1 ? ' needs' : 's need'} attention.` : 'Your near-term load is calm.'} ${next.title} is the clearest next move.`
     : 'Your semester is quiet. Import one real syllabus or add one commitment and Nūs will shape the day around it.';
   $('#today-list').innerHTML = ranked.length ? ranked.slice(0,3).map((item) => `<div class="move-row"><button class="check-button" data-move="${item.id}" title="Mark done">✓</button><div><strong>${esc(item.title)}</strong><small>${esc(item.course_name || 'General')} · ${esc(relativeDue(item.due_date))}</small></div><span class="due-chip">${esc(shortDate(item.due_date))}</span></div>`).join('') : '<div class="empty-state"><strong>Nothing ranked yet.</strong>Import a syllabus or add a task and your next three moves appear here.</div>';
   renderHero();
@@ -334,7 +389,7 @@ function renderKbDetail() {
     if (source) {
       const course = courses.find((item) => item.id === source.course_id);
       target.innerHTML = `<div class="kb-detail-head"><div class="section-kicker">Imported source</div><h2>${esc(sourceLabel(source))}</h2><p>${esc(source.source_type)} · ${course ? `filed under ${esc(course.name)}` : 'unfiled'}</p></div>
-        <div class="kb-detail-body"><article class="source-row"><div class="source-glyph">${sourceGlyph(source)}</div><div class="source-name"><strong>${esc(source.file_path || sourceLabel(source))}</strong><small>Stored on this device</small></div><div class="source-meta">Imported locally</div><div class="confidence">Source file</div></article>${source.raw_text && !source.course_id ? `<button class="primary-button" data-extract-source="${source.id}" style="margin-top:12px">Read with AI: extract courses &amp; deadlines</button>` : ''}</div>
+        <div class="kb-detail-body"><article class="source-row"><div class="source-glyph">${sourceGlyph(source)}</div><div class="source-name"><strong>${esc(source.file_path || sourceLabel(source))}</strong><small>Stored on this device</small></div><div class="source-meta">Imported locally</div><div class="confidence">Source file</div></article>${source.content_bytes > 0 && !source.course_id ? `<button class="primary-button" data-extract-source="${source.id}" style="margin-top:12px">Read with AI: extract courses &amp; deadlines</button>` : ''}</div>
         <p class="kb-provenance">Nothing here left your machine. Delete the source and everything Nūs read from it goes with it.</p>`;
       return;
     }
@@ -361,7 +416,7 @@ $('#memory-list').addEventListener('click', async (event) => {
   const result = await api.syllabusExtract(Number(button.dataset.extractSource));
   button.disabled = false;
   if (result.error === 'no_ai') { showToast(aiError('no_ai')); setView('settings'); return; }
-  if (result.error) { button.textContent = 'Read with AI: extract courses & deadlines'; showToast(aiError(result.error, result.detail)); return; }
+  if (result.error) { button.textContent = 'Read with AI: extract courses & deadlines'; reportAiError(result); return; }
   openReview(result.data, result.fileName, result.sourceId);
 });
 $('#kb-tree').addEventListener('click', (event) => {
@@ -403,7 +458,7 @@ function renderIntegrations() {
     if (button.dataset.handler==='folder') {
       const report=await api.importFolder();
       if(!report||report.canceled)return;
-      if(report.error)return showToast(aiError(report.error,report.detail));
+      if(report.error)return reportAiError(report);
       await load();
       showToast(`${report.folder}: ${report.events} calendar event${report.events===1?'':'s'} imported, ${report.queued.length} file${report.queued.length===1?'':'s'} queued for review, ${report.skipped.length} skipped.`);
       return;
@@ -411,7 +466,7 @@ function renderIntegrations() {
     if (button.dataset.handler==='gcal') {
       const connected=button.textContent.includes('Disconnect');
       const result=connected?await api.gcalDisconnect():await api.gcalConnect();
-      if (result.error) return showToast(result.error);
+      if (result.error) return reportAiError(result);
       showToast(connected?'Google Calendar disconnected.':'Google Calendar connected.');
       await load();
       return;
@@ -419,14 +474,15 @@ function renderIntegrations() {
     if(button.dataset.handler==='soon'){showToast(`${state.data.integrations.find((item)=>item.provider===button.dataset.integration)?.label||'This'} live sync ships in an update. Local file import works today.`);return;}
     if(button.dataset.actionable!=='true'){showToast(state.data.integrations.find((item)=>item.provider===button.dataset.integration)?.detail||'This connection needs credentials.');return;}
     const result=await api.importSource(button.dataset.integration);
+    if(result?.error)return reportAiError(result);
     if(result&&!result.canceled){await load();showToast(`${result.fileName} imported locally.`);}
   }));
 }
-async function importDefault(){const result=await api.importSource('calendar_file');if(result&&!result.canceled){await load();showToast(`${result.imported} calendar item${result.imported===1?'':'s'} imported.`);}}
+async function importDefault(){const result=await api.importSource('calendar_file');if(result?.error)return showToast(aiError(result.error,result.detail));if(result&&!result.canceled){await load();showToast(`${result.imported} calendar item${result.imported===1?'':'s'} imported.`);}}
 $('#import-primary').addEventListener('click',importSyllabusFlow);
 $('#source-import').addEventListener('click',()=>setView('integrations'));
 
-const AI_ERRORS={no_ai:'Connect an AI provider first. Taking you to Settings.',empty_text:'No readable text in that file. Scanned PDFs need selectable text.',bad_json:'The AI reply was not readable. Try the import again.',read_failed:'Could not read that file.',cli_timeout:'Claude Code took too long. Try again.',cli_failed:'Claude Code returned an error.',cli_spend_limit:'Your Claude subscription hit its spend limit. Add an Anthropic API key in Settings, or raise the limit in Claude Code.',cli_not_logged_in:'Claude Code is installed but signed out. Open a terminal, run "claude", then /login, or paste an Anthropic API key in Settings.',cli_spawn_failed:'Claude Code could not start.',api_failed:'The Anthropic API returned an error.',api_refused:'The AI declined this content.',api_timeout:'The API call timed out. Try again.',api_network:'Network problem reaching Anthropic.',unexpected_reply:'The provider answered, but not as expected.',source_missing:'That import is no longer on file.',course_name_required:'The course needs a name.',target_not_found:'I could not find that item. Try its exact name.',incomplete_command:'I need a bit more: which item, and what date?',unknown_intent:'That request did not survive the trip. Try again.'};
+const AI_ERRORS={no_ai:'Connect an AI provider first. Taking you to Settings.',empty_text:'No readable text in that file. Scanned PDFs need selectable text.',bad_json:'The AI reply was not readable. Try the import again.',read_failed:'Could not read that file.',storage_limit:'Nūs local storage is full. Remove an import before adding another.',limit_syllabus_imports:'Free includes three AI syllabus imports. Upgrade to Pro for more.',limit_questions:'Free includes ten Ask or chat questions each day. Upgrade to Pro or come back tomorrow.',limit_connected_accounts:'Free includes one connected account. Disconnect the current account or upgrade to Pro.',limit_automation_rules:'Free includes one automation rule. Remove it or upgrade to Pro.',limit_companion_minutes:'Free Companion listening is used for today. Upgrade to Pro or come back tomorrow.',limit_companion_history:'Free includes seven days of Companion history. Upgrade to Pro for full history.',cli_timeout:'Claude Code took too long. Try again.',cli_failed:'Claude Code returned an error.',cli_spend_limit:'Your Claude subscription hit its spend limit. Add an Anthropic API key in Settings, or raise the limit in Claude Code.',cli_not_logged_in:'Claude Code is installed but signed out. Open a terminal, run "claude", then /login, or paste an Anthropic API key in Settings.',cli_spawn_failed:'Claude Code could not start.',api_failed:'The Anthropic API returned an error.',api_refused:'The AI declined this content.',api_timeout:'The API call timed out. Try again.',api_network:'Network problem reaching Anthropic.',unexpected_reply:'The provider answered, but not as expected.',source_missing:'That import is no longer on file.',course_name_required:'The course needs a name.',target_not_found:'I could not find that item. Try its exact name.',incomplete_command:'I need a bit more: which item, and what date?',unknown_intent:'That request did not survive the trip. Try again.'};
 function aiError(code,detail){const base=AI_ERRORS[code]||`Import failed (${code}).`;return detail?`${base} (${String(detail).slice(0,120)})`:base;}
 
 async function importSyllabusFlow(){
@@ -434,7 +490,7 @@ async function importSyllabusFlow(){
   const result=await api.syllabusImport();
   if(!result||result.canceled)return;
   if(result.error==='no_ai'||result.error==='cli_not_logged_in'){state.pendingSourceId=result.sourceId||null;showToast(aiError(result.error));setView('settings');return;}
-  if(result.error){showToast(aiError(result.error,result.detail));return;}
+  if(result.error){reportAiError(result);return;}
   openReview(result.data,result.fileName,result.sourceId);
 }
 
@@ -565,7 +621,7 @@ function renderAutomations() {
 const automationScrim=$('#automation-scrim');
 $('#new-automation').addEventListener('click',()=>automationScrim.classList.remove('hidden'));
 $('#automation-close').addEventListener('click',()=>automationScrim.classList.add('hidden'));
-$('#automation-save').addEventListener('click',async()=>{const title=$('#automation-title').value.trim();if(!title)return showToast('Name the recurring task.');const trigger=$('#automation-trigger').value;const next=new Date();next.setDate(next.getDate()+(trigger==='daily'?1:7));await api.addAutomation({name:title,trigger_type:trigger,trigger:{timezone:Intl.DateTimeFormat().resolvedOptions().timeZone},action_type:'create_task',action:{title,estimated_minutes:Number($('#automation-minutes').value)||45},next_run_at:next.toISOString()});automationScrim.classList.add('hidden');await load();showToast('Local automation approved.');});
+$('#automation-save').addEventListener('click',async()=>{const title=$('#automation-title').value.trim();if(!title)return showToast('Name the recurring task.');const trigger=$('#automation-trigger').value;const next=new Date();next.setDate(next.getDate()+(trigger==='daily'?1:7));const result=await api.addAutomation({name:title,trigger_type:trigger,trigger:{timezone:Intl.DateTimeFormat().resolvedOptions().timeZone},action_type:'create_task',action:{title,estimated_minutes:Number($('#automation-minutes').value)||45},next_run_at:next.toISOString()});if(result?.error)return reportAiError(result);automationScrim.classList.add('hidden');await load();showToast('Local automation approved.');});
 
 function courseStatus(course){
   const pending=state.data.assignments.filter((item)=>item.course_id===course.id&&item.status==='pending');
@@ -840,7 +896,7 @@ $$('.settings-link').forEach((link)=>link.addEventListener('click',()=>{
 function formatBytes(bytes){if(bytes<1024)return`${bytes} B`;if(bytes<1048576)return`${(bytes/1024).toFixed(1)} KB`;if(bytes<1073741824)return`${(bytes/1048576).toFixed(1)} MB`;return`${(bytes/1073741824).toFixed(2)} GB`;}
 async function renderStorage(){
   const status=await api.storageStatus().catch(()=>null); if(!status)return;
-  const used=status.dbBytes;
+  const used=status.usedBytes;
   const pct=Math.min(100,(used/status.capBytes)*100);
   // Small mirror in the rail, so the number is visible without opening Settings.
   const railValue=$('#rail-storage-value'), railBar=$('#rail-storage-bar');
@@ -865,24 +921,27 @@ async function renderAuthState() {
   if (signedIn) {
     $('#auth-user-email').textContent = email;
     $('#auth-title').textContent = 'Signed in';
-    $('#auth-copy').textContent = 'Local SQLite stays the source of truth. Supabase holds your identity and (only if you turn on cloud sync) your bounded snapshot.';
+    $('#auth-copy').textContent = 'Your semester stays on this device. Supabase holds only your identity and subscription status.';
     $('#auth-badge').textContent = 'Signed in';
     $('#auth-badge').classList.add('good');
     $('#rail-name').textContent = email.split('@')[0];
     $('#rail-avatar').textContent = email.slice(0, 1).toUpperCase();
-    $('#rail-mode').textContent = 'Signed in';
+    $('#rail-mode').firstChild.textContent = 'Signed in';
+    $('#rail-signout')?.classList.remove('hidden');
     $('#settings-name').textContent = email.split('@')[0];
     $('#settings-email').textContent = email;
   } else {
     $('#auth-title').textContent = authConfig.supabase ? 'Sign in to Nūs' : 'Accounts are coming soon';
     $('#auth-copy').textContent = authConfig.supabase
       ? 'Google or email. Local mode stays available if you skip sign-in.'
-      : 'Nūs runs fully on this device today. Optional accounts and cross-device sync ship in an update. Nothing you add now is lost.';
+      : 'Nūs runs fully on this device today. Optional accounts ship in an update. Nothing you add now is lost.';
     $('#auth-badge').textContent = 'Local';
     $('#auth-badge').classList.remove('good');
     $('#rail-name').textContent = 'You';
     $('#rail-avatar').textContent = 'N';
-    $('#rail-mode').textContent = 'Local profile';
+    $('#rail-mode').firstChild.textContent = 'Local profile';
+    $('#rail-plan')?.classList.add('hidden');
+    $('#rail-signout')?.classList.add('hidden');
     $('#settings-name').textContent = 'Local';
     $('#settings-email').textContent = 'Not signed in';
     if (!authConfig.supabase) {
@@ -891,39 +950,192 @@ async function renderAuthState() {
   }
 }
 
-$('#auth-login').addEventListener('click', async () => {
-  const email = $('#auth-email').value.trim();
-  const password = $('#auth-password').value;
-  if (!email || !password) return showToast('Enter email and password.');
+const CAP_LABELS = {
+  syllabusImports: ['AI syllabus imports', (n) => String(n), 'lifetime'],
+  questions: ['Questions today', (n) => String(n), 'resets at midnight'],
+  companionMs: ['Companion minutes today', (n) => String(Math.floor(n / 60000)), 'resets at midnight'],
+};
+let licenseState = null;
+function usageMeter(key, row) {
+  const [label, fmt, note] = CAP_LABELS[key];
+  const used = Number(row?.used) || 0;
+  const limit = row?.limit;
+  if (!limit) return `<div class="usage-meter unlimited"><span>${label}</span><i style="--p:100%"></i><b>${fmt(used)} · unlimited</b></div>`;
+  const pct = Math.min(100, Math.round((used / limit) * 100));
+  return `<div class="usage-meter${pct >= 100 ? ' full' : pct >= 70 ? ' warm' : ''}" title="${note}"><span>${label}</span><i style="--p:${pct}%"></i><b>${fmt(used)}/${fmt(limit)}</b></div>`;
+}
+async function renderLicenseState(nextState) {
+  if (!api.licenseStatus) return;
+  const plan = nextState || await api.licenseStatus().catch(() => null);
+  if (!plan) return;
+  licenseState = plan;
+  const pro = Boolean(plan.isPro);
+  const usage = plan.usage || {};
+  $('#license-title').textContent = pro ? 'Nūs Pro' : 'Nūs Free';
+  $('#license-badge').textContent = pro ? 'Pro' : 'Free';
+  $('#license-badge').classList.toggle('good', pro);
+  $('#license-upgrade').classList.toggle('hidden', pro);
+  $('#license-portal').classList.toggle('hidden', !pro);
+  $('#rail-plan')?.classList.toggle('hidden', !pro);
+  if (pro) {
+    const ends = plan.currentPeriodEnd ? new Date(plan.currentPeriodEnd).toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) : null;
+    $('#license-copy').textContent = plan.cancelAtPeriodEnd && ends
+      ? `Pro stays active through ${ends}, then this account returns to Free.`
+      : `Imports, questions, connections, automations, and the Companion are uncapped.${ends ? ` Renews ${ends}.` : ''}`;
+    $('#license-usage').innerHTML = `<div class="usage-meter unlimited"><span>${plan.source === 'offline_cache' ? 'Verified recently. Offline grace active.' : 'Entitlement verified with your account.'}</span></div>`;
+    return;
+  }
+  $('#license-copy').textContent = 'Free is a full local semester with honest caps. Pro lifts them.';
+  $('#license-usage').innerHTML = ['syllabusImports', 'questions', 'companionMs'].map((key) => usageMeter(key, usage[key])).join('');
+}
+
+// ---- Upgrade sheet: every refused cap lands here, never in a toast. ----
+const upgradeScrim = $('#upgrade-scrim');
+const LIMIT_COPY = {
+  limit_syllabus_imports: ['Syllabus imports', 'Free includes three AI syllabus imports for the life of this install. You have used all three.'],
+  limit_questions: ['Questions today', 'Free includes ten Ask or chat questions a day. Today\'s ten are used. They reset at midnight.'],
+  limit_connected_accounts: ['Connected accounts', 'Free includes one connected account. Disconnect the current one, or go Pro to run Google Calendar and Outlook together.'],
+  limit_automation_rules: ['Automation rules', 'Free includes one automation rule. Remove it, or go Pro for as many as you want.'],
+  limit_companion_minutes: ['Companion minutes', 'Free Companion listening is twenty minutes a day, and today\'s are used. They reset at midnight.'],
+  limit_companion_history: ['Companion history', 'Free keeps seven days of Companion history. Pro keeps all of it.'],
+};
+let upgradeReason = null;
+function isLimitError(result) { return Boolean(result && (result.upgrade === true || String(result.error || '').startsWith('limit_'))); }
+function showUpgradeSheet(result) {
+  const code = String(result?.error || 'limit');
+  const [kicker, reason] = LIMIT_COPY[code] || ['Free limit reached', aiError(code)];
+  upgradeReason = code.replace(/^limit_/, '');
+  $('#upgrade-kicker').textContent = `Free limit: ${kicker}`;
+  $('#upgrade-reason').textContent = reason;
+  const signedIn = Boolean($('#auth-signedin') && !$('#auth-signedin').classList.contains('hidden'));
+  $('#upgrade-go').textContent = signedIn ? 'Upgrade to Pro' : 'Sign in to upgrade';
+  $('#upgrade-status').textContent = signedIn ? '' : 'Pro is tied to your Nūs account so it follows you to any PC.';
+  upgradeScrim.classList.remove('hidden');
+  requestAnimationFrame(() => upgradeScrim.classList.add('open'));
+  $('#upgrade-go').focus();
+}
+function closeUpgradeSheet() { upgradeScrim.classList.remove('open'); upgradeScrim.classList.add('hidden'); }
+function handleLimit(result) { if (!isLimitError(result)) return false; showUpgradeSheet(result); return true; }
+// One door for every provider or cap error: caps open the sheet, the rest toast.
+function reportAiError(result) { if (handleLimit(result)) return; showToast(aiError(result?.error, result?.detail)); }
+$('#upgrade-close').addEventListener('click', closeUpgradeSheet);
+$('#upgrade-later').addEventListener('click', closeUpgradeSheet);
+upgradeScrim.addEventListener('click', (event) => { if (event.target === upgradeScrim) closeUpgradeSheet(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !upgradeScrim.classList.contains('hidden')) closeUpgradeSheet(); });
+
+const CHECKOUT_ERRORS = {
+  sign_in_required: 'Sign in first. Pro is attached to your account.',
+  already_subscribed: 'This account already has Pro. Refreshing your plan.',
+  billing_not_configured: 'Checkout is not switched on yet on the server. Try again soon.',
+  network: 'No connection. Try again when you are back online.',
+  not_authenticated: 'Your session expired. Sign in again and retry.',
+  checkout_unavailable: 'Stripe could not open a checkout right now. Try again in a minute.',
+};
+async function startCheckout(reason, statusEl) {
+  const setStatus = (text) => { if (statusEl) statusEl.textContent = text; };
+  setStatus('Opening Stripe Checkout…');
+  const result = await api.licenseCheckout({ reason: reason || 'settings' });
+  if (result?.error === 'sign_in_required') { setStatus(''); closeUpgradeSheet(); focusSettingsCard('auth-card'); showToast(CHECKOUT_ERRORS.sign_in_required); return false; }
+  if (result?.error === 'already_subscribed') { setStatus(''); closeUpgradeSheet(); renderLicenseState(await api.licenseRefresh()); showToast(CHECKOUT_ERRORS.already_subscribed); return false; }
+  if (result?.error) { const text = CHECKOUT_ERRORS[result.error] || `Checkout failed (${result.error}).`; setStatus(text); showToast(text); return false; }
+  setStatus('Stripe Checkout is open in your browser. Pro turns on here the moment it completes.');
+  showToast('Stripe Checkout opened in your browser.');
+  return true;
+}
+$('#upgrade-go').addEventListener('click', async () => {
+  const button = $('#upgrade-go'); button.disabled = true;
+  try { await startCheckout(upgradeReason, $('#upgrade-status')); } finally { button.disabled = false; }
+});
+$('#license-upgrade').addEventListener('click', async () => {
+  const button = $('#license-upgrade'); button.disabled = true;
+  try { await startCheckout('settings', null); } finally { button.disabled = false; }
+});
+$('#license-portal').addEventListener('click', async () => {
+  const button = $('#license-portal'); button.disabled = true; button.textContent = 'Opening…';
+  try {
+    const result = await api.licensePortal();
+    if (result?.error === 'no_subscription') showToast('No Stripe subscription is attached to this account yet.');
+    else if (result?.error) showToast(result.error === 'network' ? CHECKOUT_ERRORS.network : 'The billing portal could not open. Try again in a minute.');
+    else showToast('Stripe billing portal opened in your browser.');
+  } finally { button.disabled = false; button.textContent = 'Manage subscription'; }
+});
+$('#license-refresh').addEventListener('click', async () => {
+  const button = $('#license-refresh'); button.disabled = true; button.textContent = 'Checking…';
+  try { renderLicenseState(await api.licenseRefresh()); showToast(licenseState?.isPro ? 'Pro is active.' : 'Plan checked. Still on Free.'); }
+  finally { button.disabled = false; button.textContent = 'Refresh plan'; }
+});
+$('#auth-plan-link')?.addEventListener('click', () => focusSettingsCard('license-card'));
+api.onLicenseLimit?.((result) => handleLimit(result));
+api.onLicenseActivated?.(async (plan) => {
+  closeUpgradeSheet();
+  await renderLicenseState(plan);
+  showToast(`Pro is active${plan?.email ? ` on ${plan.email}` : ''}. Caps are off.`);
+  pulseKnot();
+});
+api.onLicenseReturn?.(async (info) => {
+  if (info?.isPro) { closeUpgradeSheet(); await renderLicenseState(await api.licenseStatus()); showToast('Pro is active. Caps are off.'); pulseKnot(); }
+  else showToast('Welcome back. Checking your plan with Stripe…');
+});
+
+
+// Shared by the Settings card and the first-launch step. Each returns
+// { ok, message } and leaves the UI refresh to the caller.
+async function authEmailLogin(email, password) {
+  if (!email || !password) return { ok: false, message: 'Enter email and password.' };
   const result = await api.loginEmail(email, password);
-  if (result.error) return showToast(result.error);
-  showToast('Signed in.');
-  renderAuthState();
+  if (result.error) return { ok: false, message: result.error };
+  await renderAuthState();
+  await renderLicenseState(await api.licenseRefresh());
   renderSyncState();
+  return { ok: true, message: 'Signed in.' };
+}
+async function authEmailSignup(email, password) {
+  if (!email || !password) return { ok: false, message: 'Enter email and password.' };
+  if (password.length < 8) return { ok: false, message: 'Password must be at least 8 characters.' };
+  const result = await api.signupEmail(email, password);
+  if (result.error) return { ok: false, message: result.error };
+  await renderAuthState();
+  await renderLicenseState(await api.licenseRefresh());
+  return { ok: true, pending: !result.session, message: result.session ? 'Account created and signed in.' : 'Check your email for the confirmation link, then sign in here.' };
+}
+async function authGoogle() {
+  const result = await api.loginGoogle();
+  if (result.error) return { ok: false, message: result.error };
+  return { ok: true, message: 'Continuing in your browser. Come back to Nūs after approving.' };
+}
+$('#auth-login').addEventListener('click', async () => {
+  const result = await authEmailLogin($('#auth-email').value.trim(), $('#auth-password').value);
+  showToast(result.message);
 });
 $('#auth-signup').addEventListener('click', async () => {
-  const email = $('#auth-email').value.trim();
-  const password = $('#auth-password').value;
-  if (!email || !password) return showToast('Enter email and password.');
-  if (password.length < 8) return showToast('Password must be at least 8 characters.');
-  const result = await api.signupEmail(email, password);
-  if (result.error) return showToast(result.error);
-  showToast(result.session ? 'Account created and signed in.' : 'Check your email to confirm the account.');
-  renderAuthState();
+  const result = await authEmailSignup($('#auth-email').value.trim(), $('#auth-password').value);
+  showToast(result.message);
 });
 $('#auth-google').addEventListener('click', async () => {
-  const result = await api.loginGoogle();
-  if (result.error) return showToast(result.error);
-  showToast('Continuing in your browser. Return to Nūs after approving.');
+  const result = await authGoogle();
+  showToast(result.message);
+});
+api.onAuthChanged?.(async () => {
+  showToast('Signed in with Google.');
+  await renderAuthState();
+  await renderLicenseState(await api.licenseRefresh());
+  await renderSyncState();
+  if (onboardStep === 'auth' && !$('#onboard-scrim').classList.contains('hidden')) advanceFromAuthStep();
 });
 $('#auth-logout').addEventListener('click', async () => {
-  await api.logout();
-  showToast('Signed out. Cloud data removed.');
+  const result=await api.logout();
+  if(result?.error)return showToast(result.error);
+  showToast('Signed out.');
   renderAuthState();
+  renderLicenseState(await api.licenseRefresh());
   renderSyncState();
 });
 
 async function renderSyncState() {
+  // Cloud content sync is not shipped. The card stays in the DOM as a visible
+  // seam for whoever builds it later; hidden means there is nothing to render.
+  const card = $('#sync-card');
+  if (!card || card.hidden) return;
   const status = await api.syncStatus();
   const toggle = $('#sync-toggle');
   const label = $('#sync-label');
@@ -996,9 +1208,10 @@ $('#outlook-connect').addEventListener('click', async () => {
   if (!disconnecting) $('#outlook-status').textContent = 'Waiting for the sign-in window…';
   const result = disconnecting ? await api.outlookDisconnect() : await api.outlookConnect(false);
   if (result.error) {
-    $('#outlook-status').textContent = result.error;
+    $('#outlook-status').textContent = aiError(result.error, result.detail);
     if (result.needsAdminConsent) $('#outlook-note').textContent = 'Many universities block third-party mail access until IT approves the app. You can request approval from that screen, or connect a personal Microsoft account. Either way, the drafter below works right now and the Copy button puts the email on your clipboard.';
-    return showToast(result.needsAdminConsent ? 'Your school needs to approve mail access.' : result.error);
+    if (handleLimit(result)) return;
+    return showToast(result.needsAdminConsent ? 'Your school needs to approve mail access.' : aiError(result.error, result.detail));
   }
   showToast(result.connected ? 'Outlook connected (read-only).' : 'Outlook disconnected.');
   renderEmail();
@@ -1132,6 +1345,7 @@ async function submitGlobalAsk(){
   state.busy=true;renderHero();
   try{
     const result=await api.assistantParse(text);
+    if(handleLimit(result)){globalAnswer.classList.add('hidden');return;}
     if(result.error||!result.proposal||!result.proposal.needs_confirm){await answerWithAi(result?.proposal?.command?.question||text,globalAnswer,Boolean(result.error));return;}
     state.proposal=result.proposal;setView('today');renderProposal();
   }finally{state.busy=false;renderHero();}
@@ -1141,13 +1355,16 @@ $('#global-ask').addEventListener('keydown',(event)=>{if(event.key==='Enter')sub
 document.addEventListener('click',(event)=>{if(!globalAnswer.classList.contains('hidden')&&!event.target.closest('#global-answer,.topbar-ask'))globalAnswer.classList.add('hidden');});
 
 // Email: let Nūs fill the form from what it already knows.
-$('#draft-fill')?.addEventListener('click',()=>{
+$('#draft-fill')?.addEventListener('click',async()=>{
   const courseId=Number($('#draft-course').value)||state.data.courses[0]?.id;
   const course=state.data.courses.find((c)=>c.id===courseId);
   if(!course){showToast('Add a course first, then Nūs can fill this.');return;}
   if(course.code&&!$('#draft-section').value)$('#draft-section').value=course.code;
   const syllabus=state.data.sources.find((src)=>src.source_type==='syllabus'&&src.course_id===courseId);
-  const text=syllabus?.raw_text||'';
+  // Imported text lives in a file now, not in the sources row. Without this
+  // fetch the regexes below always ran on an empty string and the drafter
+  // claimed the syllabus had nothing in it, even with one imported.
+  const text=syllabus ? (await api.sourceText(syllabus.id)) || '' : '';
   if(!$('#draft-prof-name').value){const m=text.match(/(?:professor|instructor|prof\.?|dr\.?)[:\s]+([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,2})/i);if(m)$('#draft-prof-name').value=m[1].trim();}
   if(!$('#draft-prof-email').value){const m=text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(?:edu|org|com)/);if(m)$('#draft-prof-email').value=m[0];}
   if(!$('#draft-pref-name').value&&$('#draft-prof-name').value)$('#draft-pref-name').value='Professor '+$('#draft-prof-name').value.split(' ').slice(-1)[0];
@@ -1192,7 +1409,10 @@ async function answerWithAi(query,target,skipAi){
   if(guideAnswer(query,target))return;
   if(skipAi){answerLocally(query,target);return;}
   target.textContent='Nūs is thinking…';target.classList.remove('hidden');
+  setKnotSpeaking(true);
   const result=await api.chatSend([{role:'user',text:query}],{qaOnly:true}).catch(()=>null);
+  setTimeout(()=>setKnotSpeaking(false),1400);
+  if(handleLimit(result)){target.classList.add('hidden');return;}
   if(!result||result.error||!result.text){answerLocally(query,target);return;}
   target.textContent=result.text;
 }
@@ -1222,6 +1442,33 @@ function answerLocally(query,target){
 // Star field is generated once; nodes and edges re-render from live data.
 let heroKnot3d=null;
 let heroStarsSeeded=false;
+function pulseKnot(){const orb=$('#hero-orb');if(!orb)return;orb.classList.remove('pulse');void orb.offsetWidth;orb.classList.add('pulse');setTimeout(()=>orb.classList.remove('pulse'),1400);}
+let knotSpeaking=false;
+function setKnotSpeaking(on){
+  knotSpeaking=Boolean(on);
+  const orb=$('#hero-orb');if(!orb)return;
+  orb.classList.toggle('speaking',knotSpeaking);
+  if(heroKnot3d)heroKnot3d.setState(knotSpeaking?'ready':orb.dataset.knot||'idle');
+}
+// The Knot leans toward the cursor and brightens as it gets close.
+(function heroPointer(){
+  const hero=$('#nus-hero');if(!hero||reducedMotion)return;
+  const wrap=hero.querySelector('.hero-knot-wrap');const orb=$('#hero-orb');
+  let raf=null,pending=null;
+  const apply=()=>{
+    raf=null;const e=pending;if(!e||!wrap)return;
+    const r=orb.getBoundingClientRect();
+    const cx=r.left+r.width/2,cy=r.top+r.height/2;
+    const dx=(e.clientX-cx)/Math.max(1,r.width),dy=(e.clientY-cy)/Math.max(1,r.height);
+    const dist=Math.hypot(dx,dy);
+    const lean=Math.max(-1,Math.min(1,dx))*9,leanY=Math.max(-1,Math.min(1,dy))*7;
+    wrap.style.setProperty('--kx',`${lean.toFixed(1)}px`);
+    wrap.style.setProperty('--ky',`${leanY.toFixed(1)}px`);
+    orb.style.setProperty('--kglow',String(Math.max(.55,Math.min(1,1.05-dist*.35)).toFixed(2)));
+  };
+  hero.addEventListener('mousemove',(e)=>{pending=e;if(!raf)raf=requestAnimationFrame(apply);});
+  hero.addEventListener('mouseleave',()=>{pending=null;if(wrap){wrap.style.setProperty('--kx','0px');wrap.style.setProperty('--ky','0px');}orb.style.removeProperty('--kglow');});
+})();
 function seedHeroStars(){
   if(heroStarsSeeded)return;
   heroStarsSeeded=true;
@@ -1324,8 +1571,9 @@ function renderHero(){
   const chips=[['Idle',knotState==='idle'],['Listening',knotState==='listening'],['Thinking',knotState==='thinking'],['Ready',knotState==='ready']];
   $('#hero-chips').innerHTML=chips.map(([label,on])=>`<span class="hero-chip${on?` on state-${knotState}`:''}">${label}</span>`).join('');
   const orb=$('#hero-orb'); orb.dataset.knot=knotState; orb.classList.toggle('working',Boolean(state.busy));
+  $('#nus-hero')?.classList.toggle('busy',Boolean(state.busy));
   renderConstellation();
-  if(heroKnot3d)heroKnot3d.setState(knotState);
+  if(heroKnot3d)heroKnot3d.setState(knotSpeaking?'ready':knotState);
   const bubbles=[];
   const syllabusCourses=state.data.sources.filter((s)=>s.source_type==='syllabus'&&s.course_id).map((s)=>state.data.courses.find((c)=>c.id===s.course_id)?.name).filter(Boolean);
   if(syllabusCourses.length)bubbles.push(`${syllabusCourses[0]} syllabus`);
@@ -1340,10 +1588,14 @@ function renderHero(){
 
 function relativeTime(iso){if(!iso)return'';const mins=Math.round((Date.now()-new Date(iso+(iso.endsWith('Z')||iso.includes('+')?'':'Z')))/60000);if(mins<1)return'now';if(mins<60)return`${mins}m ago`;if(mins<1440)return`${Math.round(mins/60)}h ago`;return`${Math.round(mins/1440)}d ago`;}
 
+let lastActivityId=null;
 function renderActivity(){
   const feed=state.data.activity||[];
   const glyphs={done:'✓',review:'✦',waiting:'○'};
-  $('#activity-feed').innerHTML=feed.length?feed.slice(0,6).map((row)=>`<div class="feed-row"><span class="feed-glyph ${esc(row.status)}">${glyphs[row.status]||'✓'}</span><div><strong>${esc(row.summary)}</strong>${row.detail?`<small>${esc(row.detail)}</small>`:''}</div><span class="feed-time">${relativeTime(row.created_at)}</span></div>`).join(''):'<div class="empty-state">Nūs has not acted yet. Ask it to handle something above.</div>';
+  $('#activity-feed').innerHTML=feed.length?feed.slice(0,6).map((row,index)=>`<div class="feed-row" style="--i:${index}"><span class="feed-glyph ${esc(row.status)}">${glyphs[row.status]||'✓'}</span><div><strong>${esc(row.summary)}</strong>${row.detail?`<small>${esc(row.detail)}</small>`:''}</div><span class="feed-time">${relativeTime(row.created_at)}</span></div>`).join(''):'<div class="empty-state">Nūs has not acted yet. Ask it to handle something above.</div>';
+  const newest=(state.data.activity||[])[0]?.id??null;
+  if(lastActivityId!==null&&newest!==null&&newest!==lastActivityId)pulseKnot();
+  lastActivityId=newest;
 }
 
 // ---- Companion control panel (Jarvis rail) ----
@@ -1385,7 +1637,7 @@ $('#companion-power')?.addEventListener('click', async()=>{
   paintCompanionPanel(); renderHero();
   showToast(off?'Companion is back on your desktop.':'Companion removed. Hotkeys released. Turn it back on here any time.');
 });
-$('#companion-capture')?.addEventListener('click', async()=>{ const s=await api.companionControl?.(companionState.capturing?'capture-stop':'capture-start'); if(s) companionState=s; paintCompanionPanel(); });
+$('#companion-capture')?.addEventListener('click', async()=>{ const s=await api.companionControl?.(companionState.capturing?'capture-stop':'capture-start'); if(s?.error)reportAiError(s);if(s) companionState=s; paintCompanionPanel(); });
 api.onCompanionState?.((s)=>{ if(s){ companionState=s; if(state.view==='companion') paintCompanionPanel(); renderHero(); } });
 
 // ---- Knot-pane chat: a persistent thread over the same AI pipeline. ----
@@ -1413,7 +1665,7 @@ async function sendChat(){
   renderChat();
   try{
     const result=await api.chatSend(state.chat.slice(-12));
-    if(result?.error){showToast(aiError(result.error,result.detail));state.chat.pop();}
+    if(result?.error){reportAiError(result);state.chat.pop();}
     else{
       state.chat.push({role:'nus',text:result.text||'…'});
       chatProposal=result.proposal||null;
@@ -1432,7 +1684,7 @@ $('#chat-thread')?.addEventListener('click',async(e)=>{
   if(b.id!=='chat-confirm'||!chatProposal)return;
   const proposal=chatProposal;chatProposal=null;renderChat();
   const result=await api.assistantExecute(proposal);
-  if(result?.error){state.chat.push({role:'nus',text:aiError(result.error,result.detail)});}
+  if(result?.error){if(handleLimit(result))state.chat.push({role:'nus',text:'That needs Pro. The upgrade sheet is open.'});else state.chat.push({role:'nus',text:aiError(result.error,result.detail)});}
   else{
     state.chat.push({role:'nus',text:result.message||'Done.'});
     if(result.navigate==='email'){
@@ -1519,7 +1771,7 @@ async function submitToNus(text){
   try{
     const result=await api.assistantParse(text);
     if(result.error==='no_ai'||result.error==='cli_not_logged_in'){answerLocally(text);showToast(aiError(result.error));return;}
-    if(result.error){showToast(aiError(result.error,result.detail));return;}
+    if(result.error){reportAiError(result);return;}
     const proposal=result.proposal;
     if(!proposal.needs_confirm){await answerWithAi(proposal.command.question||text,askAnswer);return;}
     state.proposal=proposal;renderProposal();
@@ -1575,7 +1827,7 @@ $('#nus-proposal').addEventListener('click',async(event)=>{
   const proposal=state.proposal;state.proposal=null;renderProposal();
   const pickedFrom=proposal.resolved?.from;
   const result=await api.assistantExecute(proposal);
-  if(result.error){showToast(aiError(result.error,result.detail));return;}
+  if(result.error){reportAiError(result);return;}
   if(result.navigate==='email'){
     if(result.prefill?.help_type)$('#draft-help-type').value=result.prefill.help_type;
     if(result.prefill?.course_id)$('#draft-course').value=String(result.prefill.course_id);
@@ -1640,8 +1892,39 @@ let focusPicked=[];
 let tourIndex=0;
 let welcomeTimer=null;
 
+let onboardStep = 'focus';
+function renderAuthStep(){
+  onboardStep='auth';
+  $('.onboard-card').dataset.step='auth';
+  $('#onboard-content').innerHTML=`<div class="section-kicker">Welcome</div><h2>Hey. I am Nūs.</h2><p>Sign in and Pro, whenever you want it, follows you to any PC. Your syllabi, notes, and transcripts stay on this machine either way. Supabase only holds your email and plan.</p>
+    <div class="onboard-auth">
+      <button id="ob-google" class="primary-button" type="button">Continue with Google</button>
+      <div class="auth-divider"><span>or use email</span></div>
+      <div class="onboard-auth-grid"><input id="ob-email" type="email" placeholder="School or personal email" autocomplete="email" /><input id="ob-password" type="password" placeholder="Password, 8+ characters" autocomplete="current-password" /></div>
+      <div class="onboard-auth-row"><button id="ob-login" class="quiet-button" type="button">Sign in</button><button id="ob-signup" class="quiet-button" type="button">Create account</button><span id="ob-status" class="onboard-auth-status"></span></div>
+    </div>`;
+  $('#onboard-dots').innerHTML='';
+  $('#onboard-back').style.visibility='hidden';
+  $('#onboard-next').textContent='Continue without an account';
+  $('#onboard-skip').textContent='Skip setup';
+  const status=(text,bad)=>{const el=$('#ob-status');if(!el)return;el.textContent=text;el.classList.toggle('bad',Boolean(bad));};
+  const busy=(on)=>$$('#ob-google,#ob-login,#ob-signup').forEach((b)=>{b.disabled=on;});
+  $('#ob-google').addEventListener('click',async()=>{busy(true);const r=await authGoogle();status(r.message,!r.ok);busy(false);});
+  $('#ob-login').addEventListener('click',async()=>{busy(true);const r=await authEmailLogin($('#ob-email').value.trim(),$('#ob-password').value);status(r.message,!r.ok);busy(false);if(r.ok)setTimeout(advanceFromAuthStep,500);});
+  $('#ob-signup').addEventListener('click',async()=>{busy(true);const r=await authEmailSignup($('#ob-email').value.trim(),$('#ob-password').value);status(r.message,!r.ok);busy(false);if(r.ok&&!r.pending)setTimeout(advanceFromAuthStep,500);});
+  $('#ob-password').addEventListener('keydown',(e)=>{if(e.key==='Enter')$('#ob-login').click();});
+  setTimeout(()=>$('#ob-email')?.focus(),350);
+}
+async function advanceFromAuthStep(){
+  await api.setPreference('auth_prompted',true);
+  onboardStep='focus';
+  knotMood('thinking',900);
+  swapOnboardContent(renderFocusPicker);
+}
 function renderFocusPicker(){
-  $('#onboard-content').innerHTML=`<div class="section-kicker">Before we start</div><h2>What are you carrying this semester?</h2><p>Pick everything that applies. Nūs will shape the first week around it.</p><div class="choice-grid">${focusOptions.map(([label,detail])=>`<div class="choice-card${focusPicked.includes(label)?' active':''}" data-focus="${esc(label)}"><strong>${esc(label)}</strong><span>${esc(detail)}</span></div>`).join('')}</div>`;
+  onboardStep='focus';
+  $('.onboard-card').dataset.step='focus';
+  $('#onboard-content').innerHTML=`<div class="section-kicker">Before we start</div><h2>What are you carrying this semester?</h2><p>Pick everything that applies. Nūs will shape the first week around it.</p><div class="choice-grid">${focusOptions.map(([label,detail],index)=>`<div class="choice-card${focusPicked.includes(label)?' active':''}" data-focus="${esc(label)}" style="--i:${index}"><strong>${esc(label)}</strong><span>${esc(detail)}</span></div>`).join('')}</div>`;
   $('#onboard-dots').innerHTML='';
   $('#onboard-back').style.visibility='hidden';
   $('#onboard-next').textContent=focusPicked.length?`Continue with ${focusPicked.length}`:'Continue';
@@ -1651,7 +1934,11 @@ $('#onboard-content').addEventListener('click',(event)=>{
   const card=event.target.closest('[data-focus]'); if(!card)return;
   const label=card.dataset.focus;
   focusPicked=focusPicked.includes(label)?focusPicked.filter((item)=>item!==label):[...focusPicked,label];
-  renderFocusPicker();
+  card.classList.toggle('active',focusPicked.includes(label));
+  const next=$('#onboard-next');
+  next.textContent=focusPicked.length?`Continue with ${focusPicked.length}`:'Continue';
+  next.classList.remove('bump');void next.offsetWidth;next.classList.add('bump');
+  knotMood('listening',700);
 });
 
 function companionWelcome(){
@@ -1680,8 +1967,9 @@ function streamWelcome(){
   answer.innerHTML='';
   answer.classList.remove('hidden');
   let index=0;
+  setKnotSpeaking(true);
   const push=()=>{
-    if(index>=paragraphs.length){clearInterval(welcomeTimer);welcomeTimer=null;return;}
+    if(index>=paragraphs.length){clearInterval(welcomeTimer);welcomeTimer=null;setTimeout(()=>setKnotSpeaking(false),900);return;}
     const p=document.createElement('p');
     p.textContent=paragraphs[index];
     answer.appendChild(p);
@@ -1694,8 +1982,14 @@ function streamWelcome(){
 
 function positionCoach(step){
   const card=$('#coach-card');
+  const spot=$('#coach-spot');
+  const scrim=$('#coach-scrim');
   $$('.nav-item').forEach((item)=>item.classList.remove('coach-target'));
-  if(!step.rail){card.classList.add('centered');card.style.top='';card.style.left='';return;}
+  if(!step.rail){
+    card.classList.add('centered');card.style.top='';card.style.left='';
+    spot.classList.remove('on');scrim.classList.remove('spotlit');
+    return;
+  }
   card.classList.remove('centered');
   const target=$(`.nav-item[data-view="${step.rail}"]`);
   if(!target)return;
@@ -1704,8 +1998,20 @@ function positionCoach(step){
   const top=Math.max(18,Math.min(rect.top-12,window.innerHeight-card.offsetHeight-24));
   card.style.top=`${top}px`;
   card.style.left='262px';
+  // The spotlight is a box-shadow cutout that glides to the next rail item.
+  Object.assign(spot.style,{top:`${rect.top-4}px`,left:`${rect.left-4}px`,width:`${rect.width+8}px`,height:`${rect.height+8}px`});
+  spot.classList.add('on');scrim.classList.add('spotlit');
 }
+let coachPainted=false;
 function renderCoach(){
+  const card=$('#coach-card');
+  if(coachPainted&&!reducedMotion){
+    card.classList.add('swapping');
+    setTimeout(()=>{paintCoach();card.classList.remove('swapping');},200);
+  } else paintCoach();
+  coachPainted=true;
+}
+function paintCoach(){
   const step=tourSteps[tourIndex];
   setView(step.view);
   $('#coach-step').textContent=step.done?'Done':`Step ${tourIndex+1} of ${tourSteps.length}`;
@@ -1727,26 +2033,44 @@ function renderCoach(){
   positionCoach(step);
 }
 function beginCoach(){
-  tourIndex=0;
+  tourIndex=0;coachPainted=false;
   $('#coach-scrim').classList.remove('hidden');
-  $('#coach-card').classList.remove('hidden');
+  const card=$('#coach-card');card.classList.remove('hidden','closing');
   renderCoach();
   streamWelcome();
 }
+let finishing=false;
 async function finishOnboard(){
+  if(finishing)return;finishing=true;
   clearInterval(welcomeTimer); welcomeTimer=null;
   $$('.nav-item').forEach((item)=>item.classList.remove('coach-target'));
   $('#onboard-scrim').classList.add('hidden');
-  $('#coach-scrim').classList.add('hidden');
-  $('#coach-card').classList.add('hidden');
+  const card=$('#coach-card');
+  const spot=$('#coach-spot');
+  spot.classList.remove('on');
+  const scrim=$('#coach-scrim');scrim.classList.remove('spotlit');
+  // The card folds into the Knot, which answers with one pulse.
+  if(!card.classList.contains('hidden')&&!reducedMotion){
+    card.classList.add('closing');scrim.style.opacity='0';
+    await new Promise((r)=>setTimeout(r,420));
+    scrim.style.opacity='';
+  }
+  scrim.classList.add('hidden');
+  card.classList.add('hidden');card.classList.remove('closing');
+  setKnotSpeaking(false);
+  if(state.view!=='today')setView('today');
+  pulseKnot();
   await api.setPreference('onboarded',true);
+  finishing=false;
 }
 $('#onboard-next').addEventListener('click',async()=>{
+  if(onboardStep==='auth'){advanceFromAuthStep();return;}
+  knotMood('thinking');
   await api.setPreference('focus_areas',focusPicked);
   $('#onboard-scrim').classList.add('hidden');
   beginCoach();
 });
-$('#onboard-back').addEventListener('click',()=>renderFocusPicker());
+$('#onboard-back').addEventListener('click',()=>swapOnboardContent(renderFocusPicker));
 $('#onboard-skip').addEventListener('click',finishOnboard);
 $('#coach-next').addEventListener('click',()=>{
   if(tourIndex>=tourSteps.length-1){finishOnboard();return;}
@@ -1754,16 +2078,70 @@ $('#coach-next').addEventListener('click',()=>{
 });
 $('#coach-back').addEventListener('click',()=>{tourIndex=Math.max(0,tourIndex-1);renderCoach();});
 $('#coach-close').addEventListener('click',finishOnboard);
-$('#replay-tour').addEventListener('click',()=>{focusPicked=state.data.preferences.focus_areas||[];renderFocusPicker();$('#onboard-scrim').classList.remove('hidden');});
+$('#replay-tour').addEventListener('click',()=>{focusPicked=state.data.preferences.focus_areas||[];onboardStep='focus';mountOnboardKnot();knotMood('ready');renderFocusPicker();$('#onboard-scrim').classList.remove('hidden');});
 window.addEventListener('resize',()=>{if(!$('#coach-card').classList.contains('hidden'))positionCoach(tourSteps[tourIndex]);});
 
-async function start(){await load();setView('today');if(!state.data.preferences.onboarded){focusPicked=state.data.preferences.focus_areas||[];renderFocusPicker();$('#onboard-scrim').classList.remove('hidden');}}
+async function needsAuthStep(){
+  if(state.data.preferences.auth_prompted)return false;
+  const [cfg,sess]=await Promise.all([api.authConfig().catch(()=>({})),api.authSession().catch(()=>null)]);
+  return Boolean(cfg?.supabase)&&!sess?.user;
+}
+let onboardKnot=null;
+function mountOnboardKnot(){
+  const canvas=$('#onboard-knot');
+  if(!onboardKnot&&canvas&&window.NusKnot3D){onboardKnot=NusKnot3D.mount(canvas,{ground:false,scale:.31});if(onboardKnot)$('.onboard-card').classList.add('has-knot');}
+  return onboardKnot;
+}
+function knotMood(mood,revertMs){
+  if(onboardKnot)onboardKnot.setState(mood);
+  if(revertMs)setTimeout(()=>onboardKnot&&onboardKnot.setState('ready'),revertMs);
+}
+// Cross-fade the onboarding step instead of swapping the DOM under the cursor.
+function swapOnboardContent(render){
+  const el=$('#onboard-content');
+  if(reducedMotion||!el.innerHTML){render();return;}
+  el.classList.add('swap-out');
+  setTimeout(()=>{
+    render();
+    el.classList.remove('swap-out');el.classList.add('swap-in');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.remove('swap-in')));
+  },220);
+}
+// First launch: the Knot forms alone, then the welcome settles in around it.
+function openOnboarding(renderStep){
+  const scrim=$('#onboard-scrim');
+  mountOnboardKnot();
+  scrim.classList.remove('hidden');
+  if(reducedMotion){renderStep();knotMood('ready');return;}
+  scrim.classList.add('booting');
+  $('#onboard-content').innerHTML='';
+  knotMood('thinking');
+  let ended=false;
+  const end=()=>{
+    if(ended)return;ended=true;
+    scrim.classList.remove('booting');
+    knotMood('ready');
+    renderStep();
+    scrim.removeEventListener('click',end);
+  };
+  scrim.addEventListener('click',end);
+  setTimeout(end,1700);
+}
+async function start(){
+  await load();setView('today');
+  document.body.classList.add('ready');
+  if(!state.data.preferences.onboarded){
+    focusPicked=state.data.preferences.focus_areas||[];
+    const auth=await needsAuthStep();
+    openOnboarding(()=>{if(auth)renderAuthStep();else renderFocusPicker();});
+  }
+}
 start().catch((error)=>{console.error(error);showToast('Nūs could not read the local semester.');});
 
 function createPreviewApi(){
   const today=isoDay(),plus=(days)=>{const d=new Date();d.setDate(d.getDate()+days);return isoDay(d);};
   const data={courses:[{id:1,name:'Linear Algebra',code:'MATH 2418',credit_hours:4},{id:2,name:'Computer Science II',code:'COSC 1437',credit_hours:4}],assignments:[{id:1,course_id:1,title:'Matrix transformations set',due_date:plus(1),status:'pending'},{id:2,course_id:2,title:'Linked list lab',due_date:plus(3),status:'pending'}],tasks:[{id:1,title:'Study for linear algebra midterm',course_name:'Linear Algebra',due_date:plus(5),done:0,estimated_minutes:100,steps:[{id:1,title:'Collect the exact topics and materials',done:1,estimated_minutes:20},{id:2,title:'Run a quick diagnostic without notes',done:0,estimated_minutes:20},{id:3,title:'Review the weakest two topics',done:0,estimated_minutes:20},{id:4,title:'Complete a timed practice pass',done:0,estimated_minutes:20},{id:5,title:'Write the one-page final review sheet',done:0,estimated_minutes:20}]}],sources:[{id:1,title:'Fall 2026 calendar.ics',source_type:'calendar_file'}],integrations:[['calendar_file','Calendar file','connected','12 events imported locally.'],['google_calendar','Google Calendar','needs_credentials','OAuth client ID required before live sync can be enabled.'],['canvas','Canvas','needs_credentials','Requires your school Canvas domain and an approved OAuth client.'],['blackboard','Blackboard','needs_admin','Requires an Anthology app registration and campus approval.'],['chatgpt_export','ChatGPT history','ready','Import an exported JSON or HTML archive locally.'],['claude_export','Claude history','ready','Import exported JSON, HTML, Markdown, or text locally.'],['google_docs','Google Docs','ready','Import downloaded Docs as PDF, DOCX, Markdown, or text.'],['icloud_notes','iCloud Notes','ready','Import exported notes as HTML, Markdown, or text.']].map(([provider,label,status,detail])=>({provider,label,status,detail})),automations:[{id:1,name:'Weekly calculus review',trigger_type:'weekly',enabled:1,run_count:2}],repeated_signals:[{recurrence_key:'weekly review',occurrences:3,example_title:'Weekly chapter review'}],preferences:{onboarded:true},activity:[{id:2,action_type:'assistant_reschedule',summary:'Assignment 3 due date updated',detail:'Changed in memory and Calendar using your Linear Algebra syllabus context.',status:'done',created_at:new Date(Date.now()-1800000).toISOString()},{id:1,action_type:'assistant_draft',summary:'Professor absence email drafted',detail:'Used "Dr. Ibarra," your section number, and your usual professional tone.',status:'review',created_at:new Date(Date.now()-3600000).toISOString()}],ranked:[{id:1,title:'Matrix transformations set',due_date:plus(1),course_name:'Linear Algebra',days_left:1,reason:'Due tomorrow in Linear Algebra.'},{id:2,title:'Linked list lab',due_date:plus(3),course_name:'Computer Science II',days_left:3,reason:'Due in 3 days.'}],gpa:{overall:3.54,courses:[{course:'Linear Algebra',letter:'A-',known_weight:30,assumed_weight:70},{course:'Computer Science II',letter:'B+',known_weight:45,assumed_weight:55}]}};
-  return {getState:async()=>data,updateTask:async()=>{},updateTaskStep:async()=>{},updateAssignment:async(id)=>{data.assignments=data.assignments.filter((a)=>a.id!==id);data.ranked=data.ranked.filter((r)=>r.id!==id);},addTask:async(task)=>{task.id=Date.now();task.course_name='General';task.done=0;task.steps=[1,2,3,4,5].map((id,index)=>({id:Date.now()+id,title:['Define what done looks like','Prepare the materials','Complete the first pass','Resolve the main blocker','Review and close'][index],done:0,estimated_minutes:12}));data.tasks.unshift(task);},setPreference:async(key,value)=>{data.preferences[key]=value;},importSource:async()=>({canceled:false,imported:4,fileName:'semester.ics'}),aiStatus:async()=>({cli:true,apiKey:false,encryptionAvailable:true}),aiSetKey:async()=>({ok:true}),aiClearKey:async()=>({ok:true}),aiTest:async()=>({ok:true}),syllabusImport:async()=>({sourceId:1,fileName:'COSC 1437 Syllabus.pdf',data:{course:{name:'Computer Science II',code:'COSC 1437',credit_hours:4,term:'Fall 2026'},grade_weights:[{category:'Homework',weight_pct:20},{category:'Labs',weight_pct:20},{category:'Midterm',weight_pct:25},{category:'Final',weight_pct:35}],assignments:[{title:'Linked list lab',due_date:plus(6),category:'Labs'},{title:'Homework 1: recursion',due_date:plus(9),category:'Homework'},{title:'Midterm exam',due_date:plus(30),category:'Midterm'}]}}),syllabusExtract:async()=>({error:'source_missing'}),syllabusConfirm:async()=>({ok:true,courseId:3,assignments:3,weights:4}),authConfig:async()=>({supabase:false,googleCalendar:false,outlook:true}),outlookStatus:async()=>({configured:true,connected:true,email:'you@utdallas.edu'}),outlookInbox:async()=>({messages:[{subject:'Assignment 3 deadline moved to Friday',from_name:'Dr. Lina Ibarra',from_address:'ibarra@utdallas.edu',received_at:new Date(Date.now()-3600000).toISOString(),preview:'Canvas will update tonight. The new deadline is Friday at 11:59pm.',unread:true,important:false},{subject:'Fall internship fair registration opens',from_name:'UTD Career Center',from_address:'careers@utdallas.edu',received_at:new Date(Date.now()-7200000).toISOString(),preview:'Registration opens this week for the fall fair.',unread:false,important:false}]}),styleProfile:async()=>({ready:true,exemplars:38,formality:'balanced',avgSentenceWords:16}),listActivity:async()=>data.activity,assistantParse:async(text)=>{const isQ=/\?|what|how|when|should/i.test(text);return isQ?{proposal:{command:{intent:'question',question:text,summary_for_user:''},resolved:{},notes:[],needs_confirm:false}}:{proposal:{command:{intent:'add_task',title:text.slice(0,60),due_date:plus(1),summary_for_user:`Create task "${text.slice(0,40)}" due tomorrow.`,confidence:0.9},resolved:{},notes:[],needs_confirm:true}};},assistantExecute:async()=>({ok:true,message:'Done (preview).'}),authSession:async()=>({user:null,configured:false}),syncStatus:async()=>({configured:false,authenticated:false,enabled:false}),addAutomation:async(item)=>{data.automations.unshift({...item,id:Date.now(),enabled:1,run_count:0});},updateAutomation:async()=>{},bridgeStatus:async()=>({connected:true,updated_at:new Date().toISOString()}),storageStatus:async()=>({dbBytes:4823040,sourceBytes:2411520,capBytes:536870912}),
+  return {getState:async()=>data,updateTask:async()=>{},updateTaskStep:async()=>{},updateAssignment:async(id)=>{data.assignments=data.assignments.filter((a)=>a.id!==id);data.ranked=data.ranked.filter((r)=>r.id!==id);},addTask:async(task)=>{task.id=Date.now();task.course_name='General';task.done=0;task.steps=[1,2,3,4,5].map((id,index)=>({id:Date.now()+id,title:['Define what done looks like','Prepare the materials','Complete the first pass','Resolve the main blocker','Review and close'][index],done:0,estimated_minutes:12}));data.tasks.unshift(task);},setPreference:async(key,value)=>{data.preferences[key]=value;},importSource:async()=>({canceled:false,imported:4,fileName:'semester.ics'}),aiStatus:async()=>({cli:true,apiKey:false,encryptionAvailable:true}),aiSetKey:async()=>({ok:true}),aiClearKey:async()=>({ok:true}),aiTest:async()=>({ok:true}),syllabusImport:async()=>({sourceId:1,fileName:'COSC 1437 Syllabus.pdf',data:{course:{name:'Computer Science II',code:'COSC 1437',credit_hours:4,term:'Fall 2026'},grade_weights:[{category:'Homework',weight_pct:20},{category:'Labs',weight_pct:20},{category:'Midterm',weight_pct:25},{category:'Final',weight_pct:35}],assignments:[{title:'Linked list lab',due_date:plus(6),category:'Labs'},{title:'Homework 1: recursion',due_date:plus(9),category:'Homework'},{title:'Midterm exam',due_date:plus(30),category:'Midterm'}]}}),syllabusExtract:async()=>({error:'source_missing'}),syllabusConfirm:async()=>({ok:true,courseId:3,assignments:3,weights:4}),authConfig:async()=>({supabase:false,googleCalendar:false,outlook:true}),outlookStatus:async()=>({configured:true,connected:true,email:'you@utdallas.edu'}),outlookInbox:async()=>({messages:[{subject:'Assignment 3 deadline moved to Friday',from_name:'Dr. Lina Ibarra',from_address:'ibarra@utdallas.edu',received_at:new Date(Date.now()-3600000).toISOString(),preview:'Canvas will update tonight. The new deadline is Friday at 11:59pm.',unread:true,important:false},{subject:'Fall internship fair registration opens',from_name:'UTD Career Center',from_address:'careers@utdallas.edu',received_at:new Date(Date.now()-7200000).toISOString(),preview:'Registration opens this week for the fall fair.',unread:false,important:false}]}),styleProfile:async()=>({ready:true,exemplars:38,formality:'balanced',avgSentenceWords:16}),listActivity:async()=>data.activity,assistantParse:async(text)=>{const isQ=/\?|what|how|when|should/i.test(text);return isQ?{proposal:{command:{intent:'question',question:text,summary_for_user:''},resolved:{},notes:[],needs_confirm:false}}:{proposal:{command:{intent:'add_task',title:text.slice(0,60),due_date:plus(1),summary_for_user:`Create task "${text.slice(0,40)}" due tomorrow.`,confidence:0.9},resolved:{},notes:[],needs_confirm:true}};},assistantExecute:async()=>({ok:true,message:'Done (preview).'}),authSession:async()=>({user:null,configured:false}),syncStatus:async()=>({configured:false,authenticated:false,enabled:false}),addAutomation:async(item)=>{data.automations.unshift({...item,id:Date.now(),enabled:1,run_count:0});},updateAutomation:async()=>{},bridgeStatus:async()=>({connected:true,updated_at:new Date().toISOString()}),storageStatus:async()=>({dbBytes:4823040,sourceBytes:2411520,capBytes:536870912}),saveState:async()=>({ok:true,kind:null,message:null,failedSince:null}),onSaveState:()=>{},sourceText:async()=>'Professor: Dr. Lina Ibarra, ibarra@utdallas.edu',
     companionStatus:async()=>({running:true,visible:true,capturing:false,stealth:false}),
     companionControl:async(action)=>({running:true,visible:action!=='hide',capturing:action==='capture-start',stealth:false}),
     companionSessions:async()=>([{id:1,started_at:new Date(Date.now()-5400000).toISOString(),ended_at:new Date(Date.now()-3600000).toISOString(),pack:'demo-brief',title:'Pricing objection walkthrough',message_count:6,first_line:'Pricing objection walkthrough'}]),

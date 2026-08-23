@@ -97,3 +97,45 @@ test('updateCompanionSession refuses fields outside the allow-list', () => {
   assert.equal(after.id, id, 'id is not writable');
   assert.equal(after.started_at, before.started_at, 'started_at is not writable');
 });
+
+test('source text lives in a managed sidecar, not the database or its backup', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nus-sidecar-'));
+  await open(dir);
+  const marker = 'UNIQUE-RAW-SOURCE-MARKER-48291';
+  const id = api.addSource({ file_path: 'syllabus.txt', title: 'Syllabus', source_type: 'syllabus', raw_text: marker });
+  api.flushPersist();
+  assert.equal(api.getSourceText(id), marker);
+  assert.equal(api.listSources()[0].raw_text, undefined, 'raw text is not returned in source listings');
+  assert.ok(api.storageStatus().sourceBytes >= Buffer.byteLength(marker));
+  assert.equal(fs.readFileSync(path.join(dir, 'nus.db')).includes(Buffer.from(marker)), false);
+  assert.equal(fs.readFileSync(path.join(dir, 'nus.db.bak')).includes(Buffer.from(marker)), false);
+});
+
+test('a corrupt primary recovers from the rolling backup and preserves the damaged file', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nus-recovery-'));
+  await open(dir);
+  api.addCourse({ name: 'Recovery Course' });
+  api.flushPersist();
+  api.addCourse({ name: 'Newest Course' });
+  api.flushPersist();
+  fs.writeFileSync(path.join(dir, 'nus.db'), Buffer.from('truncated'));
+  await open(dir);
+  assert.ok(api.listCourses().some((course) => course.name === 'Recovery Course'));
+  assert.ok(fs.readdirSync(dir).some((name) => name.startsWith('nus.db.replaced-')));
+});
+
+test('legacy raw_text is migrated and scrubbed from both SQLite snapshots', async () => {
+  const initSqlJs = require('sql.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nus-legacy-'));
+  const SQL = await initSqlJs({ locateFile: (f) => path.join(path.dirname(require.resolve('sql.js')), f) });
+  const legacy = new SQL.Database();
+  const marker = 'LEGACY-MARKER-DO-NOT-KEEP-IN-SQLITE-9912';
+  legacy.run('CREATE TABLE sources (id INTEGER PRIMARY KEY, course_id INTEGER, file_path TEXT NOT NULL, title TEXT, source_type TEXT, imported_at TEXT, raw_text TEXT)');
+  legacy.run('INSERT INTO sources (file_path, title, source_type, raw_text) VALUES (?, ?, ?, ?)', ['old.txt', 'Old', 'file', marker]);
+  fs.writeFileSync(path.join(dir, 'nus.db'), Buffer.from(legacy.export()));
+  legacy.close();
+  await open(dir);
+  assert.equal(api.getSourceText(1), marker);
+  assert.equal(fs.readFileSync(path.join(dir, 'nus.db')).includes(Buffer.from(marker)), false);
+  assert.equal(fs.readFileSync(path.join(dir, 'nus.db.bak')).includes(Buffer.from(marker)), false);
+});

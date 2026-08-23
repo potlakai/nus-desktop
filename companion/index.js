@@ -17,7 +17,7 @@ const { loadNusContext, appendNusContext, renderNusSummary } = require('./src/nu
 const { appendEvent } = require('./src/nus-outbox');
 const http = require('http');
 const https = require('https');
-const { URL } = require('url');
+const { URL, pathToFileURL } = require('url');
 
 const DEBUG = false;
 
@@ -25,7 +25,21 @@ let win = null;
 let tray = null;
 let registeredAssistShortcut = null;
 let hooks = {};
-const NUS_CONTEXT_FILE = path.join(app.getPath('appData'), 'Nus', 'context.json');
+const NUS_CONTEXT_FILE = path.join(app.getPath('userData'), 'context.json');
+const TRUSTED_COMPANION_URL = pathToFileURL(path.join(__dirname, 'renderer', 'index.html')).href;
+
+function isTrustedCompanionUrl(value) {
+  try {
+    const parsed = new URL(String(value || ''));
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.href === TRUSTED_COMPANION_URL;
+  } catch { return false; }
+}
+
+function isTrustedCompanionWebContents(webContents) {
+  return Boolean(webContents && !webContents.isDestroyed?.() && isTrustedCompanionUrl(webContents.getURL?.()));
+}
 
 const DEFAULT_ASSIST_SHORTCUT = 'CommandOrControl+Return';
 const RESERVED_SHORTCUTS = new Set([
@@ -37,6 +51,10 @@ const RESERVED_SHORTCUTS = new Set([
   'commandorcontrol+shift+d',
   'commandorcontrol+shift+k',
   'commandorcontrol+shift+space'
+]);
+const ALLOWED_SYSTEM_PANES = new Set([
+  'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+  'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
 ]);
 
 // -------- capture / transcript state --------
@@ -51,6 +69,8 @@ const FLUSH_MS = 6000;
 const MIN_BYTES = Math.floor(16000 * 2 * 0.6);
 const RMS_GATE = 240;
 let flushTimer = null;
+let captureLimitTimer = null;
+let captureStartedAt = null;
 
 let sttBackoffUntil = 0;
 let sttTransientFailures = 0;
@@ -237,9 +257,28 @@ function stopFlushLoop() { if (flushTimer) { clearInterval(flushTimer); flushTim
 // -------- capture toggle --------
 function setCapturing(active) {
   if (active === state.capturing) return active;
+  if (active && hooks.captureAllowanceMs) {
+    const allowance = Number(hooks.captureAllowanceMs());
+    if (Number.isFinite(allowance) && allowance <= 0) {
+      send('status', { message: 'Free Companion time is used for today. Upgrade to Pro or come back tomorrow.' });
+      send('capture:limit', { error: 'limit_companion_minutes' });
+      try { hooks.onCaptureLimit?.(); } catch {}
+      return false;
+    }
+  }
   state.capturing = active;
   const settings = store.getSettings();
   if (active) {
+    captureStartedAt = Date.now();
+    const allowance = hooks.captureAllowanceMs ? Number(hooks.captureAllowanceMs()) : Number.POSITIVE_INFINITY;
+    if (Number.isFinite(allowance)) {
+      captureLimitTimer = setTimeout(() => {
+        send('status', { message: 'Free Companion time is used for today. Listening stopped.' });
+        setCapturing(false);
+        try { hooks.onCaptureLimit?.(); } catch {}
+      }, Math.max(1, allowance));
+      captureLimitTimer.unref?.();
+    }
     // Open a durable session in the desktop database.
     const packName = settings.packPath ? path.basename(path.dirname(settings.packPath)) : '';
     if (hooks.onSessionStart) {
@@ -253,6 +292,7 @@ function setCapturing(active) {
     }
     startFlushLoop();
   } else {
+    if (captureLimitTimer) { clearTimeout(captureLimitTimer); captureLimitTimer = null; }
     stopFlushLoop();
     // Flush what's left so the tail of the conversation isn't dropped.
     flushChannel('you'); flushChannel('them');
@@ -262,6 +302,11 @@ function setCapturing(active) {
       hooks.onSessionEnd(sessionId, { ended_at: new Date().toISOString(), audio_path: dir || '' });
     }
     sessionId = null;
+    if (captureStartedAt && hooks.onCaptureEnd) {
+      const endedAt = Date.now();
+      try { hooks.onCaptureEnd({ started_at: new Date(captureStartedAt).toISOString(), ended_at: new Date(endedAt).toISOString(), duration_ms: endedAt - captureStartedAt }); } catch {}
+    }
+    captureStartedAt = null;
   }
   send('capture:state', { active });
   updateTrayMenu();
@@ -420,7 +465,7 @@ async function runFeature(mode, userText) {
       hooks.onMessage(sessionId, { channel: 'nus', text: fullText, ts: Date.now(), mode, used_screenshot: Boolean(imageDataUrl) });
     }
     if (fullText && settings.reportToNus === true) {
-      appendEvent(app.getPath('appData'), {
+      appendEvent(app.getPath('userData'), {
         mode,
         used_screenshot: Boolean(imageDataUrl),
         answer: fullText,
@@ -722,10 +767,7 @@ function registerIpc() {
   ipcMain.on('companion:system:pcm', (_e, arrayBuffer) => { if (state.capturing) buffers.them.push(Buffer.from(arrayBuffer)); });
   ipcMain.on('companion:mouse:ignore', (_e, v) => { if (win && !win.isDestroyed()) win.setIgnoreMouseEvents(!!v, { forward: true }); });
   ipcMain.on('companion:open-pane', (_e, url) => {
-    if (typeof url !== 'string') return;
-    if (url.startsWith('x-apple.systempreferences:') || url.startsWith('https://')) {
-      shell.openExternal(url).catch(() => {});
-    }
+    if (typeof url === 'string' && ALLOWED_SYSTEM_PANES.has(url)) shell.openExternal(url).catch(() => {});
   });
   ipcMain.on('companion:log', (_e, msg) => console.log('[companion]', msg));
 }
@@ -755,16 +797,20 @@ function stopCursorProbe() {
 //   onSessionEnd(sessionId, meta)         session closed (ended_at, audio_path)
 //   onMessage(sessionId, turn)            each transcript line / question / answer
 //   onStateChange(status)                 visibility/capture changes, for the desktop UI
+//   captureAllowanceMs()                  remaining listening time for this plan
+//   onCaptureEnd(meta)                    records elapsed listening time
 //   onOutboxEvent()                       an outbox event was appended (live ingest)
 //   audioRoot() -> path                   folder for opt-in retained audio
 //   showDesktop()                         focus/reopen the desktop window
 function initCompanion(providedHooks = {}) {
   hooks = providedHooks;
 
-  const allowMedia = (permission) => permission === 'media' || permission === 'microphone' || permission === 'audioCapture' || permission === 'display-capture';
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(allowMedia(permission)));
-  session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowMedia(permission));
+  const allowMedia = (webContents, permission) => isTrustedCompanionWebContents(webContents)
+    && (permission === 'media' || permission === 'microphone' || permission === 'audioCapture' || permission === 'display-capture');
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, cb) => cb(allowMedia(webContents, permission)));
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) => allowMedia(webContents, permission));
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    if (!isTrustedCompanionUrl(request?.frame?.url)) { callback(); return; }
     desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
       if (sources.length) callback({ video: sources[0], audio: 'loopback' });
       else callback();
@@ -792,7 +838,11 @@ function initCompanion(providedHooks = {}) {
     toggle: () => { toggleOverlay(); return companionStatus(); },
     panic: () => { panicHide(); return companionStatus(); },
     toggleKnot,
-    setCapturing: (v) => { setCapturing(Boolean(v)); return companionStatus(); },
+    setCapturing: (v) => {
+      const requested = Boolean(v);
+      const result = setCapturing(requested);
+      return requested && result === false ? { ...companionStatus(), error: 'limit_companion_minutes' } : companionStatus();
+    },
     isCapturing: () => state.capturing,
     isEnabled: () => store.getSettings().companionEnabled !== false,
     disable: disableCompanion,

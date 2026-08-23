@@ -1,6 +1,6 @@
 {
   "name": "nus-desktop",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "description": "Nūs: the semester organizer that runs on your own AI, on your own machine.",
   "main": "src/main.js",
   "private": true,
@@ -9,64 +9,25 @@
     "smoke": "electron . --smoke",
     "tour": "electron . --tour",
     "test:db": "node --test src/db.test.js",
-    "dist": "electron-builder --win",
-    "test": "node --test src/*.test.js companion/test/*.test.js"
-  },
-  "build": {
-    "appId": "com.nus.desktop",
-    "productName": "Nus",
-    "copyright": "Copyright 2026 Pranav Desu",
-    "directories": {
-      "output": "dist",
-      "buildResources": "build"
-    },
-    "files": [
-      "src/**/*",
-      "renderer/**/*",
-      "companion/**/*",
-      "package.json",
-      "!**/*.test.js",
-      "!docs/**",
-      "!companion/test/**"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "build/icon.ico",
-      "artifactName": "Nus-Setup.${ext}"
-    },
-    "portable": {
-      "artifactName": "Nus-Portable.${ext}"
-    },
-    "nsis": {
-      "oneClick": true,
-      "perMachine": false,
-      "runAfterFinish": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Nus"
-    }
+    "dist": "electron-builder --win --config electron-builder.config.js",
+    "test": "node --test src/*.test.js companion/test/*.test.js",
+    "dist:check": "node scripts/package-security-check.js"
   },
   "engines": {
     "node": ">=18"
   },
   "author": "Pranav Desu",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/potlakai/nus-desktop.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/potlakai/nus-desktop.git"
+  },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
+    "@google/genai": "^2.18.0",
     "@supabase/supabase-js": "^2.112.3",
+    "electron-updater": "^6.8.9",
+    "openai": "^7.5.0",
     "pdf-parse": "^1.1.1",
     "sql.js": "^1.14.1"
   },

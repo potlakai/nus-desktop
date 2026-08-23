@@ -148,6 +148,14 @@ p { line-height: 1.55; }
 .coach-card { position: fixed; z-index: 78; width: min(360px,86vw); padding: 20px 21px 17px; border: 1px solid rgba(255,255,255,.13); border-radius: 16px; color: #f1f1f4; background: linear-gradient(150deg,rgba(24,28,43,.99),rgba(12,14,22,.99)); box-shadow: 0 32px 80px rgba(0,0,0,.5); }.coach-card.centered { left: 50%; top: 50%; transform: translate(-50%,-50%); }.coach-card .section-kicker { color: #7f86a8; }.coach-card h3 { margin: 7px 0 9px; color: #fff; font-size: 21px; }.coach-card p { margin: 0 0 18px; color: #a6aab9; font-size: 11px; }.coach-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.coach-footer > div:last-child { display: flex; gap: 7px; }.coach-footer .quiet-button { border-color: rgba(255,255,255,.16); color: #c9ccd8; background: rgba(255,255,255,.05); }.coach-footer .quiet-button:hover { color: #fff; background: rgba(255,255,255,.12); }.coach-close { position: absolute; right: 13px; top: 11px; border: 0; color: #767c92; background: none; font-size: 15px; line-height: 1; }.coach-close:hover { color: #fff; }
 .ask-dock { z-index: 77; }.ask-answer { max-height: 42vh; overflow-y: auto; }.ask-answer p { margin: 0 0 11px; }.ask-answer p:last-child { margin-bottom: 0; }
 
+/* Sits above everything, including the modal scrims: an unsaved database
+   outranks whatever the user is currently doing. */
+.save-banner { position: fixed; z-index: 300; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 9px 18px; background: #7a1d1d; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .01em; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+.save-banner[hidden] { display: none; }
+.save-banner-dot { width: 7px; height: 7px; border-radius: 50%; background: #ff8f8f; flex: none; animation: save-banner-pulse 1.4s ease-in-out infinite; }
+@keyframes save-banner-pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .save-banner-dot { animation: none; } }
+
 .toast { position: fixed; z-index: 100; right: 24px; bottom: 24px; max-width: 320px; padding: 12px 15px; border-radius: 11px; color: #fff; background: #202536; box-shadow: 0 20px 50px rgba(0,0,0,.25); font-size: 10px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: .2s ease; }.toast.show { opacity: 1; transform: none; }
 
 @media (max-width: 1120px) { .shell { grid-template-columns: 218px 1fr; }.integration-grid { grid-template-columns: repeat(3,1fr); }.today-layout { grid-template-columns: 1fr; }.pulse-column { grid-template-columns: repeat(3,1fr); }.calendar-shell { grid-template-columns: 1fr; }.agenda { display: none; } }
@@ -420,3 +428,204 @@ p { line-height: 1.55; }
   .hero-node { font-size: 9.5px; padding: 4px 9px 4px 7px; }
   .hero-node span { max-width: 84px; }
 }
+
+/* ---- Plan card, upgrade sheet, account chip (billing pass 2026-08-22) ---- */
+.setting-card > div { min-width: 0; flex: 1 1 auto; }
+.setting-card .status-badge { flex: none; margin-left: 16px; }
+.setting-card.flash { border-color: rgba(53,73,229,.55); box-shadow: 0 0 0 4px rgba(53,73,229,.12); }
+#auth-card .sheet-actions, .license-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
+.license-actions button, #auth-card .sheet-actions button { flex: none; }
+.auth-signedin-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.license-usage { display: grid; gap: 8px; margin-top: 14px; max-width: 520px; }
+.usage-meter { display: grid; grid-template-columns: 150px 1fr auto; align-items: center; gap: 12px; color: #4d5266; font-size: 10px; }
+.usage-meter span { font-weight: 600; color: #303440; }
+.usage-meter i { position: relative; display: block; height: 6px; border-radius: 999px; background: rgba(30,35,50,.1); overflow: hidden; }
+.usage-meter i::after { content: ''; position: absolute; inset: 0; width: var(--p, 0%); border-radius: inherit; background: linear-gradient(90deg,#5265ff,#8ea0ff); transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.usage-meter b { font-variant-numeric: tabular-nums; font-weight: 700; color: #303440; }
+.usage-meter.warm i::after { background: linear-gradient(90deg,#d99a3c,#e8b86b); }
+.usage-meter.full i::after { background: linear-gradient(90deg,#d95c53,#e8837b); }
+.usage-meter.full b { color: #b9473f; }
+.usage-meter.unlimited { grid-template-columns: 1fr auto; }
+.usage-meter.unlimited i { display: none; }
+.usage-meter.unlimited span { color: #1b6e57; }
+
+.upgrade-sheet { width: min(520px,94vw); }
+.upgrade-reason { margin: 0 0 14px; color: #3a3f52; font-size: 12px; line-height: 1.55; }
+.upgrade-list { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; margin: 0 0 16px; padding: 14px 16px; list-style: none; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.5); color: #3a3f52; font-size: 10.5px; }
+.upgrade-list li { position: relative; padding-left: 14px; }
+.upgrade-list li::before { content: ''; position: absolute; left: 0; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+.upgrade-list b { color: #161923; }
+.upgrade-price { display: flex; align-items: baseline; gap: 10px; color: #4d5266; font-size: 11px; }
+.upgrade-price strong { font: 30px/1 var(--serif); letter-spacing: -.8px; color: #161923; }
+.upgrade-actions { gap: 12px; }
+.upgrade-actions #upgrade-status { flex: 1 1 160px; min-width: 0; color: #56609c; font-size: 9.5px; line-height: 1.4; }
+.upgrade-buttons { display: flex; gap: 8px; flex: none; }
+#upgrade-go:disabled, #license-upgrade:disabled, #license-portal:disabled, #license-refresh:disabled { opacity: .6; cursor: progress; }
+
+.rail-plan { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: rgba(82,101,255,.28); color: #cdd6ff; font-size: 7.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; vertical-align: 1px; }
+.rail-profile { cursor: pointer; }
+.rail-profile .profile-more { justify-self: end; padding: 4px 6px; border-radius: 6px; transition: background .15s ease, color .15s ease; }
+.rail-profile:hover .profile-more { color: #fff; background: rgba(255,255,255,.08); }
+.rail-menu { position: absolute; left: 14px; right: 14px; bottom: 62px; z-index: 5; display: grid; gap: 2px; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(20,23,35,.98); box-shadow: 0 18px 40px rgba(0,0,0,.45); animation: navChildIn .16s ease; }
+.rail-menu button { border: 0; border-radius: 8px; padding: 9px 10px; text-align: left; color: #d5d8e6; background: transparent; font-size: 10.5px; font-weight: 600; }
+.rail-menu button:hover { color: #fff; background: rgba(255,255,255,.08); }
+.rail-menu #rail-signout { color: #e3a19b; }
+aside.rail { position: relative; }
+
+.hero-orb.pulse { animation: orbPulse 1.3s cubic-bezier(.2,.8,.2,1) 1; }
+@keyframes orbPulse { 0% { filter: drop-shadow(0 0 26px rgba(77,94,226,.25)); transform: scale(1); } 35% { filter: drop-shadow(0 0 60px rgba(120,140,255,.85)); transform: scale(1.08); } 100% { filter: drop-shadow(0 0 26px rgba(77,94,226,.25)); transform: scale(1); } }
+
+/* onboarding sign-in step */
+.onboard-auth { display: grid; gap: 12px; margin-top: 26px; max-width: 420px; }
+.onboard-auth .auth-divider { margin: 2px 0; color: #6f7590; }
+.onboard-auth .auth-divider::before, .onboard-auth .auth-divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.1); }
+.onboard-auth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.onboard-auth input { width: 100%; padding: 11px 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; color: #f1f1f4; background: rgba(255,255,255,.05); font-size: 11px; }
+.onboard-auth input:focus { outline: none; border-color: rgba(110,130,255,.6); box-shadow: 0 0 0 3px rgba(82,101,255,.18); }
+.onboard-auth-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.onboard-auth-status { flex: 1 1 140px; color: #aab0c8; font-size: 9.5px; }
+.onboard-auth-status.bad { color: #f0a39b; }
+.onboard-auth #ob-google { justify-content: center; padding: 12px 16px; background: #fff; color: #161923; font-size: 11.5px; }
+.onboard-auth #ob-google:hover { background: #e9ecff; }
+.onboard-auth .quiet-button { border: 1px solid rgba(110,130,255,.35); color: #cdd6ff; background: rgba(53,73,229,.14); }
+.onboard-knot { position: absolute; right: 34px; top: 50%; width: 300px; height: 300px; transform: translateY(-50%); pointer-events: none; z-index: 1; --knot-tint: 77,94,226; --knot-accent: #506CFF; }
+.onboard-knot canvas { width: 100%; height: 100%; display: block; }
+@media (max-width: 980px) { .onboard-knot { width: 200px; height: 200px; right: 10px; opacity: .55; } }
+
+/* settings polish: hidden cards stay hidden, cards land under the topbar, keyboard focus is ours */
+.setting-card[hidden] { display: none !important; }
+.setting-card { scroll-margin-top: 118px; }
+.settings-nav { position: sticky; top: 114px; align-self: start; }
+button:focus-visible, .primary-button:focus-visible, .quiet-button:focus-visible { outline: 2px solid rgba(53,73,229,.65); outline-offset: 2px; }
+.onboard-card button:focus-visible, .coach-card button:focus-visible { outline-color: rgba(140,160,255,.85); }
+
+/* ==========================================================================
+   Motion pass (2026-08-22): welcome, tour, the living Knot, app-wide easing.
+   Every animation here is transform/opacity/filter only. Reduced motion
+   collapses all of it to instant states at the bottom of this block.
+   ========================================================================== */
+:root { --ease-out: cubic-bezier(.2,.8,.2,1); --ease-soft: cubic-bezier(.33,1,.68,1); }
+
+/* app boot: the workspace fades up once the first render landed */
+.workspace { opacity: 0; transform: translateY(6px); transition: opacity .45s var(--ease-out), transform .45s var(--ease-out); }
+body.ready .workspace { opacity: 1; transform: none; }
+.rail { animation: railIn .5s var(--ease-out) both; }
+@keyframes railIn { from { opacity: 0; transform: translateX(-8px); } }
+
+/* views: keep the existing viewIn, make it feel deliberate */
+.view { animation: viewIn .32s var(--ease-out) both; }
+@keyframes viewIn { from { opacity: 0; transform: translateY(8px); } }
+
+/* buttons and nav: press feedback, hover lift */
+.primary-button, .quiet-button, .nav-item, .text-button, .hero-go, .icon-button, .settings-link { transition: transform .12s var(--ease-out), background .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.primary-button:active, .quiet-button:active, .hero-go:active, .icon-button:active { transform: scale(.97); }
+.primary-button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(20,24,37,.2); }
+.primary-button:disabled:hover { transform: none; }
+.nav-item:active { transform: scale(.985); }
+
+/* sheets: the scrim fades, the sheet rises */
+.scrim { animation: scrimIn .22s ease both; }
+@keyframes scrimIn { from { opacity: 0; } }
+.scrim .composer-sheet { animation: sheetIn .32s var(--ease-out) both; }
+@keyframes sheetIn { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+.toast { transition: opacity .28s var(--ease-out), transform .28s var(--ease-out); transform: translate(12px, 8px); }
+.toast.show { transform: none; }
+.global-answer { animation: answerIn .26s var(--ease-out) both; }
+@keyframes answerIn { from { opacity: 0; transform: translateY(-6px) scale(.985); } }
+.hero-answer, .nus-proposal { animation: viewIn .3s var(--ease-out) both; }
+.feed-row, .move-row, .todo-row { animation: rowIn .34s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes rowIn { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---- the living Knot on Today ---- */
+.hero-field { height: 330px; }
+.hero-orb { width: 236px; height: 190px; animation: cloud-breathe 5.2s ease-in-out infinite, orbBreath 4.2s ease-in-out infinite; transition: filter .9s ease, transform .6s var(--ease-soft); }
+@keyframes orbBreath { 0%,100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+.hero-knot-wrap { transform: translate(calc(-50% + var(--kx, 0px)), calc(-50% + var(--ky, 0px))); transition: transform .55s var(--ease-soft); will-change: transform; }
+.hero-orb::before { content: ''; position: absolute; inset: -26%; border-radius: 50%; background: radial-gradient(circle at 50% 50%, rgba(90,110,255,.22), transparent 62%); opacity: var(--kglow, .55); transition: opacity .5s ease; animation: glowDrift 9s ease-in-out infinite; pointer-events: none; }
+@keyframes glowDrift { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(-4%,3%) scale(1.05); } 66% { transform: translate(4%,-3%) scale(.97); } }
+.hero-orb { position: relative; }
+.hero-orb canvas { position: relative; z-index: 1; }
+.hero-orb[data-knot="listening"] { filter: drop-shadow(0 0 34px rgba(95,115,255,.5)); }
+.hero-orb[data-knot="listening"]::before { opacity: .95; animation-duration: 3.2s; }
+.hero-orb[data-knot="thinking"] { animation-duration: 2.6s, 1.6s; filter: drop-shadow(0 0 40px rgba(120,140,255,.6)); }
+.hero-orb[data-knot="ready"]::before { opacity: .75; }
+.hero-orb.speaking { filter: drop-shadow(0 0 36px rgba(140,160,255,.55)); }
+.hero-orb.speaking::before { opacity: .9; animation-duration: 2.2s; }
+.hero-knot-label { transition: opacity .4s ease, letter-spacing .4s ease; }
+.hero-orb.pulse + .hero-knot-label { letter-spacing: .12em; }
+.hero-chip.on { animation: chipPulse 2.4s ease-in-out infinite; }
+.hero-orb[data-knot="thinking"] ~ * .hero-chip.on, .nus-hero.busy .hero-chip.on { animation-duration: 1.2s; }
+.hero-node { transition: transform .4s var(--ease-soft), border-color .3s ease, background .3s ease; }
+.hero-node:hover { transform: translate(-50%,-50%) scale(1.06); border-color: rgba(159,167,224,.6); }
+@media (max-width: 1100px) { .hero-field { height: 300px; } .hero-orb { width: 200px; height: 160px; } }
+
+/* ---- onboarding: welcome, not a form ---- */
+.onboard-scrim { transition: opacity .4s ease; }
+.onboard-card { animation: cardIn .7s var(--ease-out) both; }
+@keyframes cardIn { from { opacity: 0; transform: translateY(18px) scale(.985); } }
+.onboard-card .onboard-brand, .onboard-card .skip-button, .onboard-card .onboard-footer { transition: opacity .5s ease .2s; }
+.onboard-scrim.booting .onboard-brand, .onboard-scrim.booting .skip-button, .onboard-scrim.booting .onboard-footer, .onboard-scrim.booting #onboard-content { opacity: 0; }
+.onboard-scrim.booting .onboard-knot { right: 50%; transform: translate(50%,-50%) scale(1.25); opacity: 1; }
+.onboard-knot { transition: right .9s var(--ease-out), transform .9s var(--ease-out), opacity .6s ease; }
+.onboard-boot { position: absolute; left: 50%; top: 50%; z-index: 3; transform: translate(-50%,-50%); display: grid; justify-items: center; gap: 6px; pointer-events: none; opacity: 0; transition: opacity .45s ease; }
+.onboard-boot .onboard-boot-mark { font: 34px/1 var(--serif); letter-spacing: -.6px; color: #fff; }
+.onboard-boot .onboard-boot-sub { color: #9aa0bb; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+.onboard-scrim.booting .onboard-boot { opacity: 1; }
+.onboard-scrim.booting .onboard-boot-mark { animation: bootUp .8s var(--ease-out) .35s both; }
+.onboard-scrim.booting .onboard-boot-sub { animation: bootUp .8s var(--ease-out) .55s both; }
+@keyframes bootUp { from { opacity: 0; transform: translateY(10px); } }
+#onboard-content { transition: opacity .28s ease, transform .32s var(--ease-out); }
+#onboard-content.swap-out { opacity: 0; transform: translateY(-8px); }
+#onboard-content.swap-in { opacity: 0; transform: translateY(14px); }
+#onboard-content > .section-kicker, #onboard-content > h2, #onboard-content > p, #onboard-content > .onboard-auth { animation: stepIn .42s var(--ease-out) both; }
+#onboard-content > h2 { animation-delay: .05s; }
+#onboard-content > p { animation-delay: .1s; }
+#onboard-content > .onboard-auth { animation-delay: .16s; }
+@keyframes stepIn { from { opacity: 0; transform: translateY(12px); } }
+.choice-card { transition: transform .18s var(--ease-out), border-color .2s ease, background .2s ease, color .2s ease; animation: stepIn .38s var(--ease-out) both; animation-delay: calc(.12s + var(--i, 0) * 40ms); }
+.choice-card:hover { transform: translateY(-2px); border-color: rgba(110,130,255,.5); }
+.choice-card:active { transform: scale(.98); }
+.choice-card.active { box-shadow: 0 0 0 1px rgba(97,116,255,.5), 0 10px 26px rgba(53,73,229,.18); }
+.onboard-dots i { transition: width .3s var(--ease-out), background .3s ease; }
+#onboard-next { position: relative; overflow: hidden; }
+#onboard-next.bump { animation: bump .3s var(--ease-out); }
+@keyframes bump { 50% { transform: scale(1.05); } }
+
+/* ---- the tour moves with you ---- */
+.coach-scrim { transition: opacity .35s ease; background: rgba(8,10,16,.42); }
+.coach-spot { position: fixed; z-index: 72; border-radius: 13px; box-shadow: 0 0 0 9999px rgba(8,10,16,.55), 0 0 0 3px rgba(110,130,255,.7), 0 0 34px rgba(110,130,255,.45); pointer-events: none; opacity: 0; transition: top .45s var(--ease-out), left .45s var(--ease-out), width .45s var(--ease-out), height .45s var(--ease-out), opacity .3s ease; }
+.coach-spot.on { opacity: 1; animation: spotPulse 2.2s ease-in-out infinite; }
+@keyframes spotPulse { 50% { box-shadow: 0 0 0 9999px rgba(8,10,16,.55), 0 0 0 5px rgba(110,130,255,.5), 0 0 44px rgba(110,130,255,.6); } }
+.coach-scrim.spotlit { background: transparent; }
+.coach-card { transition: top .45s var(--ease-out), left .45s var(--ease-out), transform .45s var(--ease-out), opacity .3s ease; animation: coachIn .45s var(--ease-out) both; }
+@keyframes coachIn { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.coach-card.centered { animation: coachInCenter .45s var(--ease-out) both; }
+@keyframes coachInCenter { from { opacity: 0; transform: translate(-50%,-50%) translateY(10px) scale(.98); } to { transform: translate(-50%,-50%); } }
+.coach-card .coach-body-wrap { transition: opacity .2s ease, transform .24s var(--ease-out); }
+.coach-card.swapping #coach-title, .coach-card.swapping #coach-body, .coach-card.swapping #coach-step, .coach-card.swapping #coach-actions { opacity: 0; transform: translateY(-5px); }
+#coach-title, #coach-body, #coach-step, #coach-actions { transition: opacity .22s ease, transform .26s var(--ease-out); }
+.coach-card.closing { opacity: 0; transform: scale(.6) translateY(-40px); transition: opacity .42s ease, transform .5s var(--ease-out); pointer-events: none; }
+.coach-card.centered.closing { transform: translate(-50%,-50%) scale(.6); }
+.nav-item.coach-target { color: #fff; background: rgba(76,94,204,.16); }
+.hero-answer p { animation: lineIn .5s var(--ease-out) both; margin: 0 0 10px; }
+@keyframes lineIn { from { opacity: 0; transform: translateY(8px); filter: blur(2px); } }
+
+/* reduced motion: same flow, instant */
+@media (prefers-reduced-motion: reduce) {
+  .workspace, .rail, .view, .scrim, .scrim .composer-sheet, .toast, .global-answer, .hero-answer, .nus-proposal, .feed-row, .move-row, .todo-row,
+  .hero-orb, .hero-orb::before, .hero-knot-wrap, .hero-chip.on, .hero-node, .onboard-card, .onboard-knot, .onboard-boot, .onboard-boot-mark, .onboard-boot-sub,
+  #onboard-content, #onboard-content > *, .choice-card, .coach-spot, .coach-card, #coach-title, #coach-body, #coach-step, #coach-actions, .hero-answer p, .primary-button, .quiet-button, .nav-item
+  { animation: none !important; transition: none !important; }
+  .workspace { opacity: 1; transform: none; }
+  .onboard-scrim.booting .onboard-brand, .onboard-scrim.booting .skip-button, .onboard-scrim.booting .onboard-footer, .onboard-scrim.booting #onboard-content { opacity: 1; }
+  .onboard-scrim.booting .onboard-boot { opacity: 0; }
+  .onboard-scrim.booting .onboard-knot { right: 34px; transform: translateY(-50%); }
+}
+
+/* onboarding Knot choreography: centre while booting, beside the welcome, in the corner for the picker */
+.onboard-boot { top: calc(50% + 150px); }
+.onboard-scrim.booting .onboard-knot { top: calc(50% - 40px); }
+.onboard-knot { transition: right .9s var(--ease-out), top .9s var(--ease-out), width .9s var(--ease-out), height .9s var(--ease-out), transform .9s var(--ease-out), opacity .6s ease; }
+.onboard-card[data-step="focus"] .onboard-knot { width: 190px; height: 190px; right: 36px; top: 54px; transform: none; }
+.onboard-card.has-knot::after { opacity: .07; }
+.coach-scrim.spotlit { backdrop-filter: none; }

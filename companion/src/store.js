@@ -56,11 +56,36 @@ const DEFAULTS = {
   apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '' },
   models: {
     openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' },
-    anthropic: { fast: 'claude-3-5-haiku-latest', smart: 'claude-3-5-sonnet-latest' },
+    anthropic: { fast: 'claude-haiku-4-5', smart: 'claude-sonnet-5' },
     gemini: { fast: 'gemini-2.5-flash', smart: 'gemini-2.5-pro' },
     nvidia: { fast: 'meta/llama-3.2-11b-vision-instruct', smart: 'meta/llama-3.2-90b-vision-instruct' }
   }
 };
+
+// Model IDs age out, and a saved settings file beats DEFAULTS on merge (save()
+// writes the whole object, so every user who ever opened Settings has a models
+// block on disk). Without this, an upgrading user stays pinned to a model that
+// no longer exists and every Companion answer fails with a 404. Retired IDs are
+// rewritten to the current default for that provider and tier, once, on load.
+const RETIRED_MODELS = {
+  anthropic: {
+    'claude-3-5-haiku-latest': 'claude-haiku-4-5',
+    'claude-3-5-sonnet-latest': 'claude-sonnet-5',
+  },
+};
+
+function retireDeadModels(settings) {
+  let changed = false;
+  for (const provider of Object.keys(RETIRED_MODELS)) {
+    const tiers = settings.models && settings.models[provider];
+    if (!tiers) continue;
+    for (const tier of ['fast', 'smart']) {
+      const replacement = RETIRED_MODELS[provider][tiers[tier]];
+      if (replacement) { tiers[tier] = replacement; changed = true; }
+    }
+  }
+  return changed;
+}
 
 let data = null;
 
@@ -157,7 +182,10 @@ function load() {
     }
   }
 
-  if (legacyPlaintext || migrated) save(); // re-encrypt at rest under the new path
+  const retired = retireDeadModels(data);
+
+  // re-encrypt at rest under the new path, or persist a model retirement
+  if (legacyPlaintext || migrated || retired) save();
   return data;
 }
 function save() {

@@ -94,7 +94,13 @@
       runs[rI] = { from, to: rI === RUNS - 1 ? segments : from + runLen, z: 0 };
     }
 
+    let idleSkip = 0;
     function draw(now) {
+      // Unfocused window: keep the Knot alive at a third of the frame cost.
+      if (typeof document !== 'undefined' && !document.hasFocus() && (idleSkip = (idleSkip + 1) % 3)) {
+        if (running) frame = requestAnimationFrame(draw);
+        return;
+      }
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const target = STATES[state] || STATES.idle;

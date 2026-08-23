@@ -55,9 +55,21 @@ async function connect(withSend = false) {
   const state = randomString(16);
   const codeVerifier = randomString(64);
   secrets.setSecret('outlook_pkce_verifier', codeVerifier);
-  shell.openExternal(buildAuthUrl(redirectPort, state, codeVerifier, withSend));
+  const authUrl = buildAuthUrl(redirectPort, state, codeVerifier, withSend);
   return new Promise((resolve) => {
+    let timeout = null;
+    let settled = false;
+    let callbackInProgress = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      secrets.deleteSecret('outlook_pkce_verifier');
+      if (server.listening) { try { server.close(); } catch {} }
+      resolve(result);
+    };
     const server = http.createServer(async (req, res) => {
+      if (settled || callbackInProgress) { res.writeHead(204); res.end(); return; }
       const url = new URL(req.url, `http://${REDIRECT_HOST}:${redirectPort}`);
       const code = url.searchParams.get('code');
       const returnedState = url.searchParams.get('state');
@@ -69,8 +81,7 @@ async function connect(withSend = false) {
       if (authError) {
         const needsAdmin = /AADSTS65001|AADSTS90094|consent|admin/i.test(authErrorDesc + authError);
         res.end('<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>Not connected</h2><p>You can close this tab and return to Nus.</p></body></html>');
-        server.close();
-        resolve({
+        finish({
           error: needsAdmin
             ? 'Your school requires IT approval before an app can access your mail. The email drafter still works without connecting, or connect a personal Microsoft account instead.'
             : `Outlook sign-in was refused: ${authErrorDesc.slice(0, 180) || authError}`,
@@ -80,27 +91,27 @@ async function connect(withSend = false) {
       }
       if (!code || returnedState !== state) {
         res.end('<html><body><h2>Auth failed</h2><p>State mismatch. Try again.</p></body></html>');
-        server.close();
-        resolve({ error: 'OAuth state mismatch or no code returned.' });
+        finish({ error: 'OAuth state mismatch or no code returned.' });
         return;
       }
+      callbackInProgress = true;
       res.end('<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>Returning to Nus...</h2><p>You can close this tab.</p></body></html>');
       try {
-        const verifier = secrets.getSecret('outlook_pkce_verifier');
-        const token = await exchangeCode(code, verifier, withSend);
+        const token = await exchangeCode(code, codeVerifier, withSend);
         secrets.setSecret(TOKEN_KEY, JSON.stringify(token));
         const me = await graphGet('/me', token.access_token);
         if (me && me.mail) token.email = me.mail || me.userPrincipalName;
         secrets.setSecret(TOKEN_KEY, JSON.stringify(token));
-        server.close();
-        resolve({ connected: true, email: token.email || null });
+        finish({ connected: true, email: token.email || null });
       } catch (e) {
-        server.close();
-        resolve({ error: `Outlook token exchange failed: ${e.message}` });
+        finish({ error: `Outlook token exchange failed: ${e.message}` });
       }
     });
-    server.listen(redirectPort, REDIRECT_HOST, () => {
-      setTimeout(() => { try { server.close(); } catch {} resolve({ error: 'Outlook sign-in did not come back. If the browser showed AADSTS900971, the Azure app needs redirect URI http://127.0.0.1 under "Mobile and desktop applications".' }); }, 180000);
+    server.on('error', (error) => finish({ error: `Could not start the Outlook sign-in callback: ${error.message}` }));
+    server.listen(redirectPort, REDIRECT_HOST, async () => {
+      try { await shell.openExternal(authUrl); }
+      catch (error) { finish({ error: `Could not open Outlook sign-in: ${error.message}` }); return; }
+      timeout = setTimeout(() => finish({ error: 'Outlook sign-in did not come back. If the browser showed AADSTS900971, the Azure app needs redirect URI http://127.0.0.1 under "Mobile and desktop applications".' }), 180000);
     });
   });
 }

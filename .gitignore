@@ -2,3 +2,4 @@ node_modules/
 src/config.js
 dist/
 *.log
+supabase/.temp/

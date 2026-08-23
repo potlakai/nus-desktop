@@ -326,3 +326,77 @@ test('no personal briefing slug can reach a downloaded build', () => {
     assert.ok(!/[A-Za-z]:\\\\Users\\\\[a-z]/i.test(src), `${name} hardcodes no home directory`);
   }
 });
+
+// Imported text moved out of the sources row and into files on disk, so
+// listSources() stopped selecting raw_text. Two places in the renderer were
+// still branching on it and silently died: the "read with AI" button never
+// rendered, and the email drafter always believed the syllabus was empty.
+// Anything the renderer reads off a source row has to be a column that query
+// actually returns.
+test('the renderer never reads source.raw_text, which listSources no longer returns', () => {
+  const dbJs = read('src/db.js');
+  const listSources = dbJs.slice(dbJs.indexOf('listSources: ()'), dbJs.indexOf('getSourceText: (id)'));
+  assert.ok(!/s\.raw_text/.test(listSources), 'listSources does not select raw_text');
+  assert.match(listSources, /s\.content_bytes/, 'listSources returns content_bytes instead');
+
+  assert.ok(!/source\.raw_text|syllabus\?\.raw_text/.test(appJs),
+    'the renderer reads no raw_text off a source row');
+  assert.match(appJs, /source\.content_bytes > 0/, 'the extract button gates on content_bytes');
+
+  // The drafter needs the real text, so the accessor has to be reachable.
+  assert.match(read('src/preload.js'), /sourceText: \(id\)/, 'preload exposes sourceText');
+  assert.match(read('src/main.js'), /'sources:text'/, 'main handles sources:text');
+  assert.match(appJs, /await api\.sourceText\(/, 'the drafter fetches the text');
+});
+
+test('the desktop exposes real license state and upgrade wiring', () => {
+  const preload = read('src/preload.js');
+  const main = read('src/main.js');
+  assert.match(indexHtml, /id="license-card"/);
+  assert.match(preload, /licenseStatus: \(\) => ipcRenderer\.invoke\('license:status'\)/);
+  assert.match(preload, /licenseCheckout: \(meta\) => ipcRenderer\.invoke\('license:checkout', meta \|\| \{\}\)/);
+  assert.match(preload, /licensePortal: \(\) => ipcRenderer\.invoke\('license:portal'\)/);
+  assert.match(appJs, /renderLicenseState/);
+  assert.match(main, /'license:checkout'/);
+  assert.match(main, /'license:portal'/);
+  assert.match(main, /usageLimits\.reserveQuestion\(\)/);
+  assert.match(main, /usageLimits\.syllabusAllowed/);
+});
+
+test('every refused cap opens the upgrade sheet instead of a toast', () => {
+  const main = read('src/main.js');
+  assert.match(indexHtml, /id="upgrade-scrim"/, 'the sheet exists');
+  assert.match(indexHtml, /id="upgrade-go"/);
+  assert.match(appJs, /function handleLimit\(result\)/);
+  assert.match(appJs, /function reportAiError\(result\)/);
+  // The only raw aiError toasts left are provider setup errors, never a cap.
+  const rawToasts = appJs.match(/showToast\(aiError\([^)]*\)\)/g) || [];
+  for (const call of rawToasts) assert.ok(!/limit_/.test(call), `cap toast slipped through: ${call}`);
+  assert.match(appJs, /api\.onLicenseLimit\?\.\(/, 'the Companion cap reaches the sheet');
+  assert.match(main, /onCaptureLimit: \(\) =>/, 'main forwards the Companion cap');
+  assert.match(read('companion/index.js'), /hooks\.onCaptureLimit\?\.\(\)/);
+  // Every denied cap is one funnel row.
+  assert.ok(!/if \(!allowed\.ok\) return allowed;/.test(main), 'all cap refusals go through denied()');
+  assert.match(main, /function denied\(result\)/);
+});
+
+test('the Plan card reads its caps from the limits payload, never from literals', () => {
+  assert.ok(!/\/3 syllabus imports/.test(appJs), 'no hardcoded /3');
+  assert.match(appJs, /function usageMeter\(key, row\)/);
+  assert.match(indexHtml, /id="license-portal"/);
+  assert.match(indexHtml, /id="license-refresh"/);
+});
+
+test('first launch offers sign-in before the focus picker, and local mode stays one click away', () => {
+  assert.match(appJs, /function renderAuthStep\(\)/);
+  assert.match(appJs, /Continue without an account/);
+  assert.match(appJs, /async function needsAuthStep\(\)/);
+  assert.match(read('src/main.js'), /'auth_prompted'/, 'the renderer may persist auth_prompted');
+  assert.match(appJs, /advanceFromAuthStep\(\)/);
+});
+
+test('the account chip shows the plan and opens a menu', () => {
+  assert.match(indexHtml, /id="rail-plan"/);
+  assert.match(indexHtml, /id="rail-menu"/);
+  assert.match(appJs, /dataset\.menu === 'signout'/);
+});

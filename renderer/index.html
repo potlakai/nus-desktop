@@ -28,8 +28,13 @@
         <span class="rail-storage-track"><i id="rail-storage-bar"></i></span>
       </button>
       <button class="rail-profile" data-view="settings" type="button">
-        <span class="avatar" id="rail-avatar">N</span><span><strong id="rail-name">You</strong><small id="rail-mode">Local profile</small></span><span class="profile-more">•••</span>
+        <span class="avatar" id="rail-avatar">N</span><span><strong id="rail-name">You</strong><small id="rail-mode">Local profile<b id="rail-plan" class="rail-plan hidden">Pro</b></small></span><span class="profile-more" id="rail-more" role="button" aria-label="Account menu">•••</span>
       </button>
+      <div id="rail-menu" class="rail-menu hidden" role="menu">
+        <button type="button" data-menu="account">Account</button>
+        <button type="button" data-menu="plan">Plan and billing</button>
+        <button type="button" data-menu="signout" id="rail-signout">Sign out</button>
+      </div>
     </aside>
 
     <main class="workspace">
@@ -137,7 +142,7 @@
               <p class="sheet-note">Gmail needs no connection: add the addresses you send from, pick the one to use, and Open in Gmail launches a filled-in compose signed in as that account. Two university addresses stay separate, so nothing ever goes out from the wrong one.</p>
               <div id="email-account-list" class="email-account-list"></div>
               <div class="email-account-add">
-                <input id="email-account-input" type="email" placeholder="you@utdallas.edu" autocomplete="off" />
+                <input id="email-account-input" type="email" placeholder="School or personal email" autocomplete="off" />
                 <button id="email-account-save" class="quiet-button" type="button">Add address</button>
               </div>
             </div>
@@ -148,7 +153,7 @@
             <div class="draft-form">
               <label class="field"><span>Course</span><select id="draft-course"></select></label>
               <label class="field"><span>Professor name</span><input id="draft-prof-name" placeholder="Dr. Rivera" /></label>
-              <label class="field"><span>Professor email</span><input id="draft-prof-email" type="email" placeholder="name@utdallas.edu" /></label>
+              <label class="field"><span>Professor email</span><input id="draft-prof-email" type="email" placeholder="professor@university.edu" /></label>
               <label class="field"><span>Preferred address (from syllabus)</span><input id="draft-pref-name" placeholder="Dr. Rivera / Professor Rivera / etc." /></label>
               <label class="field"><span>Class &amp; section</span><input id="draft-section" placeholder="COSC 1437.001" /></label>
               <label class="field"><span>Kind of help</span><select id="draft-help-type">
@@ -229,7 +234,7 @@
 
       <section id="view-settings" class="view">
         <div class="settings-grid">
-          <section class="settings-nav panel-surface"><div class="settings-statue"><img src="assets/nus-statue-mark.png" alt="" /></div><h2 id="settings-name">Local</h2><p id="settings-email">Not signed in</p><button class="settings-link active" type="button" data-card="auth-card">Account</button><button class="settings-link" type="button" data-card="bridge-card">Companion</button><button class="settings-link" type="button" data-card="sync-card">Cloud sync</button><button class="settings-link" type="button" data-card="storage-card">Data</button></section>
+          <section class="settings-nav panel-surface"><div class="settings-statue"><img src="assets/nus-statue-mark.png" alt="" /></div><h2 id="settings-name">Local</h2><p id="settings-email">Not signed in</p><button class="settings-link active" type="button" data-card="auth-card">Account</button><button class="settings-link" type="button" data-card="bridge-card">Companion</button><button class="settings-link" type="button" data-card="storage-card">Data</button></section>
           <div class="settings-stack">
             <section class="setting-card" id="auth-card">
               <div>
@@ -237,7 +242,7 @@
                 <h3 id="auth-title">Sign in to Nūs</h3>
                 <p id="auth-copy">Google or email. Local mode stays available if you skip sign-in.</p>
                 <div id="auth-form" class="auth-form">
-                  <label class="field"><span>Email</span><input id="auth-email" type="email" placeholder="you@utdallas.edu" /></label>
+                  <label class="field"><span>Email</span><input id="auth-email" type="email" placeholder="School or personal email" /></label>
                   <label class="field"><span>Password</span><input id="auth-password" type="password" placeholder="Minimum 8 characters" /></label>
                   <div class="sheet-actions"><button id="auth-login" class="primary-button">Sign in</button><button id="auth-signup" class="quiet-button">Create account</button></div>
                   <div class="auth-divider"><span>or</span></div>
@@ -245,13 +250,23 @@
                 </div>
                 <div id="auth-signedin" class="auth-signedin hidden">
                   <p>Signed in as <strong id="auth-user-email"></strong>.</p>
-                  <button id="auth-logout" class="quiet-button">Sign out</button>
+                  <div class="auth-signedin-actions"><button id="auth-plan-link" class="quiet-button" type="button">Manage plan</button><button id="auth-logout" class="quiet-button">Sign out</button></div>
                 </div>
               </div>
               <span id="auth-badge" class="status-badge">Local</span>
             </section>
+            <section class="setting-card" id="license-card">
+              <div>
+                <div class="section-kicker">Plan</div>
+                <h3 id="license-title">Nūs Free</h3>
+                <p id="license-copy">Checking your plan and local usage.</p>
+                <div id="license-usage" class="license-usage" aria-live="polite"></div>
+                <div class="license-actions"><button id="license-upgrade" class="primary-button" type="button">Upgrade to Pro</button><button id="license-portal" class="quiet-button hidden" type="button">Manage subscription</button><button id="license-refresh" class="quiet-button" type="button">Refresh plan</button></div>
+              </div>
+              <span id="license-badge" class="status-badge">Free</span>
+            </section>
             <section class="setting-card" id="bridge-card"><div><div class="section-kicker">Companion</div><h3 id="bridge-title">Checking shared context…</h3><p id="bridge-copy">The overlay reads a minimal semester snapshot, never the database file.</p></div><span id="bridge-badge" class="status-badge">Checking</span></section>
-            <section class="setting-card" id="sync-card">
+            <section class="setting-card" id="sync-card" hidden>
               <div>
                 <div class="section-kicker">Cloud sync</div>
                 <h3>Visible, opt-in, revocable</h3>
@@ -336,11 +351,29 @@
   </section></div>
 
 
+  <div id="upgrade-scrim" class="scrim hidden"><section class="composer-sheet upgrade-sheet" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
+    <div class="sheet-head"><div><div class="section-kicker" id="upgrade-kicker">Free limit reached</div><h2 id="upgrade-title">Pro lifts this cap.</h2></div><button id="upgrade-close" class="icon-button" type="button" aria-label="Close">×</button></div>
+    <p id="upgrade-reason" class="upgrade-reason"></p>
+    <ul class="upgrade-list">
+      <li><b>Unlimited</b> AI syllabus imports</li>
+      <li><b>Unlimited</b> Ask and chat questions</li>
+      <li>Companion with <b>no daily limit</b></li>
+      <li><b>Full</b> Companion history, searchable</li>
+      <li>Google Calendar <b>and</b> Outlook, together</li>
+      <li><b>Unlimited</b> automation rules</li>
+      <li><b>2 GB</b> of local storage</li>
+      <li>Pro follows your account to <b>any PC</b></li>
+    </ul>
+    <div class="upgrade-price"><strong>$9.99</strong><span>a month. Cancel any time. Your AI key and your data stay yours.</span></div>
+    <div class="sheet-actions upgrade-actions"><span id="upgrade-status"></span><div class="upgrade-buttons"><button id="upgrade-later" class="quiet-button" type="button">Not now</button><button id="upgrade-go" class="primary-button" type="button">Upgrade to Pro</button></div></div>
+  </section></div>
+
   <div id="onboard-scrim" class="onboard-scrim hidden">
-    <section class="onboard-card"><div class="onboard-brand"><img src="assets/nus-statue-mark.png" alt="" /><span>Nūs</span></div><button id="onboard-skip" class="skip-button">Skip</button><div id="onboard-content"></div><div class="onboard-footer"><div id="onboard-dots" class="onboard-dots"></div><div><button id="onboard-back" class="quiet-button">Back</button><button id="onboard-next" class="primary-button">Continue</button></div></div></section>
+    <section class="onboard-card"><div class="onboard-knot" aria-hidden="true"><canvas id="onboard-knot"></canvas></div><div class="onboard-boot" aria-hidden="true"><div class="onboard-boot-mark">Nūs</div><div class="onboard-boot-sub">Your semester, in focus</div></div><div class="onboard-brand"><img src="assets/nus-statue-mark.png" alt="" /><span>Nūs</span></div><button id="onboard-skip" class="skip-button">Skip</button><div id="onboard-content"></div><div class="onboard-footer"><div id="onboard-dots" class="onboard-dots"></div><div><button id="onboard-back" class="quiet-button">Back</button><button id="onboard-next" class="primary-button">Continue</button></div></div></section>
   </div>
 
   <div id="coach-scrim" class="coach-scrim hidden"></div>
+  <div id="coach-spot" class="coach-spot" aria-hidden="true"></div>
   <section id="coach-card" class="coach-card hidden" role="dialog" aria-label="Walkthrough">
     <button id="coach-close" class="coach-close" type="button" aria-label="Close the walkthrough">×</button>
     <div id="coach-step" class="section-kicker"></div>
@@ -350,6 +383,10 @@
     <div class="coach-footer"><div id="coach-dots" class="onboard-dots"></div><div><button id="coach-back" class="quiet-button" type="button">Back</button><button id="coach-next" class="primary-button" type="button">Next</button></div></div>
   </section>
 
+  <div id="save-banner" class="save-banner" role="alert" hidden>
+    <span class="save-banner-dot" aria-hidden="true"></span>
+    <span id="save-banner-text"></span>
+  </div>
   <div id="toast" class="toast" role="status"></div>
   <script src="../companion/renderer/knot3d.js?v=atlas-12"></script>
   <script src="app.js?v=atlas-12"></script>

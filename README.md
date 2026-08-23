@@ -42,6 +42,25 @@ npm start
 `npm test` runs the full assertion suite. `npm run smoke` boots and exits.
 `npm run tour` replays the walkthrough. `npm run dist` builds the installers.
 
+### Why Windows warns you about the download
+
+The installer is not code signed yet, so SmartScreen shows **"Windows
+protected your PC", Publisher: Unknown publisher** the first time you run
+`Nus-Setup.exe`. That is the absence of a certificate, not a detection. Click
+**More info**, then **Run anyway**. The build is reproducible from this repo,
+every release lists the SHA-512 of its artifacts in `latest.yml`, and Windows
+Defender scans it clean. Signing is wired and waiting on a certificate; see
+`docs/release.md`.
+
+### Free and Pro
+
+Nūs Free runs a whole semester with honest caps: 3 AI syllabus imports, 10
+questions a day, 1 connected account, 1 automation rule, 20 Companion minutes
+a day with 7 days of history, 512 MB of storage. Pro ($9.99 a month) lifts
+them. Caps are counted locally; the plan itself is tied to your Nūs account
+(Supabase holds only your email and plan) and paid through Stripe Checkout.
+Card details never touch this app.
+
 ## What's inside
 
 - **Today**: your dashboard. The Ask bar takes plain requests ("push the calc
@@ -78,8 +97,9 @@ of every meeting, class, interview, or assessment you are in.
 
 Local-first by design. The database lives at `%APPDATA%\Nus\data\nus.db` and
 everything Nūs knows stays on this device. The only outbound calls are the AI
-providers you configured and the integrations you explicitly connect. Cloud
-sync is off by default, bounded, and revocable.
+providers you configured, the integrations you explicitly connect, and, if you
+sign in, the Supabase account check (email and plan, never content) plus Stripe
+when you buy Pro. There is no cloud sync of your coursework.
 
 ## Stack
 

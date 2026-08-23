@@ -55,7 +55,7 @@ test('no confidential credential class is present in any packaged file', () => {
 });
 
 test('test files and docs stay out of the shipped build', () => {
-  const files = require('../package.json').build.files;
+  const files = require('../electron-builder.config.js').files;
   assert.ok(files.includes('!**/*.test.js'));
   assert.ok(files.includes('!companion/test/**'), 'companion test folder excluded');
   assert.ok(files.includes('!docs/**'));
