@@ -23,9 +23,10 @@ so a semester of use stays affordable.
 screen and listens in meetings runs on its own key so live answers stay fast
 and cheap. Get a free **Google Gemini** key (aistudio.google.com/apikey) and
 paste it in **Settings → Companion AI key**, or in the Knot's own gear icon.
-One Gemini key covers both answering and speech-to-text for listening.
-(OpenAI, Anthropic, and Nvidia keys also work; with OpenAI, listening needs
-Whisper access.)
+The Gemini key covers the Companion's answers. Speech to text needs no key at
+all: Nūs transcribes on your own machine with whisper.cpp (see **Voice** below)
+and only falls back to a Gemini or OpenAI key if the local engine is missing.
+(OpenAI, Anthropic, and Nvidia keys also work for answering.)
 
 The first-run walkthrough points at both cards.
 
@@ -41,6 +42,9 @@ npm start
 
 `npm test` runs the full assertion suite. `npm run smoke` boots and exits.
 `npm run tour` replays the walkthrough. `npm run dist` builds the installers.
+`npm run setup:voice` downloads the local speech engine (whisper.cpp plus the
+base English model, about 65 MB, once) into `vendor/`. The installers bundle the
+engine and fetch the model on first use, so only source builds need this step.
 
 ### Why Windows warns you about the download
 
@@ -66,6 +70,11 @@ Card details never touch this app.
 - **Today**: your dashboard. The Ask bar takes plain requests ("push the calc
   homework to Friday", "email my professor about an extension") and proposes
   the exact change before anything is written.
+- **Voice**: click the Knot on Today and just talk. Speech to text runs locally
+  with whisper.cpp, so no key is needed and no audio leaves your computer. Your
+  words and the streamed reply appear under the Knot, which lights up as it
+  listens, thinks, and speaks. Files Nūs reads while thinking surface as stars
+  on the constellation. Talking over a spoken reply interrupts it.
 - **Map**: every course, source, and open task as a draggable knowledge graph.
 - **Calendar / Smart tasks / Semester**: deadlines, task breakdowns with
   review, GPA projection that never guesses missing weights.

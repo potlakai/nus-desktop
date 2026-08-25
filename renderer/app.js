@@ -1442,13 +1442,17 @@ function answerLocally(query,target){
 // Star field is generated once; nodes and edges re-render from live data.
 let heroKnot3d=null;
 let heroStarsSeeded=false;
+// Voice chat state lives up here because renderHero and constellationItems
+// read it on every paint; the machinery itself is below the chat section.
+let voiceState='off'; // off | listening | transcribing | thinking | speaking
+let voiceTraces=[];   // short-lived gold stars for files Nūs is reading
 function pulseKnot(){const orb=$('#hero-orb');if(!orb)return;orb.classList.remove('pulse');void orb.offsetWidth;orb.classList.add('pulse');setTimeout(()=>orb.classList.remove('pulse'),1400);}
 let knotSpeaking=false;
 function setKnotSpeaking(on){
   knotSpeaking=Boolean(on);
   const orb=$('#hero-orb');if(!orb)return;
   orb.classList.toggle('speaking',knotSpeaking);
-  if(heroKnot3d)heroKnot3d.setState(knotSpeaking?'ready':orb.dataset.knot||'idle');
+  if(heroKnot3d)heroKnot3d.setState(knotSpeaking?'speaking':orb.dataset.knot||'idle');
 }
 // The Knot leans toward the cursor and brightens as it gets close.
 (function heroPointer(){
@@ -1489,7 +1493,10 @@ function constellationItems(){
   const tasks=state.data.tasks.filter((task)=>!task.done).slice(0,2).map((task)=>({kind:'task',label:task.title,attention:risky(task.due_date),go:'tasks'}));
   const items=[...courses,...sources,...tasks].slice(0,7);
   if(!items.length)items.push({kind:'source',label:'Import a syllabus',attention:false,go:'semester'});
-  return items;
+  // Live thinking traces: files Nūs is reading right now join the sky as
+  // short-lived gold stars, displacing the tail so the total stays at 7.
+  const traces=voiceTraces.slice(-3);
+  return traces.length?[...items.slice(0,7-traces.length),...traces]:items;
 }
 let lastConstellationKey='';
 function renderConstellation(){
@@ -1567,13 +1574,18 @@ function renderHero(){
   // state: thinking (desktop busy) > listening (capturing) > ready (on screen)
   // > idle. The Today hero and the overlay Knot show the same truth.
   const cs=companionState;
-  const knotState = (state.busy || cs.busy) ? 'thinking' : cs.capturing ? 'listening' : cs.visible ? 'ready' : 'idle';
-  const chips=[['Idle',knotState==='idle'],['Listening',knotState==='listening'],['Thinking',knotState==='thinking'],['Ready',knotState==='ready']];
+  // Voice chat with the Knot overrides the companion ladder while it is live.
+  const voiceKnot = voiceState==='speaking'?'speaking'
+    : (voiceState==='thinking'||voiceState==='transcribing')?'thinking'
+    : voiceState==='listening'?'listening':null;
+  const knotState = voiceKnot || ((state.busy || cs.busy) ? 'thinking' : cs.capturing ? 'listening' : cs.visible ? 'ready' : 'idle');
+  const chips=[['Idle',knotState==='idle'],['Listening',knotState==='listening'],['Thinking',knotState==='thinking'],['Speaking',knotState==='speaking'],['Ready',knotState==='ready']];
   $('#hero-chips').innerHTML=chips.map(([label,on])=>`<span class="hero-chip${on?` on state-${knotState}`:''}">${label}</span>`).join('');
   const orb=$('#hero-orb'); orb.dataset.knot=knotState; orb.classList.toggle('working',Boolean(state.busy));
+  orb.classList.toggle('voice-live',voiceState!=='off');
   $('#nus-hero')?.classList.toggle('busy',Boolean(state.busy));
   renderConstellation();
-  if(heroKnot3d)heroKnot3d.setState(knotSpeaking?'ready':knotState);
+  if(heroKnot3d)heroKnot3d.setState(knotSpeaking&&!voiceKnot?'speaking':knotState);
   const bubbles=[];
   const syllabusCourses=state.data.sources.filter((s)=>s.source_type==='syllabus'&&s.course_id).map((s)=>state.data.courses.find((c)=>c.id===s.course_id)?.name).filter(Boolean);
   if(syllabusCourses.length)bubbles.push(`${syllabusCourses[0]} syllabus`);
@@ -1696,6 +1708,296 @@ $('#chat-thread')?.addEventListener('click',async(e)=>{
   persistChat();renderChat();
 });
 api.onCompanionMessage?.((m)=>{ if(state.view==='history' && state.historySession===m.sessionId) renderHistoryDetail(state.historySession); });
+
+// ---- Voice: talk to the Knot. ----
+// Click the Knot (or the mic button) and just talk: local whisper turns speech
+// into text, the reply streams back token by token, and the constellation
+// grows gold trace stars for every file Nūs reads while thinking. Speaking
+// during the spoken reply interrupts it (barge-in).
+let voiceOn=false, voicePendingAsk=false, voiceProposal=null, voiceNusLine=null;
+let voiceTurns=[];
+let voiceCtx=null, voiceStream=null, voiceSrcNode=null, voiceProc=null;
+let voiceTraceTimer=null, voiceLevelAt=0;
+const VAD={START:0.02,START_TTS:0.035,STOP:0.012,HANG_MS:900,PREROLL_MS:350,MIN_MS:300,MAX_MS:15000};
+let vadChunks=[],vadPre=[],vadPreSamples=0,vadHot=0,vadSpeaking=false,vadSilenceAt=0,vadStartAt=0;
+
+function setVoiceState(next){
+  if(voiceState===next)return;
+  voiceState=next;
+  const hint=$('#voice-hint');
+  if(hint){
+    hint.textContent={listening:'Listening. Just talk.',transcribing:'Heard you. Writing it down…',thinking:'Nūs is thinking…',speaking:'Nūs is speaking. Talk over it to interrupt.'}[next]||'';
+    hint.classList.toggle('live',next==='listening');
+  }
+  renderHero();
+}
+
+// Spoken replies reuse the Companion's free neural-voice picking.
+let voiceTts=null;
+function pickTtsVoice(){
+  const vs=window.speechSynthesis?speechSynthesis.getVoices().filter((v)=>v.lang.startsWith('en')):[];
+  voiceTts=vs.find((v)=>/Natural/i.test(v.name)&&/Guy|Andrew|Brian|Christopher|Ryan/i.test(v.name))||vs.find((v)=>/Natural|Online/i.test(v.name))||vs[0]||null;
+}
+if(window.speechSynthesis){speechSynthesis.onvoiceschanged=pickTtsVoice;pickTtsVoice();}
+function plainify(text){return String(text||'').replace(/```[\s\S]*?```/g,' code block omitted ').replace(/[#*_`>[\]]/g,'').replace(/\(https?:[^)]+\)/g,'');}
+function speakReply(text){
+  if(!voiceOn)return;
+  const enabled=$('#voice-speak')?.checked&&window.speechSynthesis;
+  const plain=enabled?plainify(text||'').slice(0,2200):'';
+  if(!plain.trim()){setVoiceState('listening');return;}
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(plain);
+  if(voiceTts)u.voice=voiceTts;
+  u.rate=1.05;
+  u.onstart=()=>{if(voiceOn)setVoiceState('speaking');};
+  u.onend=u.onerror=()=>{if(voiceOn&&voiceState==='speaking')setVoiceState('listening');};
+  setVoiceState('listening'); // safety net if the utterance never starts
+  speechSynthesis.speak(u);
+}
+
+function lastVoiceUser(){for(let i=voiceTurns.length-1;i>=0;i--){if(voiceTurns[i].role==='user')return voiceTurns[i].text;}return '';}
+function voiceNote(text){voiceTurns.push({role:'note',text});renderVoiceThread();}
+function renderVoiceThread(){
+  const thread=$('#voice-thread');if(!thread)return;
+  const actions=voiceProposal?'<div class="voice-actions"><button id="voice-confirm" class="primary-button" type="button">Confirm</button><button id="voice-cancel-prop" class="quiet-button" type="button">Not now</button></div>':'';
+  thread.innerHTML=(voiceTurns.length
+    ?voiceTurns.map((m)=>m.role==='note'
+      ?`<div class="voice-line note">${esc(m.text)}</div>`
+      :`<div class="voice-line ${m.role==='nus'?'nus':'you'}${m.pending?' pending':''}">${esc(m.text)}</div>`).join('')
+    :'<div class="voice-line note">Say something. Nūs is listening.</div>')+actions;
+  thread.scrollTop=thread.scrollHeight;
+}
+
+// Mirror finished voice turns into the Knot-pane thread so both surfaces share
+// one history.
+function syncVoiceIntoChat(userText,nusText){
+  if(userText)state.chat.push({role:'user',text:userText});
+  if(nusText)state.chat.push({role:'nus',text:nusText});
+  state.chat=state.chat.slice(-50);persistChat();renderChat();
+}
+
+// -- constellation thinking traces --
+function addVoiceTrace(label){
+  const short=String(label||'').replace(/\.[a-z0-9]+$/i,'').slice(0,18).trim();
+  if(!short||voiceTraces.some((t)=>t.label===short))return;
+  voiceTraces.push({kind:'trace',label:short,attention:false,go:'today',addedAt:Date.now()});
+  voiceTraces=voiceTraces.slice(-3);
+  renderConstellation();
+  if(!voiceTraceTimer)voiceTraceTimer=setInterval(()=>{
+    const before=voiceTraces.length;
+    voiceTraces=voiceTraces.filter((t)=>Date.now()-t.addedAt<6000);
+    if(voiceTraces.length!==before)renderConstellation();
+    if(!voiceTraces.length){clearInterval(voiceTraceTimer);voiceTraceTimer=null;}
+  },1500);
+}
+
+// -- mic capture: same shape as the Companion (no sampleRate pin; some
+// Windows drivers reject a forced rate, the worklet downsamples to 16kHz) --
+async function startVoiceMic(){
+  voiceStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,channelCount:1}});
+  voiceCtx=new AudioContext();
+  if(voiceCtx.state==='suspended')await voiceCtx.resume();
+  await voiceCtx.audioWorklet.addModule('../companion/renderer/pcm-processor.js');
+  voiceSrcNode=voiceCtx.createMediaStreamSource(voiceStream);
+  voiceProc=new AudioWorkletNode(voiceCtx,'pcm-processor',{processorOptions:{targetRate:16000}});
+  voiceProc.port.onmessage=(e)=>onVoicePcm(e.data);
+  const sink=voiceCtx.createGain();sink.gain.value=0;
+  voiceSrcNode.connect(voiceProc);voiceProc.connect(sink);sink.connect(voiceCtx.destination);
+}
+function stopVoiceMic(){
+  if(voiceProc){voiceProc.port.onmessage=null;voiceProc.disconnect();voiceProc=null;}
+  if(voiceSrcNode){voiceSrcNode.disconnect();voiceSrcNode=null;}
+  if(voiceCtx){voiceCtx.close();voiceCtx=null;}
+  if(voiceStream){voiceStream.getTracks().forEach((t)=>t.stop());voiceStream=null;}
+}
+
+// -- VAD: utterances end on ~0.9s of silence, with a 350ms pre-roll so the
+// first word survives, and a raised threshold during TTS for barge-in --
+function onVoicePcm({buffer,level}){
+  if(!voiceOn)return;
+  const chunk=new Int16Array(buffer);
+  if(!chunk.length)return;
+  const now=performance.now();
+  if(now-voiceLevelAt>33){voiceLevelAt=now;heroKnot3d?.setLevel?.(Math.min(1,level*7));}
+  const canTalk=voiceState==='listening'||voiceState==='speaking';
+  if(!canTalk){vadSpeaking=false;vadChunks=[];vadHot=0;return;}
+  const startThresh=voiceState==='speaking'?VAD.START_TTS:VAD.START;
+  if(!vadSpeaking){
+    vadPre.push(chunk);vadPreSamples+=chunk.length;
+    while(vadPreSamples>16000*(VAD.PREROLL_MS/1000)&&vadPre.length>1){vadPreSamples-=vadPre[0].length;vadPre.shift();}
+    vadHot=level>startThresh?vadHot+1:0;
+    if(vadHot>=2){
+      vadSpeaking=true;vadStartAt=now;vadSilenceAt=0;
+      vadChunks=vadPre.slice();vadPre=[];vadPreSamples=0;
+      if(voiceState==='speaking'){try{speechSynthesis.cancel();}catch{}setVoiceState('listening');}
+    }
+  }else{
+    vadChunks.push(chunk);
+    if(level<VAD.STOP){if(!vadSilenceAt)vadSilenceAt=now;}
+    else vadSilenceAt=0;
+    const dur=now-vadStartAt;
+    if((vadSilenceAt&&now-vadSilenceAt>=VAD.HANG_MS)||dur>=VAD.MAX_MS){
+      const chunks=vadChunks;vadChunks=[];vadSpeaking=false;vadHot=0;
+      finishUtterance(chunks,dur);
+    }
+  }
+}
+
+// Whisper adds noise tags like [BLANK_AUDIO] and (wind blowing); strip them
+// and drop utterances that were nothing but noise.
+function cleanTranscript(text){
+  const t=String(text||'').replace(/\[[^\]]*\]/g,'').replace(/\([^)]*\)/g,'').replace(/\s+/g,' ').trim();
+  return t.length>1?t:'';
+}
+async function finishUtterance(chunks,durMs){
+  if(!voiceOn||voicePendingAsk||durMs<VAD.MIN_MS)return;
+  const total=chunks.reduce((n,c)=>n+c.length,0);
+  if(total<16000*0.3)return;
+  const pcm=new Int16Array(total);let off=0;for(const c of chunks){pcm.set(c,off);off+=c.length;}
+  setVoiceState('transcribing');
+  const res=await api.voiceTranscribe(pcm.buffer).catch(()=>null);
+  if(!voiceOn)return;
+  if(res&&res.error==='stt_not_installed'){renderVoiceSetup({binary:false});return;}
+  const text=cleanTranscript(res&&res.text);
+  if(!text){setVoiceState('listening');return;}
+  voiceProposal=null; // a new request supersedes an unconfirmed proposal
+  voiceTurns.push({role:'user',text});
+  renderVoiceThread();
+  askVoice();
+}
+
+async function askVoice(){
+  voicePendingAsk=true;voiceNusLine=null;
+  setVoiceState('thinking');
+  const turns=voiceTurns.filter((t)=>t.role==='user'||t.role==='nus').slice(-12).map(({role,text})=>({role,text}));
+  const result=await api.voiceAsk(turns).catch(()=>null);
+  if(!voiceOn){voicePendingAsk=false;return;}
+  if(!result){voicePendingAsk=false;voiceNote('Nūs could not answer that one.');setVoiceState('listening');return;}
+  if(result.streaming)return; // ai:event events finish this turn
+  voicePendingAsk=false;
+  if(handleLimit(result)){stopVoice();return;}
+  if(result.error){voiceNote(aiError(result.error,result.detail));setVoiceState('listening');return;}
+  voiceTurns.push({role:'nus',text:result.text||'Done.'});
+  voiceProposal=result.proposal||null;
+  renderVoiceThread();
+  syncVoiceIntoChat(lastVoiceUser(),result.text||'');
+  speakReply(result.text);
+}
+
+api.onAiEvent?.((ev)=>{
+  if(!ev)return;
+  if(ev.type==='setup'){const el=$('#voice-setup-status');if(el)el.textContent=`Downloading voice model… ${ev.pct}%`;return;}
+  if(!voiceOn||!voicePendingAsk)return; // a stream that outlived voice mode
+  if(ev.type==='tool'){addVoiceTrace(ev.label);return;}
+  if(ev.type==='delta'){
+    if(!voiceNusLine){voiceNusLine={role:'nus',text:'',pending:true};voiceTurns.push(voiceNusLine);}
+    voiceNusLine.text+=ev.text||'';renderVoiceThread();return;
+  }
+  if(ev.type==='done'){
+    const text=String(ev.text||(voiceNusLine&&voiceNusLine.text)||'').trim()||'Done.';
+    if(!voiceNusLine){voiceNusLine={role:'nus',text};voiceTurns.push(voiceNusLine);}
+    voiceNusLine.text=text;delete voiceNusLine.pending;
+    voiceNusLine=null;voicePendingAsk=false;
+    renderVoiceThread();
+    syncVoiceIntoChat(lastVoiceUser(),text);
+    speakReply(text);
+    return;
+  }
+  if(ev.type==='error'){
+    voicePendingAsk=false;voiceNusLine=null;
+    voiceNote(aiError(ev.error,ev.detail));
+    setVoiceState('listening');
+  }
+});
+
+// -- start / stop / setup --
+function renderVoiceSetup(status){
+  const thread=$('#voice-thread');if(!thread)return;
+  $('#voice-panel')?.classList.remove('hidden');
+  const noBinary=!status||!status.binary;
+  thread.innerHTML=`<div class="voice-setup">
+    <strong>Set up free local voice</strong>
+    <span>Nūs transcribes speech on this computer with an open source Whisper model. Audio never leaves your machine.</span>
+    ${noBinary
+      ?'<span>The voice engine is missing from this build. Run <b>npm run setup:voice</b> in the app folder, then reopen this panel.</span>'
+      :'<button id="voice-setup-go" class="primary-button" type="button">Download voice model (57 MB)</button>'}
+    <small id="voice-setup-status"></small>
+  </div>`;
+}
+async function beginListening(){
+  try{await startVoiceMic();}
+  catch(err){
+    const msg=err&&err.name==='NotAllowedError'
+      ?'Microphone blocked. Allow it in Windows Settings, Privacy, Microphone, then try again.'
+      :err&&err.name==='NotFoundError'
+        ?'No microphone found. Plug one in and try again.'
+        :'Microphone failed: '+((err&&err.message)||'unknown error');
+    $('#voice-panel')?.classList.remove('hidden');
+    voiceNote(msg);
+    return;
+  }
+  voiceOn=true;
+  $('#voice-panel')?.classList.remove('hidden');
+  $('#voice-toggle')?.classList.add('live');
+  renderVoiceThread();
+  setVoiceState('listening');
+  $('#voice-panel')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+async function startVoice(){
+  if(voiceOn)return;
+  const status=await api.voiceStatus?.().catch(()=>null);
+  if(!status||!status.available){renderVoiceSetup(status);return;}
+  await beginListening();
+}
+function stopVoice(){
+  const wasOn=voiceOn;
+  voiceOn=false;voicePendingAsk=false;voiceNusLine=null;voiceProposal=null;
+  try{speechSynthesis.cancel();}catch{}
+  if(wasOn)api.voiceCancel?.().catch(()=>{});
+  stopVoiceMic();
+  if(heroKnot3d&&heroKnot3d.setLevel)heroKnot3d.setLevel(0);
+  vadChunks=[];vadPre=[];vadPreSamples=0;vadSpeaking=false;vadHot=0;
+  $('#voice-panel')?.classList.add('hidden');
+  $('#voice-toggle')?.classList.remove('live');
+  setVoiceState('off');
+}
+function toggleVoice(){
+  if(voiceOn){stopVoice();return;}
+  if(!$('#voice-panel')?.classList.contains('hidden')){stopVoice();return;} // setup card open: close it
+  startVoice();
+}
+$('#voice-toggle')?.addEventListener('click',toggleVoice);
+$('#hero-orb')?.addEventListener('click',toggleVoice);
+$('#voice-stop')?.addEventListener('click',stopVoice);
+$('#voice-thread')?.addEventListener('click',async(e)=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.id==='voice-setup-go'){
+    b.disabled=true;
+    const el=$('#voice-setup-status');if(el)el.textContent='Starting download…';
+    const res=await api.voiceSetup?.().catch(()=>null);
+    if(res&&res.available){await beginListening();}
+    else{if(el)el.textContent=res&&res.error?'Download failed: '+res.error:'Download failed. Check your connection and try again.';b.disabled=false;}
+    return;
+  }
+  if(b.id==='voice-cancel-prop'){voiceProposal=null;voiceTurns.push({role:'nus',text:'Okay, holding off. Anything else?'});renderVoiceThread();setVoiceState('listening');return;}
+  if(b.id!=='voice-confirm'||!voiceProposal)return;
+  const proposal=voiceProposal;voiceProposal=null;renderVoiceThread();
+  const result=await api.assistantExecute(proposal);
+  let reply;
+  if(result?.error){reply=handleLimit(result)?'That needs Pro. The upgrade sheet is open.':aiError(result.error,result.detail);}
+  else{
+    reply=result.message||'Done.';
+    if(result.navigate==='email'){
+      if(result.prefill?.help_type)$('#draft-help-type').value=result.prefill.help_type;
+      if(result.prefill?.course_id)$('#draft-course').value=String(result.prefill.course_id);
+      setView('email');autoDraftEmail();
+    }else await load();
+  }
+  voiceTurns.push({role:'nus',text:reply});
+  renderVoiceThread();
+  syncVoiceIntoChat('',reply);
+  speakReply(reply);
+});
 
 // ---- Companion session history ----
 async function renderHistory(){

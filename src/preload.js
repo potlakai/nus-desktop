@@ -93,4 +93,10 @@ contextBridge.exposeInMainWorld('nus', {
   onDesktopTour: (cb) => ipcRenderer.on('desktop:tour', () => cb()),
   setActiveView: (name) => ipcRenderer.invoke('state:view', name),
   onCompanionMessage: (cb) => ipcRenderer.on('companion:message', (_e, data) => cb(data)),
+  voiceStatus: () => ipcRenderer.invoke('voice:status'),
+  voiceSetup: () => ipcRenderer.invoke('voice:setup'),
+  voiceTranscribe: (pcm) => ipcRenderer.invoke('voice:transcribe', pcm),
+  voiceAsk: (messages) => ipcRenderer.invoke('voice:ask', messages),
+  voiceCancel: () => ipcRenderer.invoke('voice:cancel'),
+  onAiEvent: (cb) => ipcRenderer.on('ai:event', (_e, data) => cb(data)),
 });

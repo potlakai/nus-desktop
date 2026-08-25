@@ -28,6 +28,17 @@ async function transcribeGemini(apiKey, wav) {
 function createSTT(settings) {
   const keys = settings.apiKeys || {};
   const chain = [];
+  // Local whisper.cpp first: free, offline, and keyless. Cloud keys stay as
+  // fallbacks so a missing binary never silently kills listening.
+  let sttLocal = null;
+  try { sttLocal = require('../../src/stt-local'); } catch { sttLocal = null; }
+  if (sttLocal && sttLocal.status().available) {
+    chain.push({ p: 'local', fn: async (_wav, pcm) => {
+      const res = await sttLocal.transcribePcm(pcm);
+      if (res.error) throw new Error(res.error);
+      return res.text || '';
+    } });
+  }
   if (keys.openai) chain.push({ p: 'openai', fn: (wav) => transcribeOpenAI(keys.openai, wav, settings.sttModel) });
   if (keys.gemini) chain.push({ p: 'gemini', fn: (wav) => transcribeGemini(keys.gemini, wav) });
 
@@ -40,7 +51,7 @@ function createSTT(settings) {
       let lastErr = null;
       for (const c of chain) {
         try {
-          const text = await c.fn(wav);
+          const text = await c.fn(wav, pcm);
           return { text, provider: c.p };
         } catch (e) {
           lastErr = { status: e && e.status, code: e && e.code, message: (e && e.message) || String(e), provider: c.p };

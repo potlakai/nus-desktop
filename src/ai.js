@@ -116,6 +116,147 @@ function runCli(cliPath, prompt) {
   });
 }
 
+// Tools whose targets are worth showing on the constellation while Nus thinks.
+const TRACE_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'Bash']);
+
+function toolLabel(input) {
+  const raw = input && (input.file_path || input.path || input.pattern || input.command);
+  if (!raw) return null;
+  const base = String(raw).split(/[\\/]/).pop().trim();
+  return base ? base.slice(0, 40) : null;
+}
+
+function classifyCliError(detail) {
+  if (/not logged in|\/login|please run .?login/i.test(detail)) return 'cli_not_logged_in';
+  if (/spend limit|usage limit|rate limit|quota/i.test(detail)) return 'cli_spend_limit';
+  return 'cli_failed';
+}
+
+let streamChild = null;
+
+function cancelStream() {
+  if (!streamChild) return { ok: false };
+  try { streamChild.kill(); } catch {}
+  try { execFile('taskkill', ['/pid', String(streamChild.pid), '/t', '/f'], { windowsHide: true }, () => {}); } catch {}
+  streamChild = null;
+  return { ok: true };
+}
+
+// Streaming variant of runCli: NDJSON events instead of one buffered JSON blob,
+// so the renderer can paint tokens and tool activity as they happen.
+function runCliStream(cliPath, prompt, onEvent, { partials = true } = {}) {
+  return new Promise((resolve) => {
+    const isShim = /\.(cmd|bat)$/i.test(cliPath);
+    // Same billing rule as runCli: subscription only, never a stray API key.
+    const env = { ...process.env };
+    delete env.ANTHROPIC_API_KEY;
+    const opts = { cwd: app.getPath('userData'), env, windowsHide: true };
+    const args = ['-p', '--model', MODEL, '--output-format', 'stream-json', '--verbose'];
+    if (partials) args.push('--include-partial-messages');
+    const child = isShim
+      ? spawn('cmd.exe', ['/c', cliPath, ...args], opts)
+      : spawn(cliPath, args, opts);
+    streamChild = child;
+    let lineBuf = '';
+    let stderr = '';
+    let sawPartialDelta = false;
+    let finalText = '';
+    let settled = false;
+    const finish = (result) => {
+      if (!settled) {
+        settled = true;
+        if (streamChild === child) streamChild = null;
+        resolve(result);
+      }
+    };
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch {}
+      if (isShim) { try { execFile('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true }, () => {}); } catch {} }
+      finish({ error: 'cli_timeout' });
+    }, CLI_TIMEOUT_MS);
+    const handleLine = (line) => {
+      let msg;
+      try { msg = JSON.parse(line); } catch { return; }
+      if (msg.type === 'stream_event') {
+        const ev = msg.event || {};
+        if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta' && ev.delta.text) {
+          sawPartialDelta = true;
+          onEvent({ type: 'delta', text: ev.delta.text });
+        }
+        return;
+      }
+      if (msg.type === 'assistant' && msg.message && Array.isArray(msg.message.content)) {
+        for (const block of msg.message.content) {
+          if (block.type === 'tool_use' && TRACE_TOOLS.has(block.name)) {
+            const label = toolLabel(block.input);
+            if (label) onEvent({ type: 'tool', name: block.name, label });
+          } else if (block.type === 'text' && block.text && !sawPartialDelta) {
+            // No partial-message support on this CLI build: fall back to
+            // emitting each finished assistant text block as one delta.
+            onEvent({ type: 'delta', text: block.text });
+          }
+        }
+        return;
+      }
+      if (msg.type === 'result') {
+        finalText = String(msg.result || '');
+        if (msg.is_error) {
+          const detail = finalText.slice(0, 300);
+          return finish({ error: classifyCliError(detail), detail });
+        }
+        finish({ text: finalText });
+      }
+    };
+    child.stdout.on('data', (chunk) => {
+      lineBuf += chunk;
+      const lines = lineBuf.split(/\r?\n/);
+      lineBuf = lines.pop();
+      for (const line of lines) { if (line.trim()) handleLine(line.trim()); }
+    });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', () => { clearTimeout(timer); finish({ error: 'cli_spawn_failed' }); });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (lineBuf.trim()) handleLine(lineBuf.trim());
+      if (settled) return;
+      if (partials && code !== 0 && /unknown option|include-partial-messages/i.test(stderr)) {
+        return finish({ error: 'retry_without_partials' });
+      }
+      if (code !== 0) return finish({ error: classifyCliError(stderr), detail: String(stderr).slice(0, 300) });
+      finish({ text: finalText });
+    });
+    child.stdin.on('error', () => {});
+    child.stdin.write(prompt);
+    child.stdin.end();
+  });
+}
+
+// Streamed completion with tool events. onEvent receives {type:'delta'|'tool'},
+// and the resolved value carries the final text or error like complete().
+async function completeStream(prompt, onEvent) {
+  const cliPath = await detectCli();
+  const apiKey = secrets.getSecret(KEY_NAME);
+  let result;
+  if (cliPath) {
+    result = await runCliStream(cliPath, prompt, onEvent);
+    if (result.error === 'retry_without_partials') {
+      result = await runCliStream(cliPath, prompt, onEvent, { partials: false });
+    }
+    if (result.error === 'cli_spawn_failed') cliPathCache = undefined;
+    if (result.error && apiKey) {
+      result = await runApi(apiKey, prompt);
+      if (result.text) onEvent({ type: 'delta', text: result.text });
+    }
+  } else if (apiKey) {
+    result = await runApi(apiKey, prompt);
+    if (result.text) onEvent({ type: 'delta', text: result.text });
+  } else {
+    result = { error: 'no_ai' };
+  }
+  if (result.error && result.error !== 'no_ai') logAiError(result.error, result.detail);
+  return result;
+}
+
 async function runApi(apiKey, prompt) {
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -214,4 +355,4 @@ async function extractSyllabus(text) {
   return parseModelJson(result.text);
 }
 
-module.exports = { status, setApiKey, clearApiKey, testConnection, extractSyllabus, complete, parseJsonBlock, MODEL };
+module.exports = { status, setApiKey, clearApiKey, testConnection, extractSyllabus, complete, completeStream, cancelStream, parseJsonBlock, MODEL };

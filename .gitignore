@@ -3,3 +3,4 @@ src/config.js
 dist/
 *.log
 supabase/.temp/
+vendor/

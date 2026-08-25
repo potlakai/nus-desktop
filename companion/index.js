@@ -27,6 +27,9 @@ let registeredAssistShortcut = null;
 let hooks = {};
 const NUS_CONTEXT_FILE = path.join(app.getPath('userData'), 'context.json');
 const TRUSTED_COMPANION_URL = pathToFileURL(path.join(__dirname, 'renderer', 'index.html')).href;
+// The desktop dashboard gets microphone access for Knot voice chat, and only
+// that: display-capture stays companion-only.
+const TRUSTED_DESKTOP_URL = pathToFileURL(path.join(__dirname, '..', 'renderer', 'index.html')).href;
 
 function isTrustedCompanionUrl(value) {
   try {
@@ -39,6 +42,16 @@ function isTrustedCompanionUrl(value) {
 
 function isTrustedCompanionWebContents(webContents) {
   return Boolean(webContents && !webContents.isDestroyed?.() && isTrustedCompanionUrl(webContents.getURL?.()));
+}
+
+function isTrustedDesktopWebContents(webContents) {
+  try {
+    if (!webContents || webContents.isDestroyed?.()) return false;
+    const parsed = new URL(String(webContents.getURL?.() || ''));
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.href === TRUSTED_DESKTOP_URL;
+  } catch { return false; }
 }
 
 const DEFAULT_ASSIST_SHORTCUT = 'CommandOrControl+Return';
@@ -197,7 +210,7 @@ async function flushChannel(channel) {
     const settings = store.getSettings();
     const stt = createSTT(settings);
     if (!stt.available) {
-      if (!sttDisabled) { sttDisabled = true; send('status', { message: 'No transcription key set. Add an OpenAI (Whisper) or Gemini key in Settings to enable listening. Screen/LeetCode features work without it.' }); }
+      if (!sttDisabled) { sttDisabled = true; send('status', { message: 'No transcription available. Run voice setup in the desktop app (Today tab mic) for free local transcription, or add an OpenAI (Whisper) or Gemini key in Settings. Screen/LeetCode features work without it.' }); }
       return;
     }
     const res = await stt.transcribe(pcm);
@@ -805,8 +818,16 @@ function stopCursorProbe() {
 function initCompanion(providedHooks = {}) {
   hooks = providedHooks;
 
-  const allowMedia = (webContents, permission) => isTrustedCompanionWebContents(webContents)
-    && (permission === 'media' || permission === 'microphone' || permission === 'audioCapture' || permission === 'display-capture');
+  const allowMedia = (webContents, permission) => {
+    if (isTrustedCompanionWebContents(webContents)) {
+      return permission === 'media' || permission === 'microphone' || permission === 'audioCapture' || permission === 'display-capture';
+    }
+    if (isTrustedDesktopWebContents(webContents)) {
+      // Mic only for Knot voice chat. Never display-capture from the dashboard.
+      return permission === 'media' || permission === 'microphone' || permission === 'audioCapture';
+    }
+    return false;
+  };
   session.defaultSession.setPermissionRequestHandler((webContents, permission, cb) => cb(allowMedia(webContents, permission)));
   session.defaultSession.setPermissionCheckHandler((webContents, permission) => allowMedia(webContents, permission));
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {

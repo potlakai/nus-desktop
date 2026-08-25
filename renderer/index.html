@@ -61,8 +61,18 @@
           </div>
           <div id="hero-chips" class="hero-chips"></div>
           <p id="brief-copy" class="hero-brief">Reading your semester…</p>
-          <div class="hero-ask"><input id="ask-input" placeholder="Tell Nūs what changed, what you need, or what to handle…" /><button id="ask-go" class="hero-go" type="button">✦</button></div>
-          <p class="hero-hint">Try: "Push the calc homework to Friday" or "What should I start tonight?"</p>
+          <div class="hero-ask"><input id="ask-input" placeholder="Tell Nūs what changed, what you need, or what to handle…" /><button id="voice-toggle" class="hero-go voice" type="button" title="Talk to Nūs" aria-label="Talk to Nūs">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+          </button><button id="ask-go" class="hero-go" type="button">✦</button></div>
+          <p class="hero-hint">Try: "Push the calc homework to Friday" or "What should I start tonight?" Or click the Knot and just talk.</p>
+          <div id="voice-panel" class="voice-panel hidden">
+            <div id="voice-thread" class="voice-thread"></div>
+            <div class="voice-controls">
+              <span id="voice-hint" class="voice-hint">Listening. Just talk.</span>
+              <label class="voice-speak"><input id="voice-speak" type="checkbox" checked /><span>Speak replies</span></label>
+              <button id="voice-stop" class="text-button" type="button">End voice chat</button>
+            </div>
+          </div>
           <div id="hero-bubbles" class="hero-bubbles hidden"></div>
           <div id="nus-proposal" class="nus-proposal hidden"></div>
           <div id="ask-answer" class="hero-answer hidden"></div>

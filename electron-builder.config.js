@@ -38,6 +38,11 @@ const config = {
     '!supabase/**',
     '!electron-builder.config.js',
   ],
+  // whisper.cpp lives outside the asar so it can be spawned as a real exe.
+  // The model is NOT bundled: it downloads to userData on first use.
+  extraResources: [
+    { from: 'vendor/whisper', to: 'whisper', filter: ['**/*'] },
+  ],
   win: {
     target: [
       { target: 'nsis', arch: ['x64'] },
