@@ -6,6 +6,41 @@ const secrets = require('./secrets');
 let client = null;
 let session = null;
 
+// Shown whenever the account service cannot be reached (paused project, DNS,
+// captive portal, offline). The app is local-first, so say so instead of
+// leaking a raw fetch error or opening a browser tab that cannot load.
+const UNREACHABLE_MESSAGE = 'Nūs sign-in is unreachable right now. Free features still work; try signing in again in a few minutes.';
+const HEALTH_TIMEOUT_MS = 5000;
+
+function isNetworkError(error) {
+  if (!error) return false;
+  const name = String(error.name || '');
+  const text = [error.message, error.cause?.code, error.cause?.message].filter(Boolean).join(' ');
+  return name === 'AuthRetryableFetchError'
+    || /fetch failed|failed to fetch|network|ENOTFOUND|ECONNREFUSED|ECONNRESET|EAI_AGAIN|ETIMEDOUT|aborted/i.test(text);
+}
+
+function friendlyAuthError(error) {
+  if (isNetworkError(error)) return UNREACHABLE_MESSAGE;
+  return error?.message || 'Sign-in failed. Try again.';
+}
+
+// One cheap GET before anything that would otherwise fail loudly. Any HTTP
+// answer counts as reachable; only a transport failure or timeout does not.
+async function checkReachable({ url = config.supabase?.url, apiKey = config.supabase?.anonKey, fetchImpl = global.fetch, timeoutMs = HEALTH_TIMEOUT_MS } = {}) {
+  if (!url || typeof fetchImpl !== 'function') return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    await fetchImpl(`${url}/auth/v1/health`, { headers: apiKey ? { apikey: apiKey } : {}, signal: controller.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function storageKey(key) {
   return `supabase-session-${crypto.createHash('sha256').update(String(key)).digest('hex').slice(0, 24)}`;
 }
@@ -56,7 +91,7 @@ async function restoreSession() {
 async function loginWithEmail(email, password) {
   if (!init()) return { error: 'Supabase is not configured. See docs/credentials-needed.md.' };
   const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyAuthError(error) };
   session = data.session;
   return { session: data.session, user: data.user };
 }
@@ -64,18 +99,21 @@ async function loginWithEmail(email, password) {
 async function signUpWithEmail(email, password) {
   if (!init()) return { error: 'Supabase is not configured.' };
   const { data, error } = await client.auth.signUp({ email, password });
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyAuthError(error) };
   session = data.session;
   return { session: data.session, user: data.user };
 }
 
-async function loginWithGoogle() {
+async function loginWithGoogle({ reachable = checkReachable } = {}) {
   if (!init()) return { error: 'Supabase is not configured.' };
+  // signInWithOAuth builds the authorize URL locally, so without this check an
+  // unreachable project sends the user to a browser tab that cannot load.
+  if (!(await reachable())) return { error: UNREACHABLE_MESSAGE };
   const { data, error } = await client.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: 'nus-desktop://auth/callback' },
   });
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyAuthError(error) };
   return { url: data?.url || null };
 }
 
@@ -148,4 +186,5 @@ module.exports = {
   loginWithEmail, signUpWithEmail, loginWithGoogle, handleOAuthCallback, logout,
   getSession, getUser, getAccessToken, getUserId,
   createSecretStorage, parseCallbackUrl, completeOAuthCallback,
+  checkReachable, friendlyAuthError, isNetworkError, UNREACHABLE_MESSAGE,
 };

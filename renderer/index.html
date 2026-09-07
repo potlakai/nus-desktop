@@ -219,7 +219,7 @@
               <button id="companion-capture" class="quiet-button" type="button">Start listening</button>
               <button id="companion-power" class="danger-button" type="button">Turn off Companion</button>
             </div>
-            <p class="companion-hint">The Companion stays on your desktop after you close this window, and the hotkeys keep working: <b>Ctrl+Shift+Space</b> hide or show · <b>Ctrl+Shift+K</b> hide just the Knot · <b>Ctrl+Shift+X</b> panic (stop and vanish). Bring it back from the tray icon any time. Turning it off removes it completely, releases the hotkeys, and it stays off until you turn it back on here.</p>
+            <p class="companion-hint">The Companion stays on your desktop after you close this window, and the hotkeys keep working: <b>Ctrl+Shift+Space</b> hide or show · <b>Ctrl+Shift+X</b> panic (stop and vanish). The Knot mark alone hides from the button above. Bring it back from the tray icon any time. Turning it off removes it completely, releases the hotkeys, and it stays off until you turn it back on here.</p>
           </section>
           <section class="dash-card companion-chat">
             <div class="section-head"><div><div class="section-kicker">Chat</div><h2>Ask Nūs anything, in a thread</h2></div></div>
@@ -274,6 +274,18 @@
                 <div class="license-actions"><button id="license-upgrade" class="primary-button" type="button">Upgrade to Pro</button><button id="license-portal" class="quiet-button hidden" type="button">Manage subscription</button><button id="license-refresh" class="quiet-button" type="button">Refresh plan</button></div>
               </div>
               <span id="license-badge" class="status-badge">Free</span>
+            </section>
+            <section class="setting-card" id="acq-card">
+              <div>
+                <div class="section-kicker">Setup code</div>
+                <h3 id="acq-title">Have a setup code?</h3>
+                <p id="acq-copy">If the download page showed you a short code, paste it here. It only tells us which post or video Nūs came from: no identity, nothing about your courses. Completely optional.</p>
+                <div id="acq-form" class="auth-form">
+                  <label class="field"><span>Setup code</span><input id="acq-token" type="text" placeholder="N1.…" autocomplete="off" spellcheck="false" /></label>
+                  <div class="sheet-actions"><span id="acq-result"></span><button id="acq-redeem" class="quiet-button" type="button">Apply</button></div>
+                </div>
+              </div>
+              <span id="acq-badge" class="status-badge">Optional</span>
             </section>
             <section class="setting-card" id="bridge-card"><div><div class="section-kicker">Companion</div><h3 id="bridge-title">Checking shared context…</h3><p id="bridge-copy">The overlay reads a minimal semester snapshot, never the database file.</p></div><span id="bridge-badge" class="status-badge">Checking</span></section>
             <section class="setting-card" id="sync-card" hidden>

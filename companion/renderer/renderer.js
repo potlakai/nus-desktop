@@ -15,7 +15,6 @@
     const slot = btn.querySelector('.ic');
     if (slot) slot.innerHTML = icon(btn.dataset.icon, { size: 16 });
   });
-  $('#smart-toggle .ic').innerHTML = icon('zap', { size: 14 });
   $('#more-btn').innerHTML = icon('more-horizontal', { size: 18 });
   $('#send-btn').innerHTML = icon('play', { size: 15 });
 
@@ -52,7 +51,7 @@
     const shortcutBtn = $('#shortcut-assist');
     if (shortcutBtn && !recordingShortcut) shortcutBtn.textContent = shortcutParts(assistShortcut).join(' + ');
     const placeholder = $('#placeholder');
-    if (placeholder) placeholder.innerHTML = 'Ask about your screen or conversation, or ' + shortcutKeycapsHtml(assistShortcut) + ' for Assist';
+    if (placeholder) placeholder.innerHTML = 'Ask Nūs anything, or ' + shortcutKeycapsHtml(assistShortcut) + ' for What should I do?';
   }
 
   // minimal, safe markdown: fenced code, bullets, inline code, bold, paragraphs
@@ -151,10 +150,6 @@
     $('#orb').setAttribute('aria-expanded', String(!!panelOpen));
     $('#knot-status-title').textContent = copy[0];
     $('#knot-status-subtitle').textContent = copy[1];
-    document.querySelectorAll('.knot-state').forEach((button) => {
-      button.classList.toggle('active', button.dataset.knotState === state);
-      button.setAttribute('aria-pressed', String(button.dataset.knotState === state));
-    });
     if (knot3d) knot3d.setState($('#orb').classList.contains('spar') && !busy ? 'spar' : state);
   }
 
@@ -209,9 +204,14 @@
   function stopSpeaking() { try { speechSynthesis.cancel(); } catch (_) {} }
 
   // ---- actions -----------------------------------------------------------
+  // Modes that render without a provider key: guide answers from the local
+  // semester snapshot, numbers and brief come straight from the pack. The key
+  // ask happens inline the first time an AI mode is actually used.
+  const KEYLESS_MODES = new Set(['guide', 'numbers', 'brief']);
+
   async function runMode(mode, text) {
     if (busy) return;
-    const ready = await (nus.aiReady ? nus.aiReady() : { ok: true });
+    const ready = KEYLESS_MODES.has(mode) ? { ok: true } : await (nus.aiReady ? nus.aiReady() : { ok: true });
     if (!ready.ok) {
       // Honest feedback instead of a phantom state flip: the indicator stays
       // where it is and the message says exactly what to do.
@@ -271,7 +271,7 @@
 
   function send() {
     const text = input.value.trim();
-    if (!text) { runMode('assist', ''); return; }
+    if (!text) { runMode('guide', ''); return; }
     input.value = ''; syncPlaceholder();
     // While rehearsing, what you type is your spoken line, not a question.
     runMode(sparring ? 'spar' : 'ask', text);
@@ -291,17 +291,9 @@
     }
     const captured = keyEventToAccelerator(e);
     if (captured.accelerator && captured.accelerator.toLowerCase() === assistShortcut.toLowerCase()) {
-      e.preventDefault(); runMode('assist', ''); return;
+      e.preventDefault(); runMode('guide', ''); return;
     }
     if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); send(); }
-  });
-
-  // Smart toggle
-  const smartBtn = $('#smart-toggle');
-  smartBtn.addEventListener('click', async () => {
-    settings.smart = !settings.smart;
-    smartBtn.classList.toggle('on', settings.smart);
-    await nus.settingsSet({ smart: settings.smart });
   });
 
   // The Knot is the show/hide switch for the existing command sheet.
@@ -313,29 +305,6 @@
     nus.captureToggle();
   }
   $('#stop-btn').addEventListener('click', toggleCaptureFromUi);
-
-  document.querySelectorAll('.knot-state').forEach((button) => {
-    button.addEventListener('click', () => {
-      const state = button.dataset.knotState;
-      if (state === 'idle') {
-        if ($('#stop-btn').classList.contains('active')) nus.captureToggle();
-        panel.classList.add('collapsed');
-        syncKnotUi();
-        return;
-      }
-      if (state === 'listening') {
-        toggleCaptureFromUi();
-        return;
-      }
-      if (state === 'thinking') {
-        runMode('assist', '');   // sets busy (thinking) BEFORE the tiles paint
-        showTiles();
-        return;
-      }
-      showTiles();
-      $('#input').focus();
-    });
-  });
 
   // ---- voice wave -------------------------------------------------------
   // Live proof the mic is actually hearing you. Levels arrive from the PCM
@@ -469,6 +438,9 @@
     $('#capture-chip').classList.toggle('off', !active);
     $('#stop-btn').classList.toggle('active', active);
     $('#orb').classList.toggle('listening', active);
+    // The call tools only exist during a call: dead buttons teach people that
+    // buttons here are sometimes dead, so they never appear dead.
+    $('#live-cluster').classList.toggle('hidden', !active);
     syncKnotUi();
     clearInterval(captureClockTimer);
     captureClockTimer = null;
@@ -507,7 +479,7 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'nus-status';
-      const row = document.getElementById('action-row');
+      const row = document.getElementById('primary-row');
       row.parentNode.insertBefore(el, row); // top of the controls tile
     }
     showTiles(); // statuses matter (transcription off, pack missing): surface them
@@ -517,6 +489,28 @@
     statusTimer = setTimeout(() => el.classList.remove('show'), 11000);
   }
   nus.on('status', ({ message }) => { nus.log('[status] ' + message); showStatus(message); });
+
+  // ---- the daily line ----------------------------------------------------
+  // Once a day the main process sends the top ranked next move. It sits above
+  // the Knot until clicked; the click opens the full local guide answer.
+  const dailyLine = $('#daily-line');
+  nus.on('daily:line', ({ text }) => {
+    if (!text) return;
+    dailyLine.textContent = text;
+    dailyLine.classList.remove('hidden');
+  });
+  dailyLine.addEventListener('click', () => {
+    dailyLine.classList.add('hidden');
+    runMode('guide', '');
+  });
+
+  // Rehearsal tools require a briefing pack built by the vault; without one
+  // (or founder mode) the cluster does not exist.
+  function syncRehearsalCluster() {
+    const hasPack = !!(settings && (settings.packPath || settings.sparPath));
+    const founder = !!(settings && settings._founderTools);
+    $('#rehearsal-cluster').classList.toggle('hidden', !(hasPack || founder));
+  }
 
   // ---- settings ----------------------------------------------------------
   const scrim = $('#settings-scrim');
@@ -537,6 +531,7 @@
     $('#resume-context').value = settings.resumeContext || '';
     $('#pack-path').value = settings.packPath || '';
     $('#spar-path').value = settings.sparPath || '';
+    $('#smart-mode').checked = !!settings.smart;
     $('#speak-replies').checked = !!settings.speakReplies;
     $('#persist-transcripts').checked = settings.persistTranscripts !== false;
     $('#save-audio').checked = settings.saveAudio === true;
@@ -585,6 +580,7 @@
     settings.sparPath = $('#spar-path').value.trim();
     await nus.settingsSet({ packPath: settings.packPath, sparPath: settings.sparPath });
     refreshPackStatus();
+    syncRehearsalCluster();
   });
 
   $('#speak-replies').addEventListener('change', async (e) => {
@@ -619,6 +615,7 @@
     settings.resumeContext = $('#resume-context').value.trim();
     settings.packPath = $('#pack-path').value.trim();
     settings.sparPath = $('#spar-path').value.trim();
+    settings.smart = $('#smart-mode').checked;
     settings.speakReplies = $('#speak-replies').checked;
     settings.shareNusContextWithProvider = $('#share-nus-context').checked;
     settings.reportToNus = $('#report-to-nus').checked;
@@ -629,6 +626,7 @@
     settings.models[settings.provider].fast = $('#model-fast').value.trim();
     settings.models[settings.provider].smart = $('#model-smart').value.trim();
     await nus.settingsSet(settings);
+    syncRehearsalCluster();
   }
 
   // Assist shortcut recorder. The renderer captures a key combination and the
@@ -739,15 +737,6 @@
     }
   });
 
-  // UI Zoom buttons (text only)
-  let currentZoom = 1;
-  function updateZoom(delta) {
-    currentZoom = Math.max(0.5, Math.min(3, currentZoom + delta));
-    document.documentElement.style.setProperty('--text-zoom', currentZoom);
-  }
-  $('#zoom-in-btn').addEventListener('click', () => updateZoom(0.1));
-  $('#zoom-out-btn').addEventListener('click', () => updateZoom(-0.1));
-
   // ---- click-through: only the UI blocks the mouse; empty gaps pass to your screen ----
   const setIgnore = setIgnoreSafe;
   function modalOpen() {
@@ -759,7 +748,7 @@
     // a stray probe hand the mouse back to the desktop underneath it.
     if (modalOpen()) return true;
     const el = document.elementFromPoint(cssX, cssY);
-    return !!(el && el.closest && el.closest('#knot-shell, #panel-wrap, #settings-scrim, #onboard-scrim'));
+    return !!(el && el.closest && el.closest('#knot-shell, #panel-wrap, #settings-scrim, #onboard-scrim, #daily-line'));
   }
   document.addEventListener('mousemove', (e) => setIgnore(!overUIAt(e.clientX, e.clientY)));
   // Windows: forwarded mousemove is unreliable while click-through, so the main
@@ -780,47 +769,30 @@
       state: 'idle',
       title: 'This is the Nūs Knot',
       target: '#orb',
-      body: 'One continuous loop, no beginning, no end. It floats at the edge of your screen, tumbling quietly while it waits. It can <strong>see the screen you choose</strong> and <strong>listen when you switch it on</strong>, and it answers from your own prepared material.<br><br>Everything blooms out of the Knot: hover it now and watch.'
-    },
-    {
-      state: 'listening',
-      title: 'Four states, one glance',
-      target: '#knot-bloom',
-      body: 'The capsule beside the Knot shows what Nūs is doing: <strong>Idle</strong> (quiet), <strong>Listen</strong> (mic + meeting audio on, the Knot turns teal), <strong>Think</strong> (working, it speeds up and brightens), <strong>Ready</strong> (command layer open). The chips are also buttons; clicking Listen starts a capture session that lands in your history.'
+      body: 'One continuous loop, no beginning, no end. It floats at the edge of your screen, tumbling quietly while it waits.<br><br><strong>Click the Knot and ask "What should I do?"</strong> It answers from your real semester: your courses, tasks, and deadlines, ranked. That works right now, with no key and no setup. Once a day it also surfaces your top next move on its own.'
     },
     ...(nus.platform === 'darwin' ? [{
       state: 'idle',
       title: 'Allow the Companion to see & hear',
-      body: 'It needs two macOS permissions. Click each button, turn <strong>Nūs Companion</strong> ON in the window that opens, then come back here.<ul><li><strong>Microphone</strong>: to hear you</li><li><strong>Screen Recording</strong>: to see your screen and hear meeting audio</li></ul>',
+      body: 'For listening and screen answers it needs two macOS permissions. Click each button, turn <strong>Nūs Companion</strong> ON in the window that opens, then come back here.<ul><li><strong>Microphone</strong>: to hear you</li><li><strong>Screen Recording</strong>: to see your screen and hear meeting audio</li></ul>',
       buttons: [
         { label: 'Open Microphone settings', action: () => nus.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone') },
         { label: 'Open Screen Recording settings', action: () => nus.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture') }
       ]
     }] : []),
     {
-      state: 'thinking',
-      title: 'Give the Knot a Gemini key',
-      body: 'This is the one thing you have to do. The Knot runs on <strong>your own</strong> key, separate from the desktop app\'s Claude key, because it watches your screen live and that has to stay fast and cheap.<br><br><strong>Recommended: <span class="hl">Google Gemini</span></strong> (free tier at <span class="hl">aistudio.google.com/apikey</span>) because one key covers both answering and speech-to-text for listening. <span class="hl">OpenAI</span>, <span class="hl">Anthropic</span>, or <span class="hl">Nvidia</span> also work; with OpenAI, listening needs Whisper access on that key.<br><br>Paste it below, or in the desktop app under <strong>Settings &gt; Companion AI key</strong>. Same key either way. The pre-call brief works with no key at all.',
-      buttons: [{ label: 'Open Settings and paste it', action: () => { finishOnboard(); openSettings(); } }]
-    },
-    {
       state: 'ready',
-      title: 'Driving it: the commands',
+      title: 'Three hotkeys, anywhere',
       target: '#knot-bloom',
-      body: '<strong>Click the Knot</strong> to open this command sheet, then type a question and press Enter, or <span class="hl">Ctrl+Enter</span> anywhere for Assist. The buttons above the box are the same actions.<br><br><strong>Hotkeys, anywhere on your machine:</strong><ul><li><span class="hl">Ctrl+Shift+Space</span> hide or show the Companion</li><li><span class="hl">Ctrl+Shift+K</span> hide just the Knot mark, everything still works</li><li><span class="hl">Ctrl+Shift+X</span> panic: stop listening and vanish</li><li><span class="hl">Ctrl+Shift+N</span> numbers, <span class="hl">Ctrl+Shift+O</span> objection, <span class="hl">Ctrl+Shift+R</span> rehearsal</li></ul>I keep running after you close the desktop window, and the tray icon brings the dashboard back.'
+      body: () => `<ul><li>${shortcutKeycapsHtml(assistShortcut, 'kbd')}: <strong>What should I do?</strong> from anywhere</li><li><span class="kbd">${cmdKey}</span> <span class="kbd">⇧</span> <span class="kbd">Space</span>: hide or show the Companion</li><li><span class="kbd">${cmdKey}</span> <span class="kbd">⇧</span> <span class="kbd">X</span>: stop listening and vanish</li></ul>Type in the box for anything else. AI answers and listening need a free Gemini key (<span class="hl">aistudio.google.com/apikey</span>); I will ask for it the first time it is actually needed, and it also lives in the gear icon.`
     },
     {
       state: 'idle',
       title: 'Choose what you share',
-      body: (nus.platform === 'darwin'
+      body: () => ((nus.platform === 'darwin'
         ? 'Nūs asks macOS to exclude the Companion from many captures, but capture behavior varies by app and is <strong>not guaranteed</strong>. '
         : 'Nūs asks Windows to exclude the Companion from many captures, but capture behavior varies by app and is <strong>not guaranteed</strong>. ')
-        + 'Treat it as presentation control, not a way to conceal assistance. Always follow the rules of the meeting, class, interview, or assessment you are in.<br><br>Letting the Knot read your semester when answering with AI is a separate switch in Settings, off until you turn it on. Nothing leaves this machine without it.'
-    },
-    {
-      state: 'ready',
-      title: 'Your desktop brain',
-      body: () => `The Knot is one half of Nūs; the desktop app is the other. Every capture session lands there under <strong>Knot &gt; History</strong>, searchable and uploadable to your vault.<br><br>Hotkeys:<ul><li>${shortcutKeycapsHtml(assistShortcut, 'kbd')}: <strong>Assist</strong> with whatever's on screen or being said</li><li><span class="kbd">${cmdKey}</span> <span class="kbd">⇧</span> <span class="kbd">Space</span>: hide or show the Companion</li><li><span class="kbd">${cmdKey}</span> <span class="kbd">⇧</span> <span class="kbd">K</span>: hide just the Knot mark</li><li><span class="kbd">${cmdKey}</span> <span class="kbd">⇧</span> <span class="kbd">X</span>: stop listening and vanish</li></ul>Reopen this guide from the <strong>?</strong> in the Knot's capsule, or from the desktop app's Knot pane.`,
+        + 'Treat it as presentation control, not a way to conceal assistance. Always follow the rules of the meeting, class, interview, or assessment you are in.<br><br>Letting the Knot read your semester when answering with AI is a separate switch in Settings, off until you turn it on. Nothing leaves this machine without it. Every capture session lands in the desktop app under <strong>Knot &gt; History</strong>. Reopen this guide from the <strong>?</strong> in the Knot\'s capsule.'),
       buttons: [{ label: 'Tour the desktop app', action: () => { finishOnboard(); nus.desktopTour && nus.desktopTour(); } }]
     }
   ];
@@ -878,7 +850,10 @@
     settings = await nus.settingsGet();
     assistShortcut = (settings.shortcuts && settings.shortcuts.assist) || DEFAULT_ASSIST_SHORTCUT;
     syncAssistShortcutLabels();
-    smartBtn.classList.toggle('on', !!settings.smart);
+    // Founder tooling (stealth, packs, résumé) exists only on machines that
+    // set NUS_FOUNDER=1; everyone else never sees the rows.
+    document.documentElement.classList.toggle('founder', !!settings._founderTools);
+    syncRehearsalCluster();
     syncPlaceholder();
     const st = await nus.captureState();
     syncCaptureUi(st.active);
@@ -896,6 +871,7 @@ function createPreviewBridge() {
     models: { gemini: { fast: 'gemini-2.0-flash', smart: 'gemini-2.5-pro' } },
     shortcuts: { assist: 'CommandOrControl+Return' }, smart: false, onboarded: true,
     resumeContext: '', packPath: '', sparPath: '', speakReplies: false, shareNusContextWithProvider: false,
+    _founderTools: false,
   };
   return {
     platform: 'win32',

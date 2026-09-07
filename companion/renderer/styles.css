@@ -61,7 +61,7 @@ html, body {
   pointer-events: none;                  /* only the actual UI blocks; gaps pass through */
 }
 #stack { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; max-height: 100%; }
-#toolbar, #panel-wrap, #settings-scrim, #onboard-scrim { pointer-events: auto; }
+#toolbar, #panel-wrap, #settings-scrim, #onboard-scrim, #daily-line { pointer-events: auto; }
 #toolbar { -webkit-app-region: drag; }   /* the orb row is the window's drag handle */
 .no-drag, button, input, textarea { -webkit-app-region: no-drag; }
 
@@ -241,17 +241,6 @@ button:focus { outline: none; }
 }
 #composer-bottom { display: flex; align-items: center; gap: 8px; }
 .spacer { flex: 1; }
-.smart-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 11px; border-radius: var(--r-pill);
-  border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.05);
-  color: var(--tx-2); font-size: 13px; font-weight: 500; font-family: var(--font);
-  cursor: pointer; transition: all 140ms ease;
-}
-.smart-pill .ic { display: inline-flex; color: var(--ic); }
-.smart-pill:hover { background: rgba(255,255,255,0.09); }
-.smart-pill.on { border-color: rgba(255,255,255,0.5); color: #FFFFFF; background: rgba(255,255,255,0.10); }
-.smart-pill.on .ic { color: #FFFFFF; }
 .more-btn {
   width: 28px; height: 28px; border-radius: var(--r-8);
   border: none; background: transparent; color: rgba(255,255,255,0.7);
@@ -630,27 +619,6 @@ button:focus { outline: none; }
   line-height: 1;
   white-space: nowrap;
 }
-.knot-state-row { display: inline-flex; align-items: center; gap: 3px; flex: 1; }
-.knot-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 26px;
-  padding: 0 7px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: rgba(243,240,232,.52);
-  font: 600 9px/1 var(--font);
-  cursor: pointer;
-  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
-}
-.knot-state i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 7px currentColor; }
-.knot-state:hover { color: #F3F0E8; background: rgba(255,255,255,.055); }
-.knot-state.active { color: #90A5FF; border-color: rgba(84,108,255,.24); background: rgba(49,92,255,.10); }
-.knot-state[data-knot-state='listening'].active { color: #69E2CF; border-color: rgba(105,226,207,.22); background: rgba(105,226,207,.075); }
-.knot-state[data-knot-state='thinking'].active { color: #C3C9FF; border-color: rgba(140,150,255,.32); background: rgba(140,150,255,.10); }
-
 #knot-bloom #orb-controls {
   display: inline-flex;
   flex: 0 0 auto;
@@ -744,6 +712,33 @@ button:focus { outline: none; }
 .act { padding: 8px 11px; border-radius: 9px; }
 .sep { display: none; }
 
+/* The one always-on verb: full width, a touch heavier than the mode chips. */
+#primary-row { margin-bottom: 6px; }
+#primary-row .act.primary {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 11px 14px; border-radius: 11px;
+  border: 1px solid rgba(84,108,255,.30); background: rgba(49,92,255,.12);
+  color: #E9ECFF; font-size: 14px; font-weight: 600;
+}
+#primary-row .act.primary:hover { background: rgba(49,92,255,.20); border-color: rgba(84,108,255,.45); }
+
+/* The daily line: one sentence above the Knot, once a day, gone on click. */
+#daily-line {
+  max-width: min(440px, 92vw);
+  margin: 0 0 10px 0;
+  padding: 9px 14px;
+  border-radius: var(--r-pill, 999px);
+  color: var(--tx-1, #F3F0E8);
+  font-family: var(--font); font-size: 13px; line-height: 1.35;
+  text-align: left; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  animation: fadeUp 260ms ease both;
+}
+#daily-line:hover { border-color: rgba(84,108,255,.45); }
+
+/* Founder tooling stays invisible unless this machine runs with NUS_FOUNDER=1. */
+html:not(.founder) [data-founder] { display: none !important; }
+
 /* Bloom-up: tiles grow out of the Knot. */
 .tile { transform-origin: 14% 100%; }
 @keyframes tileIn { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
@@ -763,11 +758,6 @@ button:focus { outline: none; }
 #stack { justify-content: flex-end; overflow: hidden; }
 #panel-wrap { min-height: 0; }
 #messages { max-height: min(50vh, calc(100vh - 340px)); }
-
-/* State chips read as an indicator: the truth lit, the rest quiet. */
-.knot-state { opacity: .5; transition: opacity .3s ease, color .3s ease, border-color .3s ease; }
-.knot-state.active { opacity: 1; color: var(--accent); }
-.knot-state:hover { opacity: .85; }
 
 /* Drag region: only the Knot shell moves the window; the invisible toolbar
    band no longer exists as a click surface. */
@@ -824,8 +814,8 @@ button:focus { outline: none; }
   border: 1px solid rgba(242,239,230,.14); border-radius: 9px; background: rgba(255,255,255,.05); color: var(--tx-1);
 }
 .s-field input:focus, #settings input:focus, #settings select:focus { outline: none; border-color: rgba(80,108,255,.6); box-shadow: 0 0 0 2px rgba(80,108,255,.2); }
-.act, .smart-pill, .more-btn, .ob-primary, .ob-ghost, .s-close { transition: background .15s ease, border-color .15s ease, color .15s ease; }
-.act:hover, .smart-pill:hover, .more-btn:hover { background: rgba(255,255,255,.07); border-color: rgba(242,239,230,.18); }
+.act, .more-btn, .ob-primary, .ob-ghost, .s-close { transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.act:hover, .more-btn:hover { background: rgba(255,255,255,.07); border-color: rgba(242,239,230,.18); }
 .ob-primary { background: var(--cobalt); color: #fff; border: 0; }
 .ob-primary:hover { background: #6478ff; }
 .user-bubble { background: var(--cobalt); color: #fff; }

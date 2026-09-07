@@ -39,16 +39,17 @@ function friendlySignInError(message) {
   return text || 'The sign-in did not complete.';
 }
 
-// nus-desktop:// links carry exactly two things: a sign-in callback from
-// Supabase, or "billing finished" from the website after Stripe Checkout. The
-// path decides; anything else is ignored so a stray link never reaches the
-// OAuth exchange.
+// nus-desktop:// links carry exactly three things: a sign-in callback from
+// Supabase, "billing finished" from the website after Stripe Checkout, or an
+// acquisition token from the website's download flow. The path decides;
+// anything else is ignored so a stray link never reaches the OAuth exchange.
 function routeProtocolUrl(url) {
   let parsed;
   try { parsed = new URL(String(url)); } catch { return 'ignore'; }
   if (parsed.protocol !== `${PROTOCOL}:`) return 'ignore';
   if (parsed.hostname === 'auth' && parsed.pathname === '/callback') return 'auth';
   if (parsed.hostname === 'billing' && parsed.pathname === '/success') return 'billing';
+  if (parsed.hostname === 'acquire' && (parsed.pathname === '' || parsed.pathname === '/')) return 'acquire';
   return 'ignore';
 }
 

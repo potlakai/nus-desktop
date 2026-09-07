@@ -46,3 +46,34 @@ test('PKCE callback exchanges its code and returns the session', async () => {
   assert.deepEqual(calls, ['pkce-code']);
   assert.equal(result.user.id, 'u1');
 });
+
+test('network failures during sign-in become one friendly, local-first message', () => {
+  const { friendlyAuthError, isNetworkError, UNREACHABLE_MESSAGE } = require('./auth');
+  const retryable = Object.assign(new Error('fetch failed'), { name: 'AuthRetryableFetchError' });
+  assert.equal(friendlyAuthError(retryable), UNREACHABLE_MESSAGE);
+  const dns = Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
+  assert.equal(friendlyAuthError(dns), UNREACHABLE_MESSAGE);
+  assert.equal(isNetworkError(new Error('Invalid login credentials')), false);
+  assert.equal(friendlyAuthError(new Error('Invalid login credentials')), 'Invalid login credentials');
+  assert.match(UNREACHABLE_MESSAGE, /Free features still work/);
+});
+
+test('reachability check answers false on a transport failure and true on any HTTP reply', async () => {
+  const { checkReachable } = require('./auth');
+  const calls = [];
+  const dead = async (url) => { calls.push(url); throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } }); };
+  assert.equal(await checkReachable({ url: 'https://paused.supabase.co', apiKey: 'k', fetchImpl: dead }), false);
+  assert.deepEqual(calls, ['https://paused.supabase.co/auth/v1/health']);
+  const alive = async () => ({ ok: true, status: 200 });
+  assert.equal(await checkReachable({ url: 'https://live.supabase.co', apiKey: 'k', fetchImpl: alive }), true);
+  const slow = (_url, { signal }) => new Promise((_resolve, reject) => { signal.addEventListener('abort', () => reject(new Error('aborted'))); });
+  assert.equal(await checkReachable({ url: 'https://slow.supabase.co', apiKey: 'k', fetchImpl: slow, timeoutMs: 20 }), false);
+});
+
+test('Google sign-in refuses to open a browser tab when the project is unreachable', async () => {
+  const auth = require('./auth');
+  if (!auth.isConfigured()) return; // no src/config.js on this machine; the guard is exercised in the reachable tests above
+  const result = await auth.loginWithGoogle({ reachable: async () => false });
+  assert.equal(result.error, auth.UNREACHABLE_MESSAGE);
+  assert.equal(result.url, undefined);
+});

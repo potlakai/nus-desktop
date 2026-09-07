@@ -1,0 +1,36 @@
+# Keeps the free-tier Supabase project awake.
+#
+# Supabase pauses a free project after seven days without API traffic, and a
+# paused project's hostname stops resolving: sign-in, checkout, and funnel
+# events all fail until someone clicks Restore in the dashboard. One tiny
+# authenticated-as-anon request every two days counts as activity.
+#
+# The URL and publishable key below are public by design: the same values ship
+# inside the desktop app and on the website (RLS locks every table, and this
+# query returns an empty array for anon).
+name: keepalive
+
+on:
+  schedule:
+    - cron: '17 6 */2 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Touch the REST API
+        env:
+          SUPABASE_URL: https://xnpkplcjurzwanotmwwt.supabase.co
+          SUPABASE_KEY: sb_publishable_yBEA9loOsDI9E_HMFIVCRQ_PZvTD8rB
+        run: |
+          code=$(curl -sS -o /tmp/body -w '%{http_code}' \
+            "$SUPABASE_URL/rest/v1/events?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+          echo "HTTP $code: $(cat /tmp/body)"
+          case "$code" in
+            2*) exit 0 ;;
+            *) echo "Supabase did not answer normally. If this keeps failing, open the dashboard and check whether the project is paused." >&2; exit 1 ;;
+          esac

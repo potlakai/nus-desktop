@@ -18,6 +18,7 @@ const assistant = require('./assistant');
 const vaultNotes = require('./vault-notes');
 const { initAutoUpdate } = require('./updater');
 const { findProtocolUrl, registerProtocolClient, routeProtocolUrl, dataDirFromArgv, friendlySignInError } = require('./protocol');
+const acquisition = require('./acquisition');
 const { installCrashHandlers } = require('./crash');
 const { createQuitGuard } = require('./quit-guard');
 const { createLicense } = require('./license');
@@ -83,6 +84,15 @@ async function processProtocolUrl(url) {
   pendingProtocolUrl = null;
   const route = routeProtocolUrl(url);
   if (route === 'ignore') { showDesktopWindow(); return { error: 'ignored' }; }
+  if (route === 'acquire') {
+    showDesktopWindow();
+    let token = '';
+    try { token = new URL(url).searchParams.get('tok') || ''; } catch {}
+    const userData = app.getPath('userData');
+    const result = acquisition.redeem(userData, acquisition.getSecret(userData), token);
+    sendToDesktop('acquisition:result', result);
+    return result;
+  }
   if (route === 'billing') {
     showDesktopWindow();
     const state = await refreshLicense();
@@ -215,7 +225,14 @@ function watchForPro() {
 
 function trackEvent(name, props) {
   if (!licenseManager) return;
-  licenseManager.track(name, props).catch(() => {});
+  let merged = props && typeof props === 'object' ? props : {};
+  // Funnel events carry the acquisition campaign labels (four short strings,
+  // no identity, no content) so activation can be traced back to the post
+  // that caused it. license.js re-sanitizes every prop before sending.
+  if (name === 'app_open' || name === 'signin' || name === 'first_import') {
+    merged = { ...acquisition.getDims(app.getPath('userData')), ...merged };
+  }
+  licenseManager.track(name, merged).catch(() => {});
 }
 
 // Every refused cap is one funnel row. The unit is the error code minus its
@@ -364,13 +381,17 @@ function readSourceText(filePath) {
     const pdfParse = require('pdf-parse');
     return pdfParse(fs.readFileSync(filePath)).then((data) => String(data.text || '').slice(0, 750000));
   }
+  if (extension === '.docx') {
+    const mammoth = require('mammoth');
+    return mammoth.extractRawText({ path: filePath }).then((result) => String(result.value || '').slice(0, 750000));
+  }
   return Promise.resolve(fs.readFileSync(filePath, 'utf8').slice(0, 750000));
 }
 
 async function importLocalSource(sourceType) {
   const filters = sourceType === 'calendar_file'
     ? [{ name: 'Calendar', extensions: ['ics'] }]
-    : [{ name: 'Local exports', extensions: ['json', 'html', 'htm', 'md', 'txt', 'csv', 'ics', 'pdf'] }];
+    : [{ name: 'Local exports', extensions: ['json', 'html', 'htm', 'md', 'txt', 'csv', 'ics', 'pdf', 'docx'] }];
   const result = await dialog.showOpenDialog(win, { properties: ['openFile'], filters });
   if (result.canceled || !result.filePaths[0]) return { canceled: true };
   const filePath = result.filePaths[0];
@@ -396,7 +417,7 @@ async function importLocalSource(sourceType) {
   return { canceled: false, sourceId, imported, fileName: path.basename(filePath) };
 }
 
-const FOLDER_TEXT_EXTS = new Set(['.pdf', '.txt', '.md', '.html', '.htm', '.csv', '.json']);
+const FOLDER_TEXT_EXTS = new Set(['.pdf', '.docx', '.txt', '.md', '.html', '.htm', '.csv', '.json']);
 
 async function importFolder() {
   const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
@@ -436,22 +457,30 @@ async function importFolder() {
   return report;
 }
 
-async function importSyllabus() {
-  const result = await dialog.showOpenDialog(win, {
-    properties: ['openFile'],
-    filters: [{ name: 'Syllabus', extensions: ['pdf', 'txt', 'md', 'html', 'htm'] }],
-  });
-  if (result.canceled || !result.filePaths[0]) return { canceled: true };
-  const filePath = result.filePaths[0];
+// With no argument, opens a multi-select picker: the first file is extracted
+// now and the rest come back as `remaining` for the renderer to queue, one
+// review table at a time. With a path (a queued file), the dialog is skipped.
+async function importSyllabus(givenPath) {
+  let filePath = typeof givenPath === 'string' && givenPath ? givenPath : null;
+  let remaining = [];
+  if (!filePath) {
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Syllabus', extensions: ['pdf', 'docx', 'txt', 'md', 'html', 'htm'] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return { canceled: true };
+    filePath = result.filePaths[0];
+    remaining = result.filePaths.slice(1);
+  }
   let rawText;
-  try { rawText = await readSourceText(filePath); } catch { return { error: 'read_failed' }; }
-  if (String(rawText || '').trim().length < 200) return { error: 'empty_text' };
+  try { rawText = await readSourceText(filePath); } catch { return { error: 'read_failed', fileName: path.basename(filePath), remaining }; }
+  if (String(rawText || '').trim().length < 200) return { error: 'empty_text', fileName: path.basename(filePath), remaining };
   let sourceId;
   try { sourceId = api.addSource({ file_path: filePath, title: path.basename(filePath), source_type: 'syllabus', raw_text: rawText }); }
-  catch (error) { if (error.code === 'STORAGE_LIMIT') return { error: 'storage_limit' }; throw error; }
+  catch (error) { if (error.code === 'STORAGE_LIMIT') return { error: 'storage_limit', remaining }; throw error; }
   const extraction = await ai.extractSyllabus(rawText);
-  if (extraction.error) return { ...extraction, sourceId, fileName: path.basename(filePath) };
-  return { sourceId, fileName: path.basename(filePath), data: extraction };
+  if (extraction.error) return { ...extraction, sourceId, fileName: path.basename(filePath), remaining };
+  return { sourceId, fileName: path.basename(filePath), data: extraction, remaining };
 }
 
 function confirmSyllabus(payload) {
@@ -484,6 +513,9 @@ function confirmSyllabus(payload) {
     saved += 1;
   }
   logActivity('syllabus_confirmed', `${course.name}: ${saved} assignment${saved === 1 ? '' : 's'} confirmed from syllabus`, { ref_table: 'courses', ref_id: courseId });
+  // first_import is the activation event: the student reviewed and confirmed
+  // their first syllabus. Once per profile, ever.
+  if (acquisition.markFirstImportOnce(app.getPath('userData'))) trackEvent('first_import', {});
   writeBridge();
   return { ok: true, courseId, assignments: saved, weights: Object.keys(weightIds).length };
 }
@@ -980,6 +1012,11 @@ const handlers = {
     return result.url ? { ok: true } : result;
   },
   'license:track': (_event, name, props) => { trackEvent(String(name), props && typeof props === 'object' ? props : {}); return true; },
+  'acquisition:redeem': (_event, token) => {
+    const userData = app.getPath('userData');
+    return acquisition.redeem(userData, acquisition.getSecret(userData), String(token || '').trim());
+  },
+  'acquisition:status': () => acquisition.getDims(app.getPath('userData')),
   'sync:status': async () => sync.status(),
   'sync:set-enabled': async (_event, enabled) => {
     const r = await sync.setSyncEnabled(enabled);
@@ -1054,10 +1091,10 @@ const handlers = {
   'ai:set-key': (_event, value) => ai.setApiKey(value),
   'ai:clear-key': () => ai.clearApiKey(),
   'ai:test': async () => ai.testConnection(),
-  'syllabus:import': async () => {
+  'syllabus:import': async (_event, filePath) => {
     const allowed = usageLimits.syllabusAllowed(null);
     if (!allowed.ok) return denied(allowed);
-    const result = await importSyllabus();
+    const result = await importSyllabus(typeof filePath === 'string' ? filePath : null);
     if (result?.data && result.sourceId) usageLimits.recordSyllabus(result.sourceId);
     return result;
   },

@@ -37,12 +37,20 @@ set NUS_SMOKE_DATA_DIR=%TEMP%\nus-smoke
 ## 3. Publish
 
 ```
-git tag v0.2.2
-gh release create v0.2.2 dist/Nus-Setup.exe dist/Nus-Portable.exe dist/Nus-Setup.exe.blockmap dist/latest.yml --title "Nūs Desktop v0.2.2" --notes-file docs/release-notes.md
+git tag v0.2.4
+gh release create v0.2.4 dist/Nus-Setup.exe dist/Nus-Portable.exe dist/Nus-Setup.exe.blockmap dist/latest.yml --title "Nūs Desktop v0.2.4" --notes "One paragraph on what changed for users."
 ```
 
 `latest.yml` is what installed copies poll (`src/updater.js`); without it the
-auto-update is silent. The site's download buttons use
+auto-update is silent.
+
+Supabase pauses a free project after seven days without API traffic, and a
+paused project's hostname stops resolving (sign-in, checkout, and funnel
+events all fail until someone clicks Restore in the dashboard; this happened
+2026-09-06). `.github/workflows/keepalive.yml` sends one anon REST request
+every two days to keep it awake. It only runs once the workflow is on `main`,
+so push it with the next release and trigger it once by hand:
+`gh workflow run keepalive`. The site's download buttons use
 `releases/latest/download/Nus-Setup.exe`, so they follow the newest release
 automatically. Bump `version` in `package.json` before building; the version
 string is baked into the installer, the updater feed, and the `app_version`

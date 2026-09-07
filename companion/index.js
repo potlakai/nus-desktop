@@ -55,14 +55,12 @@ function isTrustedDesktopWebContents(webContents) {
 }
 
 const DEFAULT_ASSIST_SHORTCUT = 'CommandOrControl+Return';
+// Founder tooling (leetcode hotkey, stealth, packs, résumé) is invisible to
+// students; Pranav's own machine sets NUS_FOUNDER=1 to get it back.
+const FOUNDER = process.env.NUS_FOUNDER === '1';
 const RESERVED_SHORTCUTS = new Set([
   'commandorcontrol+h',
   'commandorcontrol+shift+x',
-  'commandorcontrol+shift+o',
-  'commandorcontrol+shift+n',
-  'commandorcontrol+shift+r',
-  'commandorcontrol+shift+d',
-  'commandorcontrol+shift+k',
   'commandorcontrol+shift+space'
 ]);
 const ALLOWED_SYSTEM_PANES = new Set([
@@ -104,7 +102,7 @@ const APP_GUIDE = 'APP GUIDE (answer questions about Nus from this, not from the
   'Email has its own tab in the rail. Gmail needs no connection at all: open the Email tab, add the address you send from under "Gmail and your addresses", fill the professor email form, press "Draft email", then press "Open in Gmail" and the finished draft opens in a Gmail compose window signed in as that address, where the student presses send. Outlook is a separate optional connection and is read-only until they opt in to sending. ' +
   'Map = rail item 02 (drag the canvas, scroll to zoom). Syllabus import = the Import button, always reviewed before saving. My capture sessions = Knot > History, uploadable to the vault. Automations and Integrations = the Connections tab. ' +
   'Keys, two of them and they are different: the DESKTOP app uses Claude, either Claude Code if it is installed or an Anthropic API key pasted in desktop Settings > AI provider. I, the Companion, use my OWN key, normally a free Google Gemini key from aistudio.google.com/apikey, pasted either in desktop Settings > "Companion AI key" (the card directly below the AI provider one) or through my gear icon in this command sheet. One Gemini key covers both my answers and speech-to-text for listening. The GPA scale for semester setup is in desktop Settings, the Data section. ' +
-  'Hotkeys: Ctrl+Shift+Space hides or shows me, Ctrl+Shift+K hides just the Knot mark, Ctrl+Shift+X stops listening and vanishes. I keep running after the dashboard closes and the hotkeys keep working. "Turn off Companion" on the Knot > Companion pane removes me completely and releases the hotkeys until turned back on there.';
+  'Hotkeys: Ctrl+Shift+Space hides or shows me, Ctrl+Shift+X stops listening and vanishes. I keep running after the dashboard closes and the hotkeys keep working. "Turn off Companion" on the Knot > Companion pane removes me completely and releases the hotkeys until turned back on there.';
 
 // -------- window --------
 function createOverlayWindow() {
@@ -145,8 +143,10 @@ function createOverlayWindow() {
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.on('did-finish-load', () => {
     win.showInactive();
-    // Restore the persisted Knot-mark visibility so Ctrl+Shift+K survives restarts.
+    // Restore the persisted Knot-mark visibility across restarts.
     send('knot:set', { hidden: store.getSettings().knotHidden === true });
+    // Give the desktop a moment to push its semester snapshot, then speak first.
+    setTimeout(maybeSendDailyLine, 3000);
   });
   win.webContents.on('render-process-gone', (_e, d) => console.log('[nus] overlay renderer gone', JSON.stringify(d)));
 }
@@ -345,6 +345,30 @@ function packStatus() {
   };
 }
 
+// Live desktop snapshot: same process, no file round-trip. The file stays
+// as the cold-start fallback.
+function desktopSnapshot() {
+  try { if (hooks.getDesktopState) return hooks.getDesktopState(); } catch (_) { /* fall through */ }
+  const fromFile = loadNusContext(NUS_CONTEXT_FILE);
+  return fromFile.ok ? fromFile.context : null;
+}
+
+// The once-a-day proactive line: the top ranked next move, rendered locally
+// with no key and no model, shown above the Knot until clicked. This is the
+// Companion speaking first, which is the whole reason it lives on screen.
+function maybeSendDailyLine() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    if (store.getSettings().lastDailyLine === today) return;
+    const snapshot = desktopSnapshot();
+    const move = snapshot && Array.isArray(snapshot.next_moves) ? snapshot.next_moves[0] : null;
+    if (!move || !move.title) return;
+    const text = move.title + (move.due_date ? ' (due ' + move.due_date + ')' : '');
+    store.setSettings({ lastDailyLine: today });
+    send('daily:line', { text });
+  } catch (_) { /* the daily line is best-effort, never a crash */ }
+}
+
 // -------- feature runner --------
 async function runFeature(mode, userText) {
   if (state.busy) { send('llm:busy', {}); return; }
@@ -352,14 +376,6 @@ async function runFeature(mode, userText) {
   if (!def) return;
 
   const settings = store.getSettings();
-
-  // Live desktop snapshot: same process, no file round-trip. The file stays
-  // as the cold-start fallback.
-  const desktopSnapshot = () => {
-    try { if (hooks.getDesktopState) return hooks.getDesktopState(); } catch (_) { /* fall through */ }
-    const fromFile = loadNusContext(NUS_CONTEXT_FILE);
-    return fromFile.ok ? fromFile.context : null;
-  };
 
   // The guide mode answers "what should I do" from the semester snapshot.
   // With no provider key (or provider-sharing off) it renders locally: the
@@ -571,13 +587,15 @@ function registerAssistShortcut(accelerator) {
   const previous = registeredAssistShortcut;
   if (previous) globalShortcut.unregister(previous);
 
+  // The primary shortcut is the one verb: "what should I do?" It works with
+  // no key set (guide renders locally), so day one it always answers.
   try {
-    if (!globalShortcut.register(next, () => runFeature('assist', ''))) {
-      if (previous) globalShortcut.register(previous, () => runFeature('assist', ''));
+    if (!globalShortcut.register(next, () => runFeature('guide', ''))) {
+      if (previous) globalShortcut.register(previous, () => runFeature('guide', ''));
       return { ok: false, error: 'That shortcut is already in use by another application.' };
     }
   } catch (_) {
-    if (previous) globalShortcut.register(previous, () => runFeature('assist', ''));
+    if (previous) globalShortcut.register(previous, () => runFeature('guide', ''));
     return { ok: false, error: 'That key combination is not a valid global shortcut.' };
   }
 
@@ -592,8 +610,8 @@ function setAssistShortcut(accelerator) {
 }
 
 // -------- visibility levels --------
-// Level 1: normal. Level 2 (Ctrl+Shift+K): Knot mark hidden, panel still works.
-// Level 3 (Ctrl+Shift+Space): window hidden; with the stealth setting on, the
+// Level 1: normal. Level 2 (desktop Knot pane): Knot mark hidden, panel still
+// works. Level 3 (Ctrl+Shift+Space): window hidden; with the stealth setting on, the
 // tray hides too and nothing on screen shows the Companion exists. The desktop
 // app's Companion pane is the always-available way back.
 function destroyTray() { if (tray) { tray.destroy(); tray = null; } }
@@ -714,25 +732,11 @@ function createTray() {
 }
 
 function registerShortcuts() {
-  globalShortcut.register('CommandOrControl+H', () => runFeature('leetcode', ''));
+  // Three hotkeys, no more: hide/show, panic, and the ask shortcut below.
+  // Knot-mark visibility stays reachable from the desktop Knot pane.
   globalShortcut.register('CommandOrControl+Shift+X', panicHide);
   globalShortcut.register('CommandOrControl+Shift+Space', toggleOverlay);
-  globalShortcut.register('CommandOrControl+Shift+K', toggleKnot);
-
-  const extras = [
-    ['CommandOrControl+Shift+O', () => runFeature('objection', '')],
-    ['CommandOrControl+Shift+N', () => runFeature('numbers', '')],
-    ['CommandOrControl+Shift+R', () => runFeature('spar', '')]
-  ];
-  for (const [accel, fn] of extras) {
-    try {
-      if (!globalShortcut.register(accel, fn)) {
-        console.log('[nus] shortcut in use by another app, skipped:', accel);
-      }
-    } catch (_) {
-      console.log('[nus] invalid shortcut, skipped:', accel);
-    }
-  }
+  if (FOUNDER) globalShortcut.register('CommandOrControl+H', () => runFeature('leetcode', ''));
 
   const settings = store.getSettings();
   const configured = settings.shortcuts && settings.shortcuts.assist;
@@ -746,7 +750,7 @@ function registerShortcuts() {
 
 // -------- IPC (namespaced companion:*) --------
 function registerIpc() {
-  ipcMain.handle('companion:settings:get', () => ({ ...store.getSettings(), _migrationNote: store.migrationNote() }));
+  ipcMain.handle('companion:settings:get', () => ({ ...store.getSettings(), _migrationNote: store.migrationNote(), _founderTools: FOUNDER }));
   ipcMain.handle('companion:settings:set', (_e, patch) => { sttDisabled = false; return store.setSettings(patch); });
   ipcMain.handle('companion:shortcut:assist:set', (_e, accelerator) => setAssistShortcut(accelerator));
   ipcMain.handle('companion:capture:toggle', () => setCapturing(!state.capturing));

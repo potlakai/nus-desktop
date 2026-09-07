@@ -45,9 +45,12 @@ const DEFAULTS = {
   // on-screen sign of the Companion. Capture keeps running. The Companion pane
   // in the Nus desktop app is always the way back.
   stealth: false,
-  // Ctrl+Shift+K hides just the Knot mark; persisted so it survives restarts
-  // and the desktop pane can always show the true state and restore it.
+  // The desktop Knot pane can hide just the Knot mark; persisted so it survives
+  // restarts and the pane can always show the true state and restore it.
   knotHidden: false,
+  // Date (YYYY-MM-DD) the proactive daily line was last shown, so it fires
+  // once per day and never nags.
+  lastDailyLine: '',
   // The Companion runs independently of the dashboard: closing the desktop
   // window leaves it on screen, and it comes back on the next launch. Turning
   // it off from the desktop Knot pane is the only thing that removes it, and

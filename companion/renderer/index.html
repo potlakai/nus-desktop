@@ -19,38 +19,41 @@
         </div>
 
         <div id="tile-controls" class="glass tile">
-        <div class="mode-cluster">
-          <div class="cluster-kicker">Live</div>
+        <!-- The one always-on verb. Everything else appears only in context. -->
+        <div id="primary-row">
+          <button class="act primary" data-mode="guide" data-icon="compass"><span class="ic"></span><span>What should I do?</span></button>
+        </div>
+
+        <!-- Only while listening: these buttons are dead without a live capture. -->
+        <div class="mode-cluster hidden" id="live-cluster">
+          <div class="cluster-kicker">Live call</div>
           <div id="action-row">
           <button class="act" data-mode="assist" data-icon="sparkles"><span class="ic"></span><span>Assist</span></button>
           <button class="act" data-mode="say" data-icon="wand-sparkles"><span class="ic"></span><span>Say next</span></button>
           <button class="act" data-mode="objection" data-icon="shield-alert"><span class="ic"></span><span>Objection</span></button>
           <button class="act" data-mode="numbers" data-icon="hash"><span class="ic"></span><span>Numbers</span></button>
+          <button class="act" data-mode="followup" data-icon="message-circle"><span class="ic"></span><span>Follow-ups</span></button>
           <button class="act" data-mode="recap" data-icon="refresh-cw"><span class="ic"></span><span>Recap</span></button>
         </div>
         </div>
 
-        <div class="mode-cluster">
+        <!-- Only when a briefing pack is set: packs come from the vault. -->
+        <div class="mode-cluster hidden" id="rehearsal-cluster">
           <div class="cluster-kicker">Rehearsal</div>
           <div id="action-row-2">
-          <button class="act" data-mode="guide" data-icon="compass"><span class="ic"></span><span>What should I do?</span></button>
           <button class="act" data-mode="brief" data-icon="file-text"><span class="ic"></span><span>Pre-call brief</span></button>
           <button class="act" id="spar-btn" data-mode="spar" data-icon="swords"><span class="ic"></span><span>Start rehearsal</span></button>
           <button class="act" data-mode="score" data-icon="clipboard-check"><span class="ic"></span><span>Score me</span></button>
-          <button class="act" data-mode="followup" data-icon="message-circle"><span class="ic"></span><span>Follow-ups</span></button>
         </div>
         </div>
 
         <div id="composer">
           <div id="input-area">
-            <div id="placeholder">Ask about your screen or conversation, or <span class="keycap">⌘</span><span class="keycap">⏎</span> for Assist</div>
+            <div id="placeholder">Ask Nūs anything, or <span class="keycap">⌘</span><span class="keycap">⏎</span> for What should I do?</div>
             <textarea id="input" rows="1" spellcheck="false"></textarea>
           </div>
           <div id="composer-bottom">
-            <button id="smart-toggle" class="smart-pill"><span class="ic"></span><span>Smart</span></button>
             <button id="more-btn" class="more-btn" title="Settings"></button>
-            <button id="zoom-out-btn" class="more-btn" title="Zoom Out" style="font-size: 18px; font-family: monospace; line-height: 1;">-</button>
-            <button id="zoom-in-btn" class="more-btn" title="Zoom In" style="font-size: 16px; font-family: monospace; line-height: 1;">+</button>
             <div class="spacer"></div>
             <button id="send-btn" title="Send"></button>
           </div>
@@ -58,6 +61,10 @@
         </div><!-- /tile-controls -->
       </div>
     </div>
+
+    <!-- Once a day the Knot speaks first: the top ranked next move, rendered
+         locally with no key. Click it to open the full answer. -->
+    <button id="daily-line" class="glass no-drag hidden" type="button"></button>
 
     <!-- The Nūs Knot: alive at rest, state controls on hover, command sheet on click. -->
     <div id="toolbar">
@@ -76,12 +83,7 @@
             </div>
           </div>
           <div class="knot-bloom-foot">
-            <div class="knot-state-row" role="group" aria-label="Nūs state controls">
-              <button class="knot-state" data-knot-state="idle" type="button"><i></i><span>Idle</span></button>
-              <button class="knot-state" data-knot-state="listening" type="button"><i></i><span>Listen</span></button>
-              <button class="knot-state" data-knot-state="thinking" type="button"><i></i><span>Think</span></button>
-              <button class="knot-state" data-knot-state="ready" type="button"><i></i><span>Ready</span></button>
-            </div>
+            <div class="spacer"></div>
             <div id="orb-controls">
               <button id="stop-btn" title="Start / stop listening" aria-label="Start or stop listening"></button>
               <button id="logo-btn" title="Help / tutorial" aria-label="Open tutorial"></button>
@@ -121,20 +123,35 @@
       </div>
       <div class="s-body">
         <div id="nus-link-status" class="nus-link-status">Checking Nūs desktop context…</div>
-        <label class="s-label">Provider</label>
-        <div class="s-seg" id="provider-seg">
-          <button data-provider="openai">OpenAI</button>
-          <button data-provider="anthropic">Anthropic</button>
-          <button data-provider="gemini">Gemini</button>
-          <button data-provider="nvidia">Nvidia</button>
-        </div>
 
-        <label class="s-label">API key <span class="s-hint">paste the one for the provider above; stored locally and encrypted</span></label>
-        <p class="s-note">Gemini is the easy choice: the free key from <b>aistudio.google.com/apikey</b> covers both answers and listening. You can also set this from the Nūs desktop app under Settings, Companion AI key.</p>
-        <div class="s-field"><span>OpenAI</span><input id="key-openai" type="password" placeholder="sk-..." autocomplete="off" /></div>
-        <div class="s-field"><span>Anthropic</span><input id="key-anthropic" type="password" placeholder="sk-ant-..." autocomplete="off" /></div>
+        <label class="s-label">Gemini API key <span class="s-hint">free at aistudio.google.com/apikey · stored locally and encrypted</span></label>
+        <p class="s-note">Only needed for AI answers and listening: <b>"What should I do?" works with no key at all</b>, straight from your semester. One free Gemini key covers both answers and speech-to-text. Also settable in the desktop app under Settings, Companion AI key.</p>
         <div class="s-field"><span>Gemini</span><input id="key-gemini" type="password" placeholder="AIza..." autocomplete="off" /></div>
-        <div class="s-field"><span>Nvidia</span><input id="key-nvidia" type="password" placeholder="nvapi-..." autocomplete="off" /></div>
+        <div class="s-field nus-share-field"><span>Smart answers <small>Off by default. On: every reply uses the slower, stronger model.</small></span><input id="smart-mode" type="checkbox" /></div>
+
+        <label class="s-label">Ask shortcut <span class="s-hint">runs "What should I do?" from anywhere</span></label>
+        <div class="s-shortcut">
+          <span>Ask</span>
+          <button id="shortcut-assist" class="shortcut-record" type="button" aria-label="Change Ask shortcut"></button>
+          <button id="shortcut-reset" class="shortcut-reset" type="button">Reset</button>
+        </div>
+        <div class="shortcut-hint" id="shortcut-hint">Click the shortcut, then press a new key combination.</div>
+
+        <details class="s-more">
+          <summary>Use a different provider</summary>
+          <div class="s-seg" id="provider-seg">
+            <button data-provider="gemini">Gemini</button>
+            <button data-provider="openai">OpenAI</button>
+            <button data-provider="anthropic">Anthropic</button>
+            <button data-provider="nvidia">Nvidia</button>
+          </div>
+          <div class="s-field"><span>OpenAI</span><input id="key-openai" type="password" placeholder="sk-..." autocomplete="off" /></div>
+          <div class="s-field"><span>Anthropic</span><input id="key-anthropic" type="password" placeholder="sk-ant-..." autocomplete="off" /></div>
+          <div class="s-field"><span>Nvidia</span><input id="key-nvidia" type="password" placeholder="nvapi-..." autocomplete="off" /></div>
+          <label class="s-label">Models <span class="s-hint">fast = Smart off · smart = Smart on</span></label>
+          <div class="s-field"><span>Fast</span><input id="model-fast" type="text" autocomplete="off" /></div>
+          <div class="s-field"><span>Smart</span><input id="model-smart" type="text" autocomplete="off" /></div>
+        </details>
 
         <details class="s-more">
           <summary>Privacy and sessions</summary>
@@ -142,10 +159,10 @@
           <div class="s-field nus-share-field"><span>Report answers back to the Nūs desktop brain <small>Off by default. Saves finished answers to a local file the Nūs desktop app reads. Stays on this machine.</small></span><input id="report-to-nus" type="checkbox" /></div>
           <div class="s-field nus-share-field"><span>Save transcripts to history <small>On by default. Every capture session lands in the desktop app, searchable and uploadable to your Jarvis vault from the Knot section.</small></span><input id="persist-transcripts" type="checkbox" /></div>
           <div class="s-field nus-share-field"><span>Keep session audio <small>Off by default. Retains voice-activated WAV audio per session for 30 days. Audio is the storage-heavy part.</small></span><input id="save-audio" type="checkbox" /></div>
-          <div class="s-field nus-share-field"><span>Full stealth when hidden <small>Off by default. Hiding the overlay (Ctrl+Shift+Space) also hides the tray icon: no on-screen sign of the Companion, and capture keeps running. Bring it back from the Companion pane in the desktop app. You are responsible for recording consent where you meet.</small></span><input id="stealth-mode" type="checkbox" /></div>
+          <div class="s-field nus-share-field" data-founder><span>Full stealth when hidden <small>Off by default. Hiding the overlay (Ctrl+Shift+Space) also hides the tray icon: no on-screen sign of the Companion, and capture keeps running. Bring it back from the Companion pane in the desktop app. You are responsible for recording consent where you meet.</small></span><input id="stealth-mode" type="checkbox" /></div>
         </details>
 
-        <details class="s-more">
+        <details class="s-more" data-founder>
           <summary>Rehearsal and briefing packs</summary>
           <div class="s-field"><span>Speak replies</span><input id="speak-replies" type="checkbox" /></div>
           <p class="s-note">Packs are built by the vault: python scripts/build_briefing.py &lt;slug&gt;. Turn Speak replies OFF before a real call.</p>
@@ -154,23 +171,11 @@
           <div class="s-resume-actions"><span class="s-hint" id="pack-status">No pack loaded.</span><button id="reload-pack" type="button">Reload packs</button></div>
         </details>
 
-        <details class="s-more">
-          <summary>Résumé, models, and shortcuts</summary>
+        <details class="s-more" data-founder>
+          <summary>Résumé</summary>
           <label class="s-label" for="resume-context">Résumé / professional background <span class="s-hint">stored locally; sent to your selected provider with each request</span></label>
           <textarea id="resume-context" class="s-textarea" maxlength="12000" placeholder="Paste your résumé or professional background here. Nūs will use it as the factual source for career-related answers."></textarea>
           <div class="s-resume-actions"><span class="s-hint">Maximum 12,000 characters</span><button id="clear-resume" type="button">Clear résumé</button></div>
-
-          <label class="s-label">Models <span class="s-hint">fast = Smart off · smart = Smart on</span></label>
-          <div class="s-field"><span>Fast</span><input id="model-fast" type="text" autocomplete="off" /></div>
-          <div class="s-field"><span>Smart</span><input id="model-smart" type="text" autocomplete="off" /></div>
-
-          <label class="s-label">Keyboard shortcuts</label>
-          <div class="s-shortcut">
-            <span>Assist</span>
-            <button id="shortcut-assist" class="shortcut-record" type="button" aria-label="Change Assist shortcut"></button>
-            <button id="shortcut-reset" class="shortcut-reset" type="button">Reset</button>
-          </div>
-          <div class="shortcut-hint" id="shortcut-hint">Click the shortcut, then press a new key combination.</div>
         </details>
 
         <div class="s-status" id="s-status"></div>

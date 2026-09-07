@@ -1,0 +1,36 @@
+{
+  "secret": "test-secret-do-not-use",
+  "now": "2026-08-25T00:00:00+00:00",
+  "vectors": [
+    {
+      "name": "valid",
+      "token": "N1.eyJhIjoiYWN0LTIwMjYwODI1LWFiYzEyMzQiLCJjIjoiZ3Jvd3RoLW9zLWFjdC0yMDI2MDgyNS1hYmMxMjM0IiwibSI6Im9yZ2FuaWMiLCJzIjoicmVkZGl0IiwieCI6IjIwMjYwOTI0In0.afbaf54bf2",
+      "expect_action_id": "act-20260825-abc1234"
+    },
+    {
+      "name": "expired",
+      "token": "N1.eyJhIjoiYWN0LTIwMjYwNjAxLWFiYzEyMzQiLCJjIjoiZ3Jvd3RoLW9zLWFjdC0yMDI2MDYwMS1hYmMxMjM0IiwibSI6Im9yZ2FuaWMiLCJzIjoieCIsIngiOiIyMDI2MDYwMiJ9.2a0878c59b",
+      "expect_action_id": null
+    },
+    {
+      "name": "bad_signature",
+      "token": "N1.eyJhIjoiYWN0LTIwMjYwODI1LWFiYzEyMzQiLCJjIjoiZ3Jvd3RoLW9zLWFjdC0yMDI2MDgyNS1hYmMxMjM0IiwibSI6Im9yZ2FuaWMiLCJzIjoicmVkZGl0IiwieCI6IjIwMjYwOTI0In0.afbaf50000",
+      "expect_action_id": null
+    },
+    {
+      "name": "truncated",
+      "token": "N1.eyJhIjoiYWN0LTIwMjYwODI1LWFiYzEyMzQiLCJjIjoiZ3Jvd3RoLW9zLWFjdC0yMDI2MDgyNS1hYmMxMjM0IiwibSI6Im9yZ2FuaWMiLCJzIjoicmVkZGl0IiwieCI6IjIwMjYwOTI0In0",
+      "expect_action_id": null
+    },
+    {
+      "name": "wrong_version",
+      "token": "N9.eyJhIjoiYWN0LTIwMjYwODI1LWFiYzEyMzQiLCJjIjoiZ3Jvd3RoLW9zLWFjdC0yMDI2MDgyNS1hYmMxMjM0IiwibSI6Im9yZ2FuaWMiLCJzIjoicmVkZGl0IiwieCI6IjIwMjYwOTI0In0.afbaf54bf2",
+      "expect_action_id": null
+    },
+    {
+      "name": "garbage",
+      "token": "not-a-token",
+      "expect_action_id": null
+    }
+  ]
+}

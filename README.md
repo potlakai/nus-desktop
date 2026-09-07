@@ -95,9 +95,8 @@ it completely and releases the hotkeys until you turn it back on.
 | Keys | Action |
 |---|---|
 | `Ctrl+Shift+Space` | Hide or show the overlay |
-| `Ctrl+Shift+K` | Hide just the Knot mark, everything keeps working |
 | `Ctrl+Shift+X` | Panic: stop listening and vanish |
-| `Ctrl+Enter` | Assist (rebindable in Companion settings) |
+| `Ctrl+Enter` | What should I do? (rebindable in Companion settings) |
 
 Capture exclusion is presentation control, not concealment. Follow the rules
 of every meeting, class, interview, or assessment you are in.

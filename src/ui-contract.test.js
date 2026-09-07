@@ -85,9 +85,13 @@ test('vault upload previews before it writes', () => {
 test('the Companion keeps the Knot and drops the retired statue orb', () => {
   assert.match(companionHtml, /class="nus-knot"/);
   assert.ok(!companionHtml.includes('nus-statue-mark.png'), 'statue mark removed from the overlay');
+  // The four states are displayed (capsule copy + toolbar data attribute), but
+  // there are no manual state buttons for the user to press.
   for (const state of ['idle', 'listening', 'thinking', 'ready']) {
-    assert.match(companionHtml, new RegExp(`data-knot-state="${state}"`), `${state} control present`);
+    assert.match(companionJs, new RegExp(`${state}: \\[`), `${state} state copy present`);
   }
+  assert.ok(!companionHtml.includes('class="knot-state"'), 'manual state buttons are gone');
+  assert.match(companionJs, /toolbar\.dataset\.knotState = state/);
   assert.match(companionJs, /function syncKnotUi/);
 });
 
@@ -147,8 +151,11 @@ test('the tutorials link to each other', () => {
 
 test('all three hide levels exist, with a way back that does not need a hotkey', () => {
   assert.match(companionIndex, /globalShortcut\.register\('CommandOrControl\+Shift\+Space', toggleOverlay\)/);
-  assert.match(companionIndex, /globalShortcut\.register\('CommandOrControl\+Shift\+K', toggleKnot\)/);
   assert.match(companionIndex, /globalShortcut\.register\('CommandOrControl\+Shift\+X', panicHide\)/);
+  // The Knot-mark level lost its hotkey in the simplification: the desktop
+  // Knot pane is the only toggle, and the function stays wired to it.
+  assert.match(companionIndex, /toggleKnot,/, 'toggleKnot still exported to the desktop');
+  assert.ok(!companionIndex.includes("register('CommandOrControl+Shift+K'"), 'no Knot-mark hotkey');
   assert.match(companionIndex, /function forceShow/, 'desktop can always force the overlay back');
   assert.match(companionCss, /#toolbar\.knot-hidden #knot-shell \{ display: none; \}/);
   // Panic must stop capture, not just hide the window.

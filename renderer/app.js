@@ -378,7 +378,14 @@ function renderKbDetail() {
     if (course) {
       const work = assignments.filter((item) => item.course_id === course.id);
       const files = sources.filter((item) => item.course_id === course.id);
-      target.innerHTML = `<div class="kb-detail-head"><div class="section-kicker">Course truth</div><h2>${esc(course.name)}</h2><p>${esc(course.code || 'No course code')} · ${course.credit_hours || 0} credit hours · ${esc(course.term || 'No term set')}</p></div>
+      target.innerHTML = `<div class="kb-detail-head"><div class="section-kicker">Course truth</div><h2>${esc(course.name)}</h2><p>${esc(course.code || 'No course code')} · ${course.credit_hours || 0} credit hours · ${esc(course.term || 'No term set')}</p>
+        <div class="course-edit"><div class="section-kicker">Edit course</div>
+          <label>Name<input data-course-field="name" value="${esc(course.name)}" /></label>
+          <label>Code<input data-course-field="code" value="${esc(course.code || '')}" placeholder="e.g. OPRE 3360" /></label>
+          <label>Credit hours<input data-course-field="credit_hours" type="number" min="0" max="12" step="0.5" value="${esc(course.credit_hours ?? '')}" /></label>
+          <label>Term<input data-course-field="term" value="${esc(course.term || '')}" placeholder="e.g. Fall 2026" /></label>
+          <button class="quiet-button" data-course-save="${course.id}">Save changes</button>
+        </div></div>
         <div class="kb-detail-body">${work.length ? work.map((item) => `<article class="source-row"><div class="source-glyph">${esc((item.category || 'WK').slice(0, 2).toUpperCase())}</div><div class="source-name"><strong>${esc(item.title)}</strong><small>${esc(item.category || 'Uncategorised')}</small></div><div class="source-meta">${esc(item.due_date ? relativeDue(item.due_date) : 'No due date')}</div><div class="confidence">Confirmed</div></article>`).join('') : '<div class="empty-state">No confirmed work on this course yet.</div>'}</div>
         <p class="kb-provenance">${files.length ? `Read from ${files.map((item) => esc(sourceLabel(item))).join(', ')}.` : 'Added by hand, not read from a file.'}</p>`;
       return;
@@ -410,6 +417,22 @@ function renderKbDetail() {
 
 $('#kb-search').addEventListener('input', (event) => { state.kb.query = event.target.value; renderSources(); });
 $('#memory-list').addEventListener('click', async (event) => {
+  const save = event.target.closest('[data-course-save]');
+  if (save) {
+    const fields = {};
+    $$('#memory-list [data-course-field]').forEach((input) => {
+      const key = input.dataset.courseField;
+      fields[key] = key === 'credit_hours'
+        ? (input.value === '' ? null : Number(input.value))
+        : (input.value.trim() || null);
+    });
+    if (!fields.name) { showToast('The course needs a name.'); return; }
+    save.disabled = true; save.textContent = 'Saving…';
+    await api.updateCourse(Number(save.dataset.courseSave), fields);
+    await load();
+    showToast(`${fields.name} updated.`);
+    return;
+  }
   const button = event.target.closest('[data-extract-source]');
   if (!button) return;
   button.disabled = true; button.textContent = 'Reading…';
@@ -485,13 +508,23 @@ $('#source-import').addEventListener('click',()=>setView('integrations'));
 const AI_ERRORS={no_ai:'Connect an AI provider first. Taking you to Settings.',empty_text:'No readable text in that file. Scanned PDFs need selectable text.',bad_json:'The AI reply was not readable. Try the import again.',read_failed:'Could not read that file.',storage_limit:'Nūs local storage is full. Remove an import before adding another.',limit_syllabus_imports:'Free includes three AI syllabus imports. Upgrade to Pro for more.',limit_questions:'Free includes ten Ask or chat questions each day. Upgrade to Pro or come back tomorrow.',limit_connected_accounts:'Free includes one connected account. Disconnect the current account or upgrade to Pro.',limit_automation_rules:'Free includes one automation rule. Remove it or upgrade to Pro.',limit_companion_minutes:'Free Companion listening is used for today. Upgrade to Pro or come back tomorrow.',limit_companion_history:'Free includes seven days of Companion history. Upgrade to Pro for full history.',cli_timeout:'Claude Code took too long. Try again.',cli_failed:'Claude Code returned an error.',cli_spend_limit:'Your Claude subscription hit its spend limit. Add an Anthropic API key in Settings, or raise the limit in Claude Code.',cli_not_logged_in:'Claude Code is installed but signed out. Open a terminal, run "claude", then /login, or paste an Anthropic API key in Settings.',cli_spawn_failed:'Claude Code could not start.',api_failed:'The Anthropic API returned an error.',api_refused:'The AI declined this content.',api_timeout:'The API call timed out. Try again.',api_network:'Network problem reaching Anthropic.',unexpected_reply:'The provider answered, but not as expected.',source_missing:'That import is no longer on file.',course_name_required:'The course needs a name.',target_not_found:'I could not find that item. Try its exact name.',incomplete_command:'I need a bit more: which item, and what date?',unknown_intent:'That request did not survive the trip. Try again.'};
 function aiError(code,detail){const base=AI_ERRORS[code]||`Import failed (${code}).`;return detail?`${base} (${String(detail).slice(0,120)})`:base;}
 
-async function importSyllabusFlow(){
-  showToast('Reading the syllabus…');
-  const result=await api.syllabusImport();
+// Multi-file import: the picker allows several syllabi at once. The first is
+// extracted immediately; the rest wait in state.importQueue and run one review
+// table at a time, so nothing is ever saved without being seen.
+async function importSyllabusFlow(givenPath){
+  const filePath=typeof givenPath==='string'&&givenPath?givenPath:null; // click handlers pass an Event here
+  const queued=(state.importQueue||[]).length;
+  showToast(filePath?`Reading ${filePath.split(/[\\/]/).pop()}…${queued?` (${queued} more after this)`:''}`:'Reading the syllabus…');
+  const result=await api.syllabusImport(filePath);
   if(!result||result.canceled)return;
-  if(result.error==='no_ai'||result.error==='cli_not_logged_in'){state.pendingSourceId=result.sourceId||null;showToast(aiError(result.error));setView('settings');return;}
-  if(result.error){reportAiError(result);return;}
+  if(result.remaining&&result.remaining.length)state.importQueue=[...(state.importQueue||[]),...result.remaining];
+  if(result.error==='no_ai'||result.error==='cli_not_logged_in'){state.importQueue=[];state.pendingSourceId=result.sourceId||null;showToast(aiError(result.error));setView('settings');return;}
+  if(result.error){reportAiError(result);nextQueuedImport();return;}
   openReview(result.data,result.fileName,result.sourceId);
+}
+function nextQueuedImport(){
+  const next=(state.importQueue||[]).shift();
+  if(next)importSyllabusFlow(next);
 }
 
 const reviewScrim=$('#syllabus-scrim');
@@ -519,7 +552,7 @@ reviewScrim.addEventListener('input',(event)=>{
 });
 reviewScrim.addEventListener('click',(event)=>{
   const button=event.target.closest('button'); if(!button)return;
-  if(button.id==='review-close'){reviewScrim.classList.add('hidden');return;}
+  if(button.id==='review-close'){reviewScrim.classList.add('hidden');nextQueuedImport();return;}
   if(button.dataset.delWeight!=null){state.review.weights.splice(Number(button.dataset.delWeight),1);renderReviewTables();return;}
   if(button.dataset.delAssignment!=null){state.review.assignments.splice(Number(button.dataset.delAssignment),1);renderReviewTables();return;}
   if(button.id==='rev-add-weight'){state.review.weights.push({category:'',weight_pct:0});renderReviewTables();return;}
@@ -539,6 +572,7 @@ $('#rev-confirm').addEventListener('click',async()=>{
   reviewScrim.classList.add('hidden');
   await load();
   showToast(`${review.course.name}: ${result.assignments} assignment${result.assignments===1?'':'s'} and ${result.weights} grade weight${result.weights===1?'':'s'} saved.`);
+  nextQueuedImport();
 });
 
 const GPA_PRESETS={'plus-minus':[[93,'A',4],[90,'A-',3.7],[87,'B+',3.3],[83,'B',3],[80,'B-',2.7],[77,'C+',2.3],[73,'C',2],[70,'C-',1.7],[67,'D+',1.3],[63,'D',1],[60,'D-',0.7],[0,'F',0]],'whole-letter':[[90,'A',4],[80,'B',3],[70,'C',2],[60,'D',1],[0,'F',0]]};
@@ -985,7 +1019,12 @@ async function renderLicenseState(nextState) {
     $('#license-usage').innerHTML = `<div class="usage-meter unlimited"><span>${plan.source === 'offline_cache' ? 'Verified recently. Offline grace active.' : 'Entitlement verified with your account.'}</span></div>`;
     return;
   }
-  $('#license-copy').textContent = 'Free is a full local semester with honest caps. Pro lifts them.';
+  // The account service could not be reached and no recent Pro cache exists.
+  // Say so; a silent "Free" reads as a lost subscription.
+  const unreachable = plan.source === 'offline_no_valid_cache';
+  $('#license-copy').textContent = unreachable
+    ? 'Could not reach the account service just now, so this session runs as Free. Everything local still works. Use Refresh plan once you are back online.'
+    : 'Free is a full local semester with honest caps. Pro lifts them.';
   $('#license-usage').innerHTML = ['syllabusImports', 'questions', 'companionMs'].map((key) => usageMeter(key, usage[key])).join('');
 }
 
@@ -1065,6 +1104,33 @@ $('#license-refresh').addEventListener('click', async () => {
   finally { button.disabled = false; button.textContent = 'Refresh plan'; }
 });
 $('#auth-plan-link')?.addEventListener('click', () => focusSettingsCard('license-card'));
+
+// Optional setup code from the download page: campaign labels only, no
+// identity. Applied at most once per install; the main process enforces that.
+(async () => {
+  if (!api.acquisitionStatus) { $('#acq-card')?.setAttribute('hidden', ''); return; }
+  const applied = (dims) => {
+    $('#acq-title').textContent = 'Setup code applied';
+    $('#acq-copy').textContent = `This install is linked to ${dims?.utm_campaign || 'a campaign'}. Thanks, that's all it does.`;
+    $('#acq-form')?.classList.add('hidden');
+    const badge = $('#acq-badge'); if (badge) badge.textContent = 'Linked';
+  };
+  try { const dims = await api.acquisitionStatus(); if (dims && dims.acq_action_id) applied(dims); } catch {}
+  $('#acq-redeem')?.addEventListener('click', async () => {
+    const input = $('#acq-token');
+    const note = $('#acq-result');
+    const token = String(input?.value || '').trim();
+    if (!token) { if (note) note.textContent = 'Paste the code first.'; return; }
+    let result;
+    try { result = await api.acquisitionRedeem(token); } catch { result = { ok: false, reason: 'error' }; }
+    if (result?.ok) { applied(result.dims); showToast('Setup code applied.'); }
+    else if (note) {
+      note.textContent = result?.reason === 'already_assigned' ? 'This install is already linked to a code.'
+        : result?.reason === 'no_secret' ? 'This build cannot verify codes yet.'
+        : 'That code is not valid or has expired.';
+    }
+  });
+})();
 api.onLicenseLimit?.((result) => handleLimit(result));
 api.onLicenseActivated?.(async (plan) => {
   closeUpgradeSheet();
@@ -1378,7 +1444,7 @@ const APP_GUIDE=[
   {match:/where.*(map|graph|brain)|mind ?map|constellation/,go:'brain',label:'Open the Map',answer:'The Map is item 02 in the rail. Every course, source, and open task is a node you can drag; scroll to zoom around your cursor, drag the canvas to pan, and Center map reframes everything.'},
   {match:/turn off|remove|disable|get rid.*(companion|knot|overlay)|companion.*(off|remove)/,go:'companion',label:'Open Knot settings',answer:'Turn off Companion, on the Knot > Companion pane, removes it completely: capture stops, the overlay closes, and the hotkeys go back to your system. It stays off across restarts until you press Turn on Companion in the same place.'},
   {match:/close|quit|exit|background|still running|stays open/,go:'companion',label:'Open Knot settings',answer:'Closing the dashboard leaves the Companion running on your desktop with every hotkey live, the same way it works after a restart. The tray icon reopens the dashboard or quits Nūs entirely, and Turn off Companion on this pane removes the overlay for good.'},
-  {match:/stealth|invisible|hide.*(companion|overlay|knot)/,go:'companion',label:'Open Knot settings',answer:'Ctrl+Shift+Space hides the whole Companion, Ctrl+Shift+K hides just the Knot mark, Ctrl+Shift+X stops listening and vanishes. Stealth mode (off by default) also hides the tray icon; this pane is always the way back.'},
+  {match:/stealth|invisible|hide.*(companion|overlay|knot)/,go:'companion',label:'Open Knot settings',answer:'Ctrl+Shift+Space hides the whole Companion, Ctrl+Shift+X stops listening and vanishes. The Knot mark alone can be hidden or shown from this pane, and this pane is always the way back.'},
   {match:/history|transcript|recording|session/,go:'history',label:'Open History',answer:'Every Companion capture session lands under Knot > History: full transcript, search, and upload into your Jarvis vault with a preview before anything is written.'},
   {match:/gemini|companion.*(key|api)|key.*companion|overlay.*key/,go:'settings',label:'Open Settings',answer:'The Companion needs its own key, separate from the desktop app\'s Claude. In Settings, the "Companion AI key" card sits right under AI provider: paste a Google Gemini key there (free tier at aistudio.google.com/apikey) and the Knot starts answering. One Gemini key covers both its answers and speech-to-text for listening. The Knot\'s gear icon sets the same key.'},
   {match:/api key|anthropic|claude key|which model/,go:'settings',label:'Open Settings',answer:'Two keys, two jobs. Desktop app: Claude, found automatically if Claude Code is installed, otherwise an Anthropic API key in Settings > AI provider. It runs on Sonnet so syllabus reading stays affordable. Companion overlay: its own Gemini key in the Companion AI key card just below.'},
@@ -2180,13 +2246,13 @@ const tourSteps=[
   {view:'calendar',rail:'calendar',title:'Calendar is the month as it is',body:'Confirmed deadlines, your smart tasks, and anything you imported, in one grid. Click a day to pull its agenda up beside it.'},
   {view:'tasks',rail:'tasks',title:'Smart tasks turn pressure into steps',body:'Give Nūs an outcome and it proposes a small path you can edit. Nothing schedules itself and nothing runs without you checking it off.'},
   {view:'sources',rail:'semester',title:'Knowledge is what Nūs has read',body:'Under Semester, next to the overview. Courses, unfiled items, and raw imports each keep their own count, so you always know what Nūs read versus what you handed it.'},
-  {view:'companion',rail:'companion',title:'The Knot rides on top of everything',body:'The Nūs Knot floats over your screen, listens when you ask it to, and answers from your briefing packs. Ctrl+Shift+Space hides it, Ctrl+Shift+K hides just the Knot, and Ctrl+Shift+X stops and vanishes in one stroke.',action:{label:'Show me the Knot',run:async()=>{await api.companionControl?.('tour');}}},
+  {view:'companion',rail:'companion',title:'The Knot rides on top of everything',body:'The Nūs Knot floats over your screen, answers "What should I do?" from your real semester, and listens when you ask it to. Ctrl+Shift+Space hides it, Ctrl+Shift+X stops and vanishes in one stroke.',action:{label:'Show me the Knot',run:async()=>{await api.companionControl?.('tour');}}},
   {view:'history',rail:'companion',title:'Every session is kept',body:'Transcripts from the Companion land here, searchable, with the briefing pack that was live at the time. Any session can be uploaded into your Jarvis vault as a note, and you see the exact markdown before it is written.'},
   {view:'settings',rail:'settings',title:'Settings is where the wiring lives',body:'Your two AI keys, email and calendar connections, Companion options, and your school\'s GPA scale all live here. The next three steps cover the ones you actually have to do.'},
   {view:'settings',rail:'settings',title:'Key 1 of 2: Claude, for the desktop app',body:'The AI provider card on this page. Claude reads your syllabi and powers the Ask bar and the chat thread. If Claude Code is installed on this machine, Nūs finds it automatically and there is nothing to paste. If not, put an Anthropic API key in that card. It is encrypted on this device and only ever used to call Anthropic.'},
-  {view:'settings',rail:'settings',title:'Key 2 of 2: Gemini, for the Companion',body:'The Companion AI key card, right below the AI provider one. The floating Knot is a separate agent: it sees your screen and listens, so it runs on its own provider to stay fast and cheap. Paste a Google Gemini key there (the free tier at aistudio.google.com/apikey is enough) and the Knot starts answering. Until it has that key it will only say it needs one. The Knot\'s own gear icon sets the same key if you prefer.'},
+  {view:'settings',rail:'settings',title:'Key 2 of 2: Gemini, for the Companion',body:'The Companion AI key card, right below the AI provider one. The floating Knot is a separate agent: it sees your screen and listens, so it runs on its own provider to stay fast and cheap. Paste a Google Gemini key there (the free tier at aistudio.google.com/apikey is enough) and the Knot starts answering with AI. Even without it, "What should I do?" answers from your semester on this machine. The Knot\'s own gear icon sets the same key if you prefer.'},
   {view:'settings',rail:'settings',title:'Fix your GPA scale',body:'Scroll to the GPA scale card, or click Data in the left column. Every school maps percentages to letters differently, so match that table to your syllabus or the registrar once. Semester setup and every GPA projection read from it, and Nūs never guesses a missing row.'},
-  {view:'companion',rail:'companion',title:'Driving the Companion',action:{label:'Show me the Knot',run:()=>{api.companionControl?.('tour');}},body:'On screen: click the Knot to open its command sheet, then type a question or press Ctrl+Enter for Assist. The buttons are the shortcuts. Ctrl+Shift+Space hides or shows it, Ctrl+Shift+K hides just the Knot mark, Ctrl+Shift+X stops listening and vanishes. It keeps running with the hotkeys live after you close this dashboard, and the tray icon brings the dashboard back. Turn off Companion on this pane removes it entirely.'},
+  {view:'companion',rail:'companion',title:'Driving the Companion',action:{label:'Show me the Knot',run:()=>{api.companionControl?.('tour');}},body:'On screen: click the Knot, then press "What should I do?" or type anything. Ctrl+Enter asks from anywhere, even with no key set. Ctrl+Shift+Space hides or shows it, Ctrl+Shift+X stops listening and vanishes. It keeps running with the hotkeys live after you close this dashboard, and the tray icon brings the dashboard back. Turn off Companion on this pane removes it entirely.'},
   {view:'today',rail:null,title:'You are set',body:'That is the tour. Anything you import lands in a review table before it is saved, so nothing enters your semester without you seeing it. You can replay this walkthrough any time from Settings.',done:true},
 ];
 

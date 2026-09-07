@@ -13,10 +13,12 @@ test('protocol matching is case-insensitive but rejects lookalike schemes', () =
   assert.equal(findProtocolUrl(['nus-desktop-evil://auth/callback?code=abc']), null);
 });
 
-test('protocol links route to auth, billing, or nowhere', () => {
+test('protocol links route to auth, billing, acquire, or nowhere', () => {
   assert.equal(routeProtocolUrl('nus-desktop://auth/callback?code=abc'), 'auth');
   assert.equal(routeProtocolUrl('nus-desktop://billing/success'), 'billing');
   assert.equal(routeProtocolUrl('nus-desktop://billing/success?session_id=cs_test'), 'billing');
+  assert.equal(routeProtocolUrl('nus-desktop://acquire?tok=N1.abc.0123456789'), 'acquire');
+  assert.equal(routeProtocolUrl('nus-desktop://acquire/extra?tok=x'), 'ignore');
   assert.equal(routeProtocolUrl('nus-desktop://auth/other'), 'ignore');
   assert.equal(routeProtocolUrl('nus-desktop://evil/callback'), 'ignore');
   assert.equal(routeProtocolUrl('https://auth/callback?code=abc'), 'ignore');

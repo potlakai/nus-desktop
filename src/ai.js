@@ -21,6 +21,10 @@ const EXTRACTION_PROMPT = `You extract structured data from a course syllabus. R
 }
 Rules:
 - Include only information actually present in the syllabus. NEVER invent dates, weights, or assignments.
+- Read the WHOLE syllabus, especially any course schedule, academic calendar, or week-by-week table. Every graded or scheduled deliverable is an assignment: homework, quizzes, exams, tests, projects, presentations, labs, papers, dated in-class exercises.
+- Quizzes and exams count as assignments even when they only appear inside a schedule row of topics ("Functions; Quiz I" means Quiz I happens that day). A review session is not the deliverable ("Quiz I Review" is not Quiz I).
+- When an item has its own due-date column use that date; otherwise use the date of the schedule row it appears in.
+- If a graded category is recurring but its items are never individually listed (e.g. "weekly homework" with no list of weeks), do NOT invent numbered items for it.
 - due_date is ISO YYYY-MM-DD. If the year is absent, infer it from the stated term; otherwise null.
 - weight_pct is a number (25 for 25%). Assignment category should match a grade_weights category when possible.
 - Unknown values are null; unknown lists are [].
