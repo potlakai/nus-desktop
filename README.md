@@ -117,8 +117,9 @@ Pointing works on the display the Knot lives on; other monitors are next.
 | `Ctrl+Shift+X` (`⌘⇧X`) | Panic: stop listening and vanish |
 | `Ctrl+Enter` (`⌘Enter`) | What should I do? (rebindable in Companion settings) |
 
-Capture exclusion is presentation control, not concealment. Follow the rules
-of every meeting, class, interview, or assessment you are in.
+The overlay is concealed from screen sharing and recordings: the Knot, the
+strand and the bubbles do not appear in what you share. Follow the rules of
+every meeting, class, interview, or assessment you are in.
 
 ## Privacy
 
