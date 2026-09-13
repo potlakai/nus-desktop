@@ -32,8 +32,9 @@ The first-run walkthrough points at both cards.
 
 ## Install and run
 
-Grab `Nus-Setup.exe` (installer) or `Nus-Portable.exe` (no install) from a
-release, or run from source:
+Grab `Nus-Setup.exe` (installer) or `Nus-Portable.exe` (no install) on
+Windows, or `Nus-arm64.dmg` (Apple Silicon) / `Nus-x64.dmg` (Intel) on a Mac,
+from a release, or run from source:
 
 ```
 npm install
@@ -55,6 +56,16 @@ protected your PC", Publisher: Unknown publisher** the first time you run
 every release lists the SHA-512 of its artifacts in `latest.yml`, and Windows
 Defender scans it clean. Signing is wired and waiting on a certificate; see
 `docs/release.md`.
+
+### Why your Mac says it could not verify the app
+
+Same reason. The Mac build is not notarized yet, so the first open says
+**"Apple could not verify Nus is free of malware"**. Click **Done**, open
+**System Settings › Privacy & Security**, scroll to the Security section and
+press **Open Anyway** next to Nus, then confirm once. That is the only time
+it asks. The Mac build cannot update itself until it is notarized, so a new
+version means downloading the dmg again. Local voice (the on-device Whisper
+engine) is Windows-only for now; everything else is the same app.
 
 ### Free and Pro
 
@@ -92,18 +103,27 @@ The Knot floats on your desktop, keeps running after you close the dashboard,
 and comes back from the tray. **Turn off Companion** on the Knot pane removes
 it completely and releases the hotkeys until you turn it back on.
 
+Point at a button, an error, or any spot on the Knot's display and press
+`Ctrl+Shift+T`: a strand runs from the Knot to that spot and you get a small
+preview of the nearby area. Choose Ask (no screen at all), Explain, Fix, or
+Guide, type a line or just press Enter, and only that preview goes to Claude
+when you press Send. Sensitive fields such as password boxes are refused.
+Pointing works on the display the Knot lives on; other monitors are next.
+
 | Keys | Action |
 |---|---|
-| `Ctrl+Shift+Space` | Hide or show the overlay |
-| `Ctrl+Shift+X` | Panic: stop listening and vanish |
-| `Ctrl+Enter` | What should I do? (rebindable in Companion settings) |
+| `Ctrl+Shift+T` (Windows) | Point at what you need help with |
+| `Ctrl+Shift+Space` (`⌘⇧Space` on a Mac) | Hide or show the overlay |
+| `Ctrl+Shift+X` (`⌘⇧X`) | Panic: stop listening and vanish |
+| `Ctrl+Enter` (`⌘Enter`) | What should I do? (rebindable in Companion settings) |
 
 Capture exclusion is presentation control, not concealment. Follow the rules
 of every meeting, class, interview, or assessment you are in.
 
 ## Privacy
 
-Local-first by design. The database lives at `%APPDATA%\Nus\data\nus.db` and
+Local-first by design. The database lives at `%APPDATA%\Nus\data\nus.db`
+(`~/Library/Application Support/Nus/data/nus.db` on a Mac) and
 everything Nūs knows stays on this device. The only outbound calls are the AI
 providers you configured, the integrations you explicitly connect, and, if you
 sign in, the Supabase account check (email and plan, never content) plus Stripe

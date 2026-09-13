@@ -26,6 +26,7 @@ const DEFAULTS = {
   deepQueryUrl: 'http://127.0.0.1:8765/api/ask',
   // Read replies aloud. On for rehearsal, off during a real call.
   speakReplies: false,
+  reducedMotion: false,
   // Explicit opt-in. When false, the Companion can show that Nūs is linked but
   // never sends the shared semester snapshot to an external model provider.
   shareNusContextWithProvider: false,
@@ -33,7 +34,8 @@ const DEFAULTS = {
   // used) are appended to the local companion-events outbox for the Nūs desktop
   // app to ingest. Never leaves the machine.
   reportToNus: false,
-  shortcuts: { assist: 'CommandOrControl+Return' },
+  // assist = "What should I do?"; ptt = hold to talk to the Knot.
+  shortcuts: { assist: 'CommandOrControl+Return', ptt: 'CommandOrControl+Alt+Space' },
   // Persist transcripts into the desktop app's history. On by default: the
   // transcript is the useful artifact and it is small.
   persistTranscripts: true,
@@ -48,6 +50,16 @@ const DEFAULTS = {
   // The desktop Knot pane can hide just the Knot mark; persisted so it survives
   // restarts and the pane can always show the true state and restore it.
   knotHidden: false,
+  // Which screen corner the Knot is pinned to: tl, tr, bl, br. It never
+  // follows the cursor and never drags; a corner is the only move.
+  knotCorner: 'br',
+  // Proactive nudges the user said "not now" to: trigger key -> the day
+  // (YYYY-MM-DD) it stays quiet. Cleared naturally by the date changing.
+  snoozes: {},
+  // Master switch for the Knot speaking first (plan nudges, app hints).
+  proactive: true,
+  // Which display the overlay covers (Electron display id); null = primary.
+  knotDisplayId: null,
   // Date (YYYY-MM-DD) the proactive daily line was last shown, so it fires
   // once per day and never nags.
   lastDailyLine: '',
@@ -194,18 +206,21 @@ function load() {
 function save() {
   try {
     const json = JSON.stringify(data, null, 2);
+    const tmp = FILE + '.tmp';
     if (safeStorage.isEncryptionAvailable()) {
       const payload = safeStorage.encryptString(json).toString('base64');
-      fs.writeFileSync(FILE, JSON.stringify({ encrypted: true, payload }), { mode: 0o600 });
+      fs.writeFileSync(tmp, JSON.stringify({ encrypted: true, payload }), { mode: 0o600 });
     } else {
-      fs.writeFileSync(FILE, json, { mode: 0o600 });
+      fs.writeFileSync(tmp, json, { mode: 0o600 });
     }
-  } catch (e) { /* ignore */ }
+    fs.renameSync(tmp, FILE);
+    return true;
+  } catch (e) { return false; }
 }
 
 module.exports = {
   getSettings() { return load(); },
-  setSettings(patch) { load(); data = deepMerge(data, patch || {}); save(); return data; },
+  setSettings(patch) { load(); const previous = data; data = deepMerge(data, patch || {}); if (!save()) { data = previous; throw new Error('Could not save Companion settings'); } return data; },
   // One-time note if the standalone Companion's settings could not be migrated.
   migrationNote() { load(); return migrationNote; }
 };

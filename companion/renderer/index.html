@@ -4,11 +4,79 @@
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
   <title>Nūs Companion</title>
-  <link rel="stylesheet" href="styles.css?v=knot-11" />
+  <link rel="stylesheet" href="styles.css?v=knot-13" />
+  <link rel="stylesheet" href="quiet-knot.css?v=quiet-2" />
 </head>
 <body>
-  <div id="app">
-    <!-- Bottom-left stack: tiles above, orb below -->
+  <!-- The strand: the Knot's thread across the screen. Covers the window,
+       never takes the mouse; the Knot corner and the bubbles are the only
+       clickable pixels. -->
+  <canvas id="strand-layer" data-task="" aria-hidden="true"></canvas>
+
+  <!-- Guide bubble at the thread tip, and the one-tap consent chip after a
+       session. Both are DOM so the text stays crisp at any zoom. -->
+  <div id="guide-bubble" class="glass no-drag hidden" role="status" aria-live="polite">
+    <div class="gb-kicker" id="gb-kicker"></div>
+    <div class="gb-text" id="gb-text"></div>
+    <div class="gb-hint" id="gb-hint"></div>
+    <div class="gb-actions" id="gb-actions"></div>
+    <form id="guide-followup" class="hidden"><input id="guide-followup-input" aria-label="Ask about this step" placeholder="Why? Explain more simply?" autocomplete="off" /><button type="submit">Ask</button></form>
+  </div>
+  <!-- The quick ask: one quiet line by the Knot. Click the Knot, type, Enter.
+       Voice is optional; this is the everyday path. -->
+  <div id="quick-ask" class="glass no-drag hidden" role="dialog" aria-label="Ask Nūs">
+    <div id="inspect-context" class="hidden" role="status"></div>
+    <img id="inspect-preview" class="hidden" alt="The exact selected snapshot that will be sent to Claude" />
+    <div id="context-used" role="status">Context: this conversation only</div>
+    <div class="quiet-composer">
+      <input id="quick-input" type="text" aria-label="What do you need help with?" placeholder="What do you need help with?" spellcheck="false" autocomplete="off" />
+      <button id="quick-talk" type="button" aria-label="Start voice question" title="Start voice question">Talk</button>
+      <button id="quick-send" type="button" aria-label="Send question" title="Send question">↑</button>
+    </div>
+    <div class="quiet-actions">
+      <select id="quick-intent" class="hidden" aria-hidden="true" tabindex="-1"><option value="ask">Ask without screen</option><option value="explain">Explain selection</option><option value="fix">Help fix selection</option><option value="guide">Guide on screen</option></select>
+      <div id="quick-modes" role="group" aria-label="How should Nūs help?">
+        <button type="button" data-intent="ask" aria-pressed="true">Ask</button>
+        <button type="button" data-intent="explain" aria-pressed="false">Explain</button>
+        <button type="button" data-intent="fix" aria-pressed="false">Fix</button>
+        <button type="button" data-intent="guide" aria-pressed="false">Guide</button>
+      </div>
+      <button id="inspect-region" type="button" class="hidden">Select region</button>
+      <button id="quick-record" type="button">Record meeting</button>
+      <button id="quick-saved" type="button">Saved</button>
+      <button id="quick-settings" type="button">Settings</button>
+      <button id="quick-more" type="button" title="More tools" aria-label="More tools">More</button>
+    </div>
+    <p id="quick-mode-hint" role="status">Ask without sharing your screen.</p>
+  </div>
+  <div id="region-picker" class="hidden" role="dialog" aria-label="Drag a region to ask about; Escape cancels"><span>Drag over the problem. Esc cancels.</span><div id="region-box"></div></div>
+  <!-- App hint: three words by the Knot when the front app has kept
+       walkthroughs. The Knot loosens a little; no thread until asked. -->
+  <button id="knot-hint" class="glass no-drag hidden" type="button" aria-live="polite"></button>
+  <div id="keep-chip" class="glass no-drag hidden" role="dialog" aria-label="Remember this for next time?">
+    <span id="keep-text">Save this task and its steps locally for next time? No audio or screenshots.</span>
+    <button id="keep-yes" type="button">Keep</button>
+    <button id="keep-no" type="button">Skip</button>
+  </div>
+  <div id="quiet-recording" class="glass no-drag hidden" role="status">
+    <span class="quiet-rec-dot" aria-hidden="true"></span><span id="quiet-recording-text">Recording · 00:00</span>
+    <div id="quiet-voice-wave" class="voice-wave" aria-hidden="true"></div>
+    <button id="quiet-stop" type="button">Stop</button>
+    <button id="quiet-cancel" type="button">Cancel</button>
+    <button id="quiet-retry" type="button" class="hidden">Retry</button>
+  </div>
+  <div id="saved-scrim" class="hidden">
+    <section id="saved-sheet" class="glass" role="dialog" aria-modal="true" aria-labelledby="saved-title">
+      <div class="s-head"><h2 id="saved-title">Saved in Nūs</h2><button id="saved-close" type="button" class="s-close">Done</button></div>
+      <p class="s-note">Walkthroughs stay in Nūs. Preview a separate export to your Jarvis vault.</p>
+      <div id="saved-list"></div><div id="saved-status" role="status"></div>
+      <button id="saved-history" type="button">Open recording history</button>
+      <div id="saved-export" class="hidden"><h3>Jarvis export preview</h3><p id="saved-destination" class="s-note"></p><pre id="saved-preview"></pre><button id="saved-export-confirm" type="button">Export to Jarvis</button></div>
+    </section>
+  </div>
+
+  <div id="app" data-corner="br">
+    <!-- Corner stack: tiles on the screen-centre side of the Knot -->
     <div id="stack">
 
     <!-- Tiles appear above the orb only when there is something to show -->
@@ -87,12 +155,18 @@
             <div id="orb-controls">
               <button id="stop-btn" title="Start / stop listening" aria-label="Start or stop listening"></button>
               <button id="logo-btn" title="Help / tutorial" aria-label="Open tutorial"></button>
-              <span class="tb-grip" title="Drag to move">⋮⋮</span>
+              <!-- Where the Knot lives. Four corners, nothing else moves. -->
+              <span id="corner-pick" title="Move the Knot to a corner" aria-label="Knot corner">
+                <button type="button" data-corner="tl" aria-label="Top left"></button>
+                <button type="button" data-corner="tr" aria-label="Top right"></button>
+                <button type="button" data-corner="bl" aria-label="Bottom left"></button>
+                <button type="button" data-corner="br" aria-label="Bottom right"></button>
+              </span>
             </div>
           </div>
         </div>
 
-        <button id="orb" class="no-drag" type="button" title="Open Nūs" aria-label="Open Nūs command sheet" aria-expanded="false">
+        <button id="orb" class="no-drag" type="button" title="Ask Nūs" aria-label="Ask Nūs" aria-expanded="false">
           <span class="knot-halo" aria-hidden="true"></span>
           <canvas id="knot-canvas" aria-hidden="true"></canvas>
           <svg class="nus-knot" viewBox="0 0 88 88" aria-hidden="true">
@@ -123,9 +197,16 @@
       </div>
       <div class="s-body">
         <div id="nus-link-status" class="nus-link-status">Checking Nūs desktop context…</div>
+        <label class="s-label" for="knot-position">Knot corner</label>
+        <div class="s-field"><select id="knot-position" aria-label="Knot corner"><option value="tl">Top left</option><option value="tr">Top right</option><option value="bl">Bottom left</option><option value="br">Bottom right</option></select></div>
 
         <label class="s-label">Gemini API key <span class="s-hint">free at aistudio.google.com/apikey · stored locally and encrypted</span></label>
-        <p class="s-note">Only needed for AI answers and listening: <b>"What should I do?" works with no key at all</b>, straight from your semester. One free Gemini key covers both answers and speech-to-text. Also settable in the desktop app under Settings, Companion AI key.</p>
+        <p class="s-note">Screen guidance uses your Companion AI provider, or the desktop’s Claude connection when no Companion key is set. Voice uses on-device transcription when available, with a configured provider as fallback. "What should I do?" can read your semester locally without a key.</p>
+        <div class="s-field nus-share-field"><span>Plan nudges and saved-app hints <small>Suggestions from your plan and saved walkthroughs. No continuous screen capture.</small></span><input id="proactive-enabled" type="checkbox" /></div>
+        <label class="s-label" for="shortcut-ptt">Voice shortcut</label>
+        <div class="s-shortcut"><input id="shortcut-ptt" type="text" aria-label="Voice shortcut" readonly /><button id="shortcut-ptt-save" type="button">Change</button></div>
+        <p class="s-note" id="ptt-shortcut-status">Hold to talk. The Talk button also starts and stops a voice question.</p>
+        <p class="s-note" id="inspect-shortcut-status" role="status">Ctrl+Shift+T: point at a problem.</p>
         <div class="s-field"><span>Gemini</span><input id="key-gemini" type="password" placeholder="AIza..." autocomplete="off" /></div>
         <div class="s-field nus-share-field"><span>Smart answers <small>Off by default. On: every reply uses the slower, stronger model.</small></span><input id="smart-mode" type="checkbox" /></div>
 
@@ -165,6 +246,7 @@
         <details class="s-more" data-founder>
           <summary>Rehearsal and briefing packs</summary>
           <div class="s-field"><span>Speak replies</span><input id="speak-replies" type="checkbox" /></div>
+          <div class="s-field"><label for="reduce-motion">Reduce companion motion</label><input id="reduce-motion" type="checkbox" /></div>
           <p class="s-note">Packs are built by the vault: python scripts/build_briefing.py &lt;slug&gt;. Turn Speak replies OFF before a real call.</p>
           <div class="s-field"><span>Live pack</span><input id="pack-path" type="text" spellcheck="false" autocomplete="off" placeholder="...\jarvis\briefings\your-meeting\pack.md" /></div>
           <div class="s-field"><span>Spar pack</span><input id="spar-path" type="text" spellcheck="false" autocomplete="off" placeholder="...\jarvis\briefings\your-meeting\spar.md" /></div>
@@ -200,8 +282,9 @@
     </div>
   </div>
 
-  <script src="knot3d.js?v=knot-11"></script>
-  <script src="icons.js?v=knot-11"></script>
-  <script src="renderer.js?v=knot-11"></script>
+  <script src="knot3d.js?v=knot-13"></script>
+  <script src="strand.js?v=knot-13"></script>
+  <script src="icons.js?v=knot-13"></script>
+  <script src="renderer.js?v=knot-13"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@
 // the main process; the renderer only ever sees booleans and parsed results.
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { app } = require('electron');
 const secrets = require('./secrets');
@@ -10,6 +11,42 @@ const secrets = require('./secrets');
 const MODEL = 'claude-sonnet-5';
 const KEY_NAME = 'anthropic_api_key';
 const CLI_TIMEOUT_MS = 180000;
+const IS_WIN = process.platform === 'win32';
+
+// Where a Claude Code install lands on macOS and Linux. A GUI app on macOS
+// starts with a bare PATH (/usr/bin:/bin:/usr/sbin:/sbin), so a plain
+// `which claude` misses every normal install; these are checked directly and
+// prepended to the PATH the CLI itself runs with (an npm install needs node).
+const UNIX_BIN_DIRS = [
+  path.join(os.homedir(), '.local', 'bin'),
+  '/opt/homebrew/bin',
+  '/usr/local/bin',
+  path.join(os.homedir(), '.claude', 'local'),
+  path.join(os.homedir(), '.npm-global', 'bin'),
+  path.join(os.homedir(), '.volta', 'bin'),
+];
+
+// The CLI must bill the user's subscription, never a stray API key from the
+// machine environment.
+function cliEnv() {
+  const env = { ...process.env };
+  delete env.ANTHROPIC_API_KEY;
+  if (!IS_WIN) env.PATH = [...UNIX_BIN_DIRS, env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'].join(':');
+  return env;
+}
+
+// Ends a CLI process and everything it spawned. Windows needs taskkill for
+// the tree (a .cmd shim owns the real node process); elsewhere SIGKILL after
+// the SIGTERM the caller already sent is enough.
+function killTree(child) {
+  if (!child || !child.pid) return;
+  if (IS_WIN) { try { execFile('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true }, () => {}); } catch {} return; }
+  try { child.kill('SIGKILL'); } catch {}
+}
+
+function isExecutable(file) {
+  try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile(); } catch { return false; }
+}
 const API_TIMEOUT_MS = 120000;
 const MAX_INPUT_CHARS = 150000;
 
@@ -37,12 +74,34 @@ let cliPathCache;
 function detectCli() {
   if (cliPathCache !== undefined) return Promise.resolve(cliPathCache);
   if (process.env.NUS_DISABLE_CLI === '1') { cliPathCache = null; return Promise.resolve(null); }
+  return (IS_WIN ? detectCliWindows() : detectCliUnix()).then((found) => { cliPathCache = found; return found; });
+}
+
+function detectCliWindows() {
   return new Promise((resolve) => {
     execFile('where.exe', ['claude'], { windowsHide: true }, (error, stdout) => {
-      cliPathCache = error ? null : (stdout.split(/\r?\n/).find((line) => line.trim()) || '').trim() || null;
-      resolve(cliPathCache);
+      resolve(error ? null : (stdout.split(/\r?\n/).find((line) => line.trim()) || '').trim() || null);
     });
   });
+}
+
+async function detectCliUnix() {
+  for (const dir of UNIX_BIN_DIRS) {
+    const full = path.join(dir, 'claude');
+    if (isExecutable(full)) return full;
+  }
+  // `which` sees only the bare GUI PATH plus the dirs above; the login shell
+  // is the last resort for an install somewhere unusual. It may print a motd
+  // first, so the path is the last non-empty line, and it must exist.
+  const probe = (file, args, pick) => new Promise((resolve) => {
+    execFile(file, args, { timeout: 3000, env: cliEnv() }, (error, stdout) => {
+      const lines = String(stdout || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const candidate = error || !lines.length ? null : pick(lines);
+      resolve(candidate && isExecutable(candidate) ? candidate : null);
+    });
+  });
+  return (await probe('/usr/bin/which', ['claude'], (lines) => lines[0]))
+    || (await probe(process.env.SHELL || '/bin/zsh', ['-lc', 'command -v claude'], (lines) => lines[lines.length - 1]));
 }
 
 async function status() {
@@ -66,18 +125,15 @@ function truncate(text) {
   return String(text || '').slice(0, MAX_INPUT_CHARS);
 }
 
-function runCli(cliPath, prompt) {
+function runCli(cliPath, prompt, guide) {
   return new Promise((resolve) => {
     const isShim = /\.(cmd|bat)$/i.test(cliPath);
-    // The CLI must bill the user's subscription, never a stray API key from the
-    // machine environment. cwd is app-owned so the CLI never sees an untrusted dir.
-    const env = { ...process.env };
-    delete env.ANTHROPIC_API_KEY;
-    const opts = { cwd: app.getPath('userData'), env, windowsHide: true };
+    // cwd is app-owned so the CLI never sees an untrusted dir.
+    const opts = { cwd: app.getPath('userData'), env: cliEnv(), windowsHide: true };
     // Pin the model. Without --model the CLI uses whatever the user's Claude
     // Code default is, which can be their most expensive one; syllabus reading
     // and short commands do not need it, and students pay for that default.
-    const args = ['-p', '--model', MODEL, '--output-format', 'json'];
+    const args = ['-p', '--model', MODEL, '--output-format', guide ? 'stream-json' : 'json', ...(guide ? ['--verbose', ...guide.cliArgs] : [])];
     const child = isShim
       ? spawn('cmd.exe', ['/c', cliPath, ...args], opts)
       : spawn(cliPath, args, opts);
@@ -87,7 +143,7 @@ function runCli(cliPath, prompt) {
     const finish = (result) => { if (!settled) { settled = true; resolve(result); } };
     const timer = setTimeout(() => {
       try { child.kill(); } catch {}
-      if (isShim) { try { execFile('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true }, () => {}); } catch {} }
+      killTree(child);
       finish({ error: 'cli_timeout' });
     }, CLI_TIMEOUT_MS);
     child.stdout.on('data', (chunk) => { stdout += chunk; });
@@ -97,12 +153,13 @@ function runCli(cliPath, prompt) {
       clearTimeout(timer);
       if (code !== 0 && !stdout.trim()) return finish({ error: 'cli_failed', detail: String(stderr).slice(0, 300) });
       try {
-        const parsed = JSON.parse(stdout);
+        const parsed = guide ? stdout.trim().split('\n').map(line => { try { return JSON.parse(line); } catch { return null; } }).filter(Boolean).findLast(item => item.type === 'result') : JSON.parse(stdout);
+        if (!parsed) return finish({ error: 'cli_failed', detail: 'No final response from Claude Code' });
         if (parsed.is_error) {
           const detail = String(parsed.result || '').slice(0, 300);
           // Installed but signed out is the most common CLI failure and has a
           // specific fix, so it gets its own code instead of a generic error.
-          if (/not logged in|\/login|please run .?login/i.test(detail)) return finish({ error: 'cli_not_logged_in', detail });
+          if (/not logged in|\/login|please run .?login|failed to authenticate|oauth session expired|session expired|could not be refreshed/i.test(detail)) return finish({ error: 'cli_not_logged_in', detail });
           // A spend cap is not a broken install: it has its own fix (raise the
           // limit, or fall back to an API key), so it gets its own message.
           if (/spend limit|usage limit|rate limit|quota/i.test(detail)) return finish({ error: 'cli_spend_limit', detail });
@@ -115,7 +172,7 @@ function runCli(cliPath, prompt) {
       }
     });
     child.stdin.on('error', () => {});
-    child.stdin.write(prompt);
+    child.stdin.write(guide ? guide.stdin : prompt);
     child.stdin.end();
   });
 }
@@ -131,7 +188,7 @@ function toolLabel(input) {
 }
 
 function classifyCliError(detail) {
-  if (/not logged in|\/login|please run .?login/i.test(detail)) return 'cli_not_logged_in';
+  if (/not logged in|\/login|please run .?login|failed to authenticate|oauth session expired|session expired|could not be refreshed/i.test(detail)) return 'cli_not_logged_in';
   if (/spend limit|usage limit|rate limit|quota/i.test(detail)) return 'cli_spend_limit';
   return 'cli_failed';
 }
@@ -141,7 +198,7 @@ let streamChild = null;
 function cancelStream() {
   if (!streamChild) return { ok: false };
   try { streamChild.kill(); } catch {}
-  try { execFile('taskkill', ['/pid', String(streamChild.pid), '/t', '/f'], { windowsHide: true }, () => {}); } catch {}
+  killTree(streamChild);
   streamChild = null;
   return { ok: true };
 }
@@ -151,10 +208,7 @@ function cancelStream() {
 function runCliStream(cliPath, prompt, onEvent, { partials = true } = {}) {
   return new Promise((resolve) => {
     const isShim = /\.(cmd|bat)$/i.test(cliPath);
-    // Same billing rule as runCli: subscription only, never a stray API key.
-    const env = { ...process.env };
-    delete env.ANTHROPIC_API_KEY;
-    const opts = { cwd: app.getPath('userData'), env, windowsHide: true };
+    const opts = { cwd: app.getPath('userData'), env: cliEnv(), windowsHide: true };
     const args = ['-p', '--model', MODEL, '--output-format', 'stream-json', '--verbose'];
     if (partials) args.push('--include-partial-messages');
     const child = isShim
@@ -175,7 +229,7 @@ function runCliStream(cliPath, prompt, onEvent, { partials = true } = {}) {
     };
     const timer = setTimeout(() => {
       try { child.kill(); } catch {}
-      if (isShim) { try { execFile('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true }, () => {}); } catch {} }
+      killTree(child);
       finish({ error: 'cli_timeout' });
     }, CLI_TIMEOUT_MS);
     const handleLine = (line) => {
@@ -327,17 +381,18 @@ function logAiError(code, detail) {
   try { fs.appendFileSync(path.join(app.getPath('userData'), 'ai-errors.log'), line); } catch {}
 }
 
-async function complete(prompt) {
+async function complete(prompt, options = {}) {
+  const guide = options.guidance ? require('./guide-input').guideInput(prompt, options.imageDataUrl) : null;
   const cliPath = await detectCli();
   const apiKey = secrets.getSecret(KEY_NAME);
   let result;
   if (cliPath) {
-    result = await runCli(cliPath, prompt);
+    result = await runCli(cliPath, prompt, guide);
     if (result.error === 'cli_spawn_failed') cliPathCache = undefined;
     // A broken CLI should never strand a user who also gave us a key.
-    if (result.error && apiKey) result = await runApi(apiKey, prompt);
+    if (result.error && apiKey) result = await runApi(apiKey, guide ? guide.content : prompt);
   } else if (apiKey) {
-    result = await runApi(apiKey, prompt);
+    result = await runApi(apiKey, guide ? guide.content : prompt);
   } else {
     result = { error: 'no_ai' };
   }

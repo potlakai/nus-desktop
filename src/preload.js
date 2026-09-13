@@ -1,6 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('nus', {
+  // 'win32' | 'darwin' | 'linux': the renderer picks OS-specific copy from it
+  // (System Settings vs Windows Settings, ⌘ vs Ctrl). Nothing else about the OS
+  // crosses the bridge.
+  platform: process.platform,
   getState: () => ipcRenderer.invoke('state:get'),
   listCourses: () => ipcRenderer.invoke('courses:list'),
   addCourse: (course) => ipcRenderer.invoke('courses:add', course),
@@ -93,6 +97,8 @@ contextBridge.exposeInMainWorld('nus', {
   onAuthChanged: (cb) => ipcRenderer.on('auth:changed', (_e, data) => cb(data)),
   onLicenseChanged: (cb) => ipcRenderer.on('license:changed', (_e, data) => cb(data)),
   onDesktopTour: (cb) => ipcRenderer.on('desktop:tour', () => cb()),
+  onDesktopHistory: (cb) => ipcRenderer.on('desktop:history', () => cb()),
+  onDesktopVoiceSetup: (cb) => ipcRenderer.on('desktop:voice-setup', () => cb()),
   setActiveView: (name) => ipcRenderer.invoke('state:view', name),
   onCompanionMessage: (cb) => ipcRenderer.on('companion:message', (_e, data) => cb(data)),
   voiceStatus: () => ipcRenderer.invoke('voice:status'),

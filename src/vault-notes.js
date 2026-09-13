@@ -34,7 +34,7 @@ function channelLabel(channel) {
 
 function buildNote(session, messages) {
   const day = (session.started_at || new Date().toISOString()).slice(0, 10);
-  const title = session.title || session.first_line || `Companion session ${day}`;
+  const title = String(session.title || session.first_line || `Companion session ${day}`).replace(/[\r\n\u0000-\u001f]+/g, ' ').replace(/\\/g, '/').slice(0, 300);
   const fileName = `${day}-${slugify(title)}.md`;
 
   const lines = [];
@@ -66,6 +66,7 @@ function writeNote(fileName, content) {
   fs.mkdirSync(dir, { recursive: true });
 
   const safeName = path.basename(fileName); // strip any path components
+  if (!/^[a-z0-9][a-z0-9._ -]*\.md$/i.test(safeName)) return { error: 'Use a Markdown note filename.' };
   let target = path.resolve(dir, safeName);
   if (!target.startsWith(path.resolve(dir) + path.sep)) return { error: 'Refused: write would land outside notes/companion/.' };
 
@@ -76,7 +77,7 @@ function writeNote(fileName, content) {
     attempt += 1;
     target = path.resolve(dir, `${stem}-${attempt}${ext}`);
   }
-  fs.writeFileSync(target, content, 'utf8');
+  fs.writeFileSync(target, content, { encoding: 'utf8', flag: 'wx' });
   return { ok: true, path: target };
 }
 

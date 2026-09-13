@@ -21,6 +21,8 @@
   // ---- state -------------------------------------------------------------
   let settings = null;
   let busy = false;
+  let guideState = null;  // main-owned guide session state, null outside a session
+  let quickOpen = false;  // the one-line quick ask by the Knot
   let aiEl = null;       // current streaming <div class="ai-text">
   let caretEl = null;
   let assistShortcut = DEFAULT_ASSIST_SHORTCUT;
@@ -48,6 +50,8 @@
   }
 
   function syncAssistShortcutLabels() {
+    const pointingStatus = $('#inspect-shortcut-status');
+    if (pointingStatus) pointingStatus.textContent = settings && settings._inspectionShortcut && !settings._inspectionShortcut.ok ? settings._inspectionShortcut.error : 'Ctrl+Shift+T: point at a control, see the Knot point to it, then optionally ask Claude.';
     const shortcutBtn = $('#shortcut-assist');
     if (shortcutBtn && !recordingShortcut) shortcutBtn.textContent = shortcutParts(assistShortcut).join(' + ');
     const placeholder = $('#placeholder');
@@ -85,6 +89,7 @@
     b.className = 'user-bubble';
     b.textContent = text;
     messages.appendChild(b);
+    return b;
   }
 
   function startAi(small) {
@@ -129,28 +134,51 @@
   // The 3D knot canvas. Falls back to the inline SVG when canvas is missing.
   // ground:false + a smaller scale: the mark floats shadow-free on the user's
   // desktop, and the extra canvas margin keeps its glow from being cut off.
-  const knot3d = window.NusKnot3D ? NusKnot3D.mount($('#knot-canvas'), { ground: false, scale: 0.285 }) : null;
+  // focusGate:false: the overlay is shown inactive by design, so the Knot
+  // must not drop to a third of its frame rate for never being focused.
+  // pauseWhenHidden:false: the overlay runs with background throttling off, so
+  // the Page Visibility API no longer tracks the window; main tells us when the
+  // overlay is hidden or shown (overlay:visible) and the Knot pauses on that.
+  const knot3d = window.NusKnot3D ? NusKnot3D.mount($('#knot-canvas'), { ground: false, scale: 0.285, focusGate: false, pauseWhenHidden: false, quietIdle: true }) : null;
   if (knot3d) $('#orb').classList.add('k3d');
+  nus.on('overlay:visible', (p) => {
+    if (!knot3d) return;
+    if (p && p.visible) knot3d.resume(); else knot3d.pause();
+    if (strand) { if (p && p.visible) strand.resume(); else strand.pause(); }
+  });
 
   function syncKnotUi() {
     const toolbar = $('#toolbar');
     const panelNode = $('#panel');
     const listening = $('#stop-btn').classList.contains('active');
     const panelOpen = panelNode && !panelNode.classList.contains('collapsed');
-    const state = busy ? 'thinking' : listening ? 'listening' : panelOpen ? 'ready' : 'idle';
-    const copy = {
+    // A guide session (main-owned) outranks the local state ladder. Thread
+    // colour = task; the Knot's glow = this state.
+    const GUIDE_KNOT = { listening: 'listening', transcribing: 'thinking', reading: 'reading', thinking: 'thinking', unwinding: 'ready', pointing: 'ready', nudging: 'ready', explaining: 'ready', keeping: 'thinking', done: 'ready', winding: 'idle' };
+    const state = guideState ? (GUIDE_KNOT[guideState] || 'ready') : busy ? 'thinking' : listening ? 'listening' : (panelOpen || quickOpen) ? 'ready' : 'idle';
+    const copy = (guideState && {
+      listening: ['Nūs listening', 'Release to send'],
+      transcribing: ['Nūs transcribing', 'Microphone stopped'],
+      reading: ['Nūs reading your screen', 'Amber means looking'],
+      unwinding: ['Nūs unwinding', 'Following the thread'],
+      pointing: ['Nūs pointing', 'Esc or click me to wind back'],
+      nudging: ['Nūs has a note', 'Not now snoozes it for today'],
+      explaining: ['Nūs answering', 'Esc or click me to close'],
+      keeping: ['Nūs keeping that', 'Stored for later'],
+      done: ['Nūs done', 'Winding back'],
+    }[guideState]) || {
       idle: ['Nūs idle', 'Quietly available'],
-      listening: ['Nūs listening', 'Screen + voice active'],
+      listening: ['Nūs recording', 'Audio capture active'],
       thinking: ['Nūs thinking', 'Working through context'],
       ready: ['Nūs ready', 'Command layer open']
     }[state];
 
     toolbar.dataset.knotState = state;
     toolbar.classList.toggle('panel-open', !!panelOpen);
-    $('#orb').setAttribute('aria-expanded', String(!!panelOpen));
+    $('#orb').setAttribute('aria-expanded', String(!!panelOpen || quickOpen));
     $('#knot-status-title').textContent = copy[0];
     $('#knot-status-subtitle').textContent = copy[1];
-    if (knot3d) knot3d.setState($('#orb').classList.contains('spar') && !busy ? 'spar' : state);
+    if (knot3d) knot3d.setState(guideState === 'reading' ? 'reading' : ($('#orb').classList.contains('spar') && !busy ? 'spar' : state));
   }
 
   function setBusy(v) {
@@ -170,6 +198,19 @@
   const panel = $('#panel');
   function showTiles() { panel.classList.remove('collapsed'); syncKnotUi(); }
   function toggleTiles() { panel.classList.toggle('collapsed'); syncKnotUi(); }
+  // Measured 2026-09-10 on the packaged build: after "Walk me through it" the
+  // selection conversation panel stayed open over the pointed control, so the
+  // person's click landed on our own panel and the screen never changed. When
+  // the panel covers a pointed target it folds away; the answer stays in it.
+  function collapsePanelIfCovering(bbox) {
+    if (!bbox || panel.classList.contains('collapsed')) return false;
+    const r = panel.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return false;
+    const covers = !(r.right < bbox.x || r.left > bbox.x + bbox.w || r.bottom < bbox.y || r.top > bbox.y + bbox.h);
+    if (!covers) return false;
+    panel.classList.add('collapsed'); syncKnotUi();
+    return true;
+  }
 
   // ---- speech out --------------------------------------------------------
   // Lifted from the Jarvis dashboard: Edge's neural voices are free and good
@@ -202,6 +243,18 @@
   }
 
   function stopSpeaking() { try { speechSynthesis.cancel(); } catch (_) {} }
+
+  // Voice input never implicitly opts into spoken output.
+  function say(text) {
+    if (!settings || !settings.speakReplies || !text) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(plainify(String(text)).slice(0, 300));
+      if (voice) u.voice = voice;
+      u.rate = 1.05;
+      speechSynthesis.speak(u);
+    } catch (_) { /* no voices on this machine */ }
+  }
 
   // ---- actions -----------------------------------------------------------
   // Modes that render without a provider key: guide answers from the local
@@ -296,8 +349,36 @@
     if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); send(); }
   });
 
-  // The Knot is the show/hide switch for the existing command sheet.
-  $('#orb').addEventListener('click', toggleTiles);
+  // The Knot: while a thread is out, one click winds it back. Otherwise it
+  // opens the quick ask (one line, type, Enter), or closes whatever is open.
+  // A double-click is one activation: the second click used to arrive as a
+  // second `click`, close the composer that the first had just opened, and
+  // hand the mouse back to the desktop, which read as the Companion vanishing.
+  // Chromium counts the clicks for us (e.detail is 2 on the second click of a
+  // double-click, using the OS double-click time); the timestamp check is the
+  // fallback for a click that arrives after a stalled frame.
+  const KNOT_CLICK_REPEAT_MS = 400; // under Windows' 500ms double-click time
+  let lastKnotClick = 0;
+  function knotClickRepeated(e) {
+    const at = e && e.timeStamp ? e.timeStamp : performance.now();
+    // Measured 2026-09-10: timing against the last ACCEPTED click let a fast
+    // burst toggle the composer every sixth click. Time against the previous
+    // click of any kind, so a burst changes nothing until it stops for 400ms.
+    const repeated = (e && e.detail > 1) || at - lastKnotClick < KNOT_CLICK_REPEAT_MS;
+    lastKnotClick = at;
+    return repeated;
+  }
+  $('#orb').addEventListener('click', (e) => {
+    if (knotClickRepeated(e)) { if (quickOpen) $('#quick-input').focus(); return; }
+    // A selection answer is up: the Knot opens a follow-up on the same
+    // snapshot. Esc and Done still wind it back.
+    if (!quickOpen && currentInspection && guideActive()) { showInspectionComposer(currentInspection, true); return; }
+    if (guideActive()) dismissGuide('knot');
+    else if (quickOpen) closeQuickAsk();
+    else if (!panel.classList.contains('collapsed')) toggleTiles();
+    else openQuickAsk();
+  });
+  $('#orb').addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); });
 
   function toggleCaptureFromUi() {
     const turningOn = !$('#stop-btn').classList.contains('active');
@@ -336,6 +417,10 @@
         bars[i].style.transform = 'scaleY(' + (0.08 + v * 0.92).toFixed(3) + ')';
         bars[i].style.opacity = (0.35 + v * 0.65).toFixed(3);
       }
+      const quietBars = $('#quiet-voice-wave').children;
+      for (let i = 0; i < quietBars.length; i++) {
+        quietBars[i].style.transform = 'scaleY(' + (0.08 + (waveLevels[i] || 0) * 0.92).toFixed(3) + ')';
+      }
     }
     waveRaf = requestAnimationFrame(paintWave);
   }
@@ -343,6 +428,8 @@
   function startWave() {
     const host = $('#voice-wave');
     if (host && !host.children.length) host.innerHTML = new Array(WAVE_BARS).fill('<i></i>').join('');
+    const quietHost = $('#quiet-voice-wave');
+    if (!quietHost.children.length) quietHost.innerHTML = new Array(WAVE_BARS).fill('<i></i>').join('');
     waveLevels.fill(0);
     if (!waveRaf) paintWave();
   }
@@ -357,37 +444,53 @@
 
   // ---- capture: mic (renderer side) --------------------------------------
   let audioCtx = null, micStream = null, micNode = null, micProc = null;
+  let pttHeld = false;
+  let micStarting = false, micEpoch = 0;
+  const captureOn = () => $('#stop-btn').classList.contains('active');
   async function startMic() {
-    if (micStream) return;
+    if (micStream || micStarting) return;
+    micStarting = true;
+    const epoch = ++micEpoch;
+    let stream = null, context = null;
+    const stillWanted = () => epoch === micEpoch && (pttHeld || captureOn());
     try {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
-      // Do NOT force sampleRate here: some Windows drivers reject the context
-      // outright, which is why capture could silently produce nothing. Take
-      // whatever rate we get and downsample inside the worklet.
-      audioCtx = new AudioContext();
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-      await audioCtx.audioWorklet.addModule('./pcm-processor.js');
-      micNode = audioCtx.createMediaStreamSource(micStream);
-      micProc = new AudioWorkletNode(audioCtx, 'pcm-processor', { processorOptions: { targetRate: 16000 } });
-      micProc.port.onmessage = (e) => { nus.micPcm(e.data.buffer); pushLevel(e.data.level); };
-      const sink = audioCtx.createGain(); sink.gain.value = 0; // run processor silently
-      micNode.connect(micProc); micProc.connect(sink); sink.connect(audioCtx.destination);
-      const label = micStream.getAudioTracks()[0]?.label || 'default device';
-      nus.log('mic: capturing at ' + audioCtx.sampleRate + 'Hz via ' + label);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+      if (!stillWanted()) return;
+      context = new AudioContext();
+      if (context.state === 'suspended') await context.resume();
+      await context.audioWorklet.addModule('./pcm-processor.js');
+      if (!stillWanted()) return;
+      micStream = stream; audioCtx = context;
+      for (const track of stream.getAudioTracks()) track.addEventListener('ended', () => {
+        if (!stillWanted()) return;
+        if (pttHeld) nus.pttFinish();
+        else if (captureOn()) nus.captureToggle();
+        showStatus('Microphone disconnected. Saving the audio already received; reconnect before recording again.');
+      });
+      micNode = context.createMediaStreamSource(stream);
+      micProc = new AudioWorkletNode(context, 'pcm-processor', { processorOptions: { targetRate: 16000 } });
+      micProc.port.onmessage = (e) => { pttHeld ? nus.pttPcm(e.data.buffer) : nus.micPcm(e.data.buffer); pushLevel(e.data.level); if (pttHeld && knot3d && knot3d.setLevel) knot3d.setLevel(Math.min(1, (e.data.level || 0) * 7)); };
+      const sink = context.createGain(); sink.gain.value = 0;
+      micNode.connect(micProc); micProc.connect(sink); sink.connect(context.destination);
+      nus.log('mic: capturing at ' + context.sampleRate + 'Hz');
       setMicError('');
     } catch (err) {
-      const message = (err && err.name === 'NotAllowedError')
-        ? 'Microphone blocked. Allow it in Windows Settings > Privacy > Microphone, then click Listen again.'
-        : (err && err.name === 'NotFoundError')
-          ? 'No microphone found. Plug one in and click Listen again.'
-          : 'Microphone failed: ' + (err && err.message);
-      nus.log('mic error: ' + (err && err.message));
-      setMicError(message);
-      showStatus(message);
+      if (epoch !== micEpoch) return;
+      const message = err && err.name === 'NotAllowedError'
+        ? 'Microphone blocked. Allow Nūs in your system microphone settings, then try Talk again.'
+        : err && err.name === 'NotFoundError' ? 'No microphone found. Connect one, then try Talk again.' : 'The microphone could not start. Please try again.';
+      if (pttHeld) nus.pttCancel();
+      stopMic();
+      setMicError(message); showStatus(message);
+    } finally {
+      if (stream && stream !== micStream) stream.getTracks().forEach(t => t.stop());
+      if (context && context !== audioCtx && context.state !== 'closed') context.close().catch(() => {});
+      if (epoch === micEpoch) micStarting = false;
     }
   }
 
   function stopMic() {
+    micEpoch++; micStarting = false;
     if (micProc) { micProc.port.onmessage = null; micProc.disconnect(); micProc = null; }
     if (micNode) { micNode.disconnect(); micNode = null; }
     if (audioCtx) { audioCtx.close(); audioCtx = null; }
@@ -425,6 +528,13 @@
   }
 
   // ---- events from main --------------------------------------------------
+  let captureSaving = false;
+  nus.on('capture:finalizing', ({active}) => {
+    captureSaving = !!active;
+    $('#quiet-recording').classList.toggle('hidden', !active && !captureOn() && !pttHeld);
+    $('#quiet-stop').disabled = !!active;
+    if (active) { $('#quiet-recording-text').textContent = 'Saving transcript…'; placeByKnot($('#quiet-recording')); }
+  });
   let captureStartedAt = null;
   let captureClockTimer = null;
   function captureTime() {
@@ -432,8 +542,15 @@
     const minutes = String(Math.floor(elapsed / 60)).padStart(2, '0');
     const seconds = String(elapsed % 60).padStart(2, '0');
     $('#capture-clock').textContent = minutes + ':' + seconds;
+    $('#quiet-recording-text').textContent = 'Recording · ' + minutes + ':' + seconds;
   }
   function syncCaptureUi(active) {
+    $('#quiet-recording').classList.toggle('hidden', !active && !captureSaving);
+    $('#quick-record').textContent = active ? 'Stop recording' : 'Record meeting';
+    $('#quiet-stop').classList.remove('hidden');
+    $('#quiet-cancel').classList.add('hidden');
+    $('#quiet-retry').classList.add('hidden');
+    if (active) placeByKnot($('#quiet-recording'));
     $('#live-dot').classList.toggle('off', !active);
     $('#capture-chip').classList.toggle('off', !active);
     $('#stop-btn').classList.toggle('active', active);
@@ -453,6 +570,48 @@
       $('#capture-clock').textContent = '00:00';
     }
   }
+  // Push-to-talk: main owns the chord (down from the hotkey, up from the
+  // probe); this side just points the mic at it while it is held.
+  let voiceClock = null;
+  nus.on('ptt:state', ({ held, startedAt, limitMs, handsFree }) => {
+    clearInterval(voiceClock);
+    pttHeld = !!held;
+    $('#quiet-retry').classList.add('hidden');
+    $('#quiet-stop').classList.toggle('hidden', !held);
+    $('#quiet-cancel').classList.toggle('hidden', !held);
+    $('#quiet-recording').classList.toggle('hidden', !held && !captureOn());
+    if (held) {
+      const update = () => {
+        const remaining = Math.max(0, Math.ceil(((limitMs || 20000) - (Date.now() - startedAt)) / 1000));
+        $('#quiet-recording-text').textContent = 'Listening · ' + remaining + 's left · ' + (handsFree ? 'Stop to send' : 'Release to send') + (remaining <= 10 ? ' · ending soon' : '');
+        placeByKnot($('#quiet-recording'));
+      };
+      update(); voiceClock = setInterval(update, 250);
+    }
+    if (pttHeld) { stopSpeaking(); startWave(); startMic(); }
+    else { if (knot3d && knot3d.setLevel) knot3d.setLevel(0); if (!captureOn()) { stopWave(); stopMic(); } }
+  });
+  const voiceBubbles = new Map();
+  nus.on('voice:transcript', (turn) => {
+    if (!turn || !turn.sessionId || !turn.text) return;
+    let entry = voiceBubbles.get(turn.sessionId);
+    if (entry && entry.revision >= turn.revision) return;
+    if (!entry || !entry.node.isConnected) {
+      const node = document.createElement('div'); node.className = 'user-bubble';
+      messages.appendChild(node); entry = { node, revision: 0 }; voiceBubbles.set(turn.sessionId, entry);
+    }
+    entry.revision = turn.revision;
+    entry.node.textContent = (turn.final ? '' : 'Incomplete: ') + turn.text;
+    showTiles();
+  });
+  nus.on('voice:status', (p) => {
+    $('#quiet-recording').classList.toggle('hidden', p.state === 'done');
+    $('#quiet-recording-text').textContent = p.text || 'Transcribing · microphone stopped';
+    $('#quiet-stop').classList.add('hidden');
+    $('#quiet-cancel').classList.toggle('hidden', p.state === 'done');
+    $('#quiet-retry').classList.toggle('hidden', !p.retry);
+    placeByKnot($('#quiet-recording'));
+  });
   nus.on('capture:state', ({ active }) => {
     syncCaptureUi(active);
     if (active) { setMicError(''); startWave(); startMic(); startSystemAudio(); }
@@ -461,13 +620,24 @@
   nus.on('llm:start', ({ userBubble, small }) => {
     setBusy(true);                                   // thinking paints first...
     showTiles();                                     // ...then the tiles materialize
-    clearMessages();
-    if (userBubble) addUserBubble(userBubble);
+    if (userBubble && (!messages.lastElementChild || messages.lastElementChild.textContent !== userBubble)) addUserBubble(userBubble);
     startAi(!!small);
     setBusy(true);
   });
   nus.on('llm:token', ({ text }) => appendToken(text));
   nus.on('llm:done', () => { speak(finalizeAi()); setBusy(false); });
+  nus.on('llm:cancelled', () => { stopSpeaking(); finalizeAi(); setBusy(false); });
+  nus.on('conversation:restore', (p) => {
+    clearMessages();
+    voiceBubbles.clear();
+    for (const turn of p.turns || []) {
+      if (turn.role === 'user') {
+        const node = addUserBubble(turn.text);
+        if (turn.voiceSessionId) voiceBubbles.set(turn.voiceSessionId, { node, revision: -1 });
+      }
+      else { startAi(false); aiEl.dataset.raw = turn.text; finalizeAi(); }
+    }
+  });
   nus.on('llm:busy', () => { setBusy(false); showStatus('Still working on the last one.'); });
   nus.on('llm:error', ({ message }) => {
     if (!aiEl) startAi(true);
@@ -517,12 +687,19 @@
   // Take the mouse immediately: waiting for a probe tick to notice the modal
   // is what made the panel look open but dead to clicks.
   function openSettings() { fillSettings(); scrim.classList.remove('hidden'); setIgnoreSafe(false); }
-  function closeSettings() { cancelShortcutRecording(); saveSettings(); scrim.classList.add('hidden'); setIgnoreSafe(true); }
+  async function closeSettings() {
+    cancelShortcutRecording(); recordingPttShortcut = false;
+    try { await saveSettings(); scrim.classList.add('hidden'); setIgnoreSafe(true); }
+    catch (_) { $('#s-status').textContent = 'Could not save settings. Please try again.'; }
+  }
   $('#more-btn').addEventListener('click', openSettings);
   $('#s-close').addEventListener('click', closeSettings);
   scrim.addEventListener('click', (e) => { if (e.target === scrim) closeSettings(); });
 
   function fillSettings() {
+    $('#knot-position').value = settings.knotCorner || 'br';
+    $('#proactive-enabled').checked = settings.proactive !== false;
+    $('#shortcut-ptt').value = (settings._pttShortcut || settings.shortcuts.ptt || 'Unavailable').replace('CommandOrControl', nus.platform === 'darwin' ? 'Command' : 'Ctrl');
     document.querySelectorAll('#provider-seg button').forEach((b) => b.classList.toggle('on', b.dataset.provider === settings.provider));
     $('#key-openai').value = settings.apiKeys.openai || '';
     $('#key-anthropic').value = settings.apiKeys.anthropic || '';
@@ -533,6 +710,7 @@
     $('#spar-path').value = settings.sparPath || '';
     $('#smart-mode').checked = !!settings.smart;
     $('#speak-replies').checked = !!settings.speakReplies;
+    $('#reduce-motion').checked = !!settings.reducedMotion;
     $('#persist-transcripts').checked = settings.persistTranscripts !== false;
     $('#save-audio').checked = settings.saveAudio === true;
     $('#stealth-mode').checked = settings.stealth === true;
@@ -596,7 +774,7 @@
   function statusText() {
     const k = settings.apiKeys;
     const has = [k.openai && 'OpenAI', k.anthropic && 'Anthropic', k.gemini && 'Gemini', k.nvidia && 'Nvidia'].filter(Boolean);
-    const stt = k.openai ? 'Whisper' : (k.gemini ? 'Gemini' : 'none');
+    const stt = settings._speechProviders || 'Check voice setup in the desktop app';
     const base = 'Active: ' + settings.provider + ' · keys: ' + (has.join(', ') || 'none set') + ' · transcription: ' + stt;
     return (settings._migrationNote && !has.length) ? settings._migrationNote + '\n' + base : base;
   }
@@ -608,6 +786,8 @@
     $('#s-status').textContent = statusText();
   }));
   async function saveSettings() {
+    settings.knotCorner = $('#knot-position').value;
+    applyCorner(settings.knotCorner, true);
     settings.apiKeys.openai = $('#key-openai').value.trim();
     settings.apiKeys.anthropic = $('#key-anthropic').value.trim();
     settings.apiKeys.gemini = $('#key-gemini').value.trim();
@@ -622,6 +802,7 @@
     settings.persistTranscripts = $('#persist-transcripts').checked;
     settings.saveAudio = $('#save-audio').checked;
     settings.stealth = $('#stealth-mode').checked;
+    settings.proactive = $('#proactive-enabled').checked;
     if (!settings.models[settings.provider]) settings.models[settings.provider] = {};
     settings.models[settings.provider].fast = $('#model-fast').value.trim();
     settings.models[settings.provider].smart = $('#model-smart').value.trim();
@@ -731,7 +912,9 @@
 
   // ---- global keys -------------------------------------------------------
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !scrim.classList.contains('hidden')) closeSettings();
+    if (e.key === 'Escape' && !scrim.classList.contains('hidden')) { closeSettings(); return; }
+    if (e.key === 'Escape' && guideActive()) { dismissGuide('esc'); return; }
+    if (e.key === 'Escape' && quickOpen) { closeQuickAsk(); return; }
     if (isCmdOrCtrl(e)) {
       if (e.key === ',') { e.preventDefault(); openSettings(); }
     }
@@ -740,15 +923,17 @@
   // ---- click-through: only the UI blocks the mouse; empty gaps pass to your screen ----
   const setIgnore = setIgnoreSafe;
   function modalOpen() {
+    if (!$('#region-picker').classList.contains('hidden')) return true;
     const s = document.getElementById('settings-scrim'), o = document.getElementById('onboard-scrim');
-    return (s && !s.classList.contains('hidden')) || (o && !o.classList.contains('hidden'));
+    const saved = document.getElementById('saved-scrim');
+    return (s && !s.classList.contains('hidden')) || (o && !o.classList.contains('hidden')) || (saved && !saved.classList.contains('hidden'));
   }
   function overUIAt(cssX, cssY) {
     // A modal covers the window and owns every click while it is up. Never let
     // a stray probe hand the mouse back to the desktop underneath it.
     if (modalOpen()) return true;
     const el = document.elementFromPoint(cssX, cssY);
-    return !!(el && el.closest && el.closest('#knot-shell, #panel-wrap, #settings-scrim, #onboard-scrim, #daily-line'));
+    return !!(el && el.closest && el.closest('#knot-shell, #panel-wrap, #settings-scrim, #onboard-scrim, #saved-scrim, #quiet-recording, #daily-line, #guide-bubble, #keep-chip, #quick-ask, #knot-hint'));
   }
   document.addEventListener('mousemove', (e) => setIgnore(!overUIAt(e.clientX, e.clientY)));
   // Windows: forwarded mousemove is unreliable while click-through, so the main
@@ -769,7 +954,7 @@
       state: 'idle',
       title: 'This is the Nūs Knot',
       target: '#orb',
-      body: 'One continuous loop, no beginning, no end. It floats at the edge of your screen, tumbling quietly while it waits.<br><br><strong>Click the Knot and ask "What should I do?"</strong> It answers from your real semester: your courses, tasks, and deadlines, ranked. That works right now, with no key and no setup. Once a day it also surfaces your top next move on its own.'
+      body: 'Click the Knot and type what you need help with, or choose Talk.<br><br>The thread points to one control at a time. You do the clicking. Escape winds it back.<br><br>For a local summary of your semester, choose <strong>More → What should I do?</strong>. Plan nudges can be turned off in Settings.'
     },
     ...(nus.platform === 'darwin' ? [{
       state: 'idle',
@@ -782,9 +967,9 @@
     }] : []),
     {
       state: 'ready',
-      title: 'Three hotkeys, anywhere',
+      title: 'Your shortcuts, anywhere',
       target: '#knot-bloom',
-      body: () => `<ul><li>${shortcutKeycapsHtml(assistShortcut, 'kbd')}: <strong>What should I do?</strong> from anywhere</li><li><span class="kbd">${cmdKey}</span> <span class="kbd">⇧</span> <span class="kbd">Space</span>: hide or show the Companion</li><li><span class="kbd">${cmdKey}</span> <span class="kbd">⇧</span> <span class="kbd">X</span>: stop listening and vanish</li></ul>Type in the box for anything else. AI answers and listening need a free Gemini key (<span class="hl">aistudio.google.com/apikey</span>); I will ask for it the first time it is actually needed, and it also lives in the gear icon.`
+      body: () => `<ul><li>${shortcutKeycapsHtml(assistShortcut, 'kbd')}: <strong>What should I do?</strong> from anywhere</li><li><span class="kbd">${cmdKey}</span> <span class="kbd">⇧</span> <span class="kbd">Space</span>: hide or show the Companion</li><li><span class="kbd">${cmdKey}</span> <span class="kbd">⇧</span> <span class="kbd">X</span>: stop listening and vanish</li></ul>Type in the box for anything else. Screen guidance uses your Companion provider or the desktop Claude connection. Voice uses local transcription when available. Open Settings to see and change your voice shortcut.`
     },
     {
       state: 'idle',
@@ -792,7 +977,7 @@
       body: () => ((nus.platform === 'darwin'
         ? 'Nūs asks macOS to exclude the Companion from many captures, but capture behavior varies by app and is <strong>not guaranteed</strong>. '
         : 'Nūs asks Windows to exclude the Companion from many captures, but capture behavior varies by app and is <strong>not guaranteed</strong>. ')
-        + 'Treat it as presentation control, not a way to conceal assistance. Always follow the rules of the meeting, class, interview, or assessment you are in.<br><br>Letting the Knot read your semester when answering with AI is a separate switch in Settings, off until you turn it on. Nothing leaves this machine without it. Every capture session lands in the desktop app under <strong>Knot &gt; History</strong>. Reopen this guide from the <strong>?</strong> in the Knot\'s capsule.'),
+        + 'Treat it as presentation control, not a way to conceal assistance. Always follow the rules of the meeting, class, interview, or assessment you are in.<br><br>Letting the Knot read your semester when answering with AI is a separate switch in Settings, off until you turn it on. Screen guidance sends your question and one screen capture per step to your AI provider. Voice transcription runs locally when available, with configured cloud providers as fallback. Recordings appear in <strong>Knot &gt; History</strong> when transcript saving is on. Keep saves guidance locally; Jarvis export is a separate preview and confirmation.'),
       buttons: [{ label: 'Tour the desktop app', action: () => { finishOnboard(); nus.desktopTour && nus.desktopTour(); } }]
     }
   ];
@@ -845,9 +1030,457 @@
   syncDesktopLink();
   setInterval(syncDesktopLink, 120000);
 
+  // ---- the Knot corner -------------------------------------------------
+  // The Knot is pinned to one of four corners and never follows the cursor.
+  // From any corner its open tail is aimed at the screen centre, so the
+  // strand always leaves toward the work instead of into the bezel.
+  const appEl = $('#app');
+  const CORNERS = new Set(['tl', 'tr', 'bl', 'br']);
+  let corner = 'br';
+  function aimKnot() {
+    if (!knot3d || !knot3d.setRotate) return;
+    knot3d.setRotate(0);
+    const seam = knot3d.getTailAnchor(0), open = knot3d.getTailAnchor(1);
+    if (!seam || !open) return;
+    const r = $('#orb').getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const want = Math.atan2(window.innerHeight / 2 - cy, window.innerWidth / 2 - cx);
+    const have = Math.atan2(open.y - seam.y, open.x - seam.x);
+    knot3d.setRotate(want - have);
+  }
+  function applyCorner(next, persist) {
+    if (!CORNERS.has(next)) next = 'br';
+    corner = next;
+    appEl.dataset.corner = next;
+    document.querySelectorAll('#corner-pick button').forEach((b) => b.classList.toggle('on', b.dataset.corner === next));
+    requestAnimationFrame(() => { aimKnot(); if (strand) strand.relayout(); positionBubble(); placeByKnot(keepChip); placeByKnot(quickAsk); placeByKnot($('#knot-hint')); });
+    if (persist && nus.knotCornerSet) Promise.resolve(nus.knotCornerSet(next)).catch(() => {});
+  }
+  document.querySelectorAll('#corner-pick button').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); applyCorner(b.dataset.corner, true); }));
+  nus.on('knot:corner', (p) => applyCorner(p && p.corner, false));
+  window.addEventListener('resize', () => requestAnimationFrame(aimKnot));
+
+  // ---- the strand: guide sessions on screen ----------------------------
+  // Main owns the session and its state machine; this side draws. A target
+  // arrives in window DIPs, the strand unwinds to it, the bubble appears at
+  // the tip once it lands, and any dismissal winds the thread back first.
+  const strandCanvas = $('#strand-layer');
+  const bubble = $('#guide-bubble');
+  const keepChip = $('#keep-chip');
+  let guideTask = '';
+  let pendingBubble = null;   // shown when the tip arrives
+  let bubbleAnchor = 'knot';
+  let afterRewind = null;
+  let guideVersion = null;
+  let keepSession = null, keepTimer = null, bubbleRaf = null;
+
+  const strand = (window.NusStrand && knot3d) ? NusStrand.mount(strandCanvas, knot3d, {
+    onArrive() {
+      if (pendingBubble) { showBubble(pendingBubble); pendingBubble = null; }
+      if (guideState === 'unwinding') setGuideState('pointing');
+      if (nus.strandArrived) nus.strandArrived(guideVersion);
+    },
+    onRewound() {
+      // A fresh explanation at home may arrive while an old strand returns.
+      if (bubbleAnchor !== 'knot') hideBubble();
+      if (guideState === 'winding') setGuideState(null);
+      const f = afterRewind; afterRewind = null;
+      if (f) f();
+    }
+  }) : null;
+  const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+  function applyMotionPreference() {
+    const reduced = motionPreference.matches || !!(settings && settings.reducedMotion);
+    document.documentElement.classList.toggle('reduced-motion', reduced);
+    if (strand && strand.setReducedMotion) strand.setReducedMotion(reduced);
+    if (knot3d && knot3d.setReducedMotion) knot3d.setReducedMotion(reduced);
+  }
+  motionPreference.addEventListener('change', applyMotionPreference);
+  $('#reduce-motion').addEventListener('change', async (e) => {
+    const value = e.target.checked;
+    await nus.settingsSet({ reducedMotion: value });
+    settings.reducedMotion = value;
+    applyMotionPreference();
+  });
+
+  function zoomFactor() { return Math.pow(1.2, (nus.getZoomLevel && nus.getZoomLevel()) || 0); }
+  function dipRectToCss(r) { const z = zoomFactor(); return { x: r.x / z, y: r.y / z, w: r.w / z, h: r.h / z }; }
+  function guideActive() { return !!guideState || !!(strand && strand.getState() !== 'idle'); }
+
+  function setGuideState(state, task) {
+    guideState = state || null;
+    if (task) guideTask = task;
+    const orb = $('#orb');
+    if (guideState) orb.dataset.state = guideState; else delete orb.dataset.state;
+    syncKnotUi();
+  }
+
+  function knotAnchor() {
+    const r = $('#orb').getBoundingClientRect();
+    const kx = r.left + r.width / 2, ky = r.top + r.height / 2;
+    const dx = window.innerWidth / 2 > kx ? 1 : -1, dy = window.innerHeight / 2 > ky ? 1 : -1;
+    return { x: kx + dx * 46, y: ky + dy * 4, dx, dy };
+  }
+  function placeAt(el, ax, ay, dx, dy) {
+    const W = window.innerWidth, H = window.innerHeight;
+    const bw = el.offsetWidth, bh = el.offsetHeight;
+    let left = dx >= 0 ? ax : ax - bw;
+    let top = dy >= 0 ? ay : ay - bh;
+    left = Math.max(8, Math.min(W - bw - 8, left));
+    top = Math.max(8, Math.min(H - bh - 8, top));
+    el.style.left = left + 'px'; el.style.top = top + 'px';
+  }
+  function placeByKnot(el) {
+    if (!el || el.classList.contains('hidden')) return;
+    const a = knotAnchor();
+    if (el.id === 'quiet-recording' && !$('#quick-ask').classList.contains('hidden')) a.y += a.dy * ($('#quick-ask').offsetHeight + 8);
+    placeAt(el, a.x, a.y, a.dx, a.dy);
+  }
+  function positionBubble() {
+    if (bubble.classList.contains('hidden')) return;
+    const tip = strand && strand.getTip(), target = strand && strand.getTarget();
+    if (bubbleAnchor === 'tip' && tip && target) {
+      // Away from the target, along the thread's approach, so the bubble
+      // never covers the control it is talking about.
+      const cx = target.x + target.w / 2, cy = target.y + target.h / 2;
+      let dx = tip.x - cx, dy = tip.y - cy;
+      const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+      placeAt(bubble, tip.x + dx * 16, tip.y + dy * 16, dx, dy);
+    } else {
+      placeByKnot(bubble);
+    }
+  }
+  function trackBubble() {
+    bubbleRaf = requestAnimationFrame(() => {
+      positionBubble();
+      if (!bubble.classList.contains('hidden')) trackBubble(); else bubbleRaf = null;
+    });
+  }
+  function showBubble(p) {
+    $('#guide-followup').classList.toggle('hidden', !p.sessionId);
+    bubble.dataset.task = p.task || guideTask || '';
+    $('#gb-kicker').textContent = p.kicker || '';
+    $('#gb-text').textContent = p.text || '';
+    $('#gb-hint').textContent = p.hint || '';
+    const actions = $('#gb-actions');
+    actions.innerHTML = '';
+    (p.actions || []).forEach((a) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = a.label || a.id;
+      if (a.primary) b.className = 'primary';
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideBubble();
+        if (a.id === 'dismiss' || a.id === 'notnow') dismissGuide(a.id);
+        else if (a.id === 'inspect-ask') showInspectionComposer(currentInspection, true);
+        else if (nus.guideAsk) nus.guideAsk({ action: a.id, text: '' });
+      });
+      actions.appendChild(b);
+    });
+    bubbleAnchor = p.anchor || 'knot';
+    bubble.classList.remove('hidden');
+    positionBubble();
+    if (!bubbleRaf) trackBubble();
+    if (p.speak) say(p.speak);
+  }
+  function hideBubble() {
+    bubble.classList.add('hidden');
+    if (bubbleRaf) { cancelAnimationFrame(bubbleRaf); bubbleRaf = null; }
+  }
+
+  // ---- the quick ask ---------------------------------------------------
+  // Typing is the everyday path: one line by the Knot, Enter sends, Esc
+  // closes, the dots open the full sheet for anyone who wants the verbs.
+  const quickAsk = $('#quick-ask');
+  const quickInput = $('#quick-input');
+  // Native select popups live outside this window's DOM. Cursor polling can
+  // mistake the open popup for empty desktop and switch it to click-through.
+  // Inline mode buttons stay inside our existing, reliable hit-test surface.
+  function setQuickIntent(value) {
+    $('#quick-intent').value = value;
+    for (const button of document.querySelectorAll('#quick-modes [data-intent]')) button.setAttribute('aria-pressed', String(button.dataset.intent === value));
+    $('#quick-mode-hint').textContent = value === 'ask' ? 'Ask without sharing your screen.' : value === 'guide' ? (currentInspection ? 'Guide using this selected snapshot. Send shares the preview with Claude.' : 'Guide reads the screen for each step. You do the clicking.') : currentInspection?.source === 'point-context' ? 'Tell me the issue, or press Enter for Claude to look at this preview and ask what you need. Only Send shares it.' : currentInspection?.imageDataUrl ? 'Send shares only this preview with Claude. You can change the selected region first.' : 'Use Ctrl+Shift+T anywhere on the Knot display to select what you need help with.';
+    placeByKnot(quickAsk);
+  }
+  for (const button of document.querySelectorAll('#quick-modes [data-intent]')) button.addEventListener('click', () => { setQuickIntent(button.dataset.intent); quickInput.focus(); });
+  $('#quick-intent').addEventListener('change', () => setQuickIntent($('#quick-intent').value));
+  $('#guide-followup').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = $('#guide-followup-input'); const text = input.value.trim();
+    if (!text) return;
+    nus.guideAsk({ text, source: 'typed' }); input.value = '';
+  });
+  function openQuickAsk() {
+    answerKeep(false, true);
+    panel.classList.add('collapsed');
+    keepChip.classList.add('hidden');
+    quickOpen = true;
+    quickAsk.classList.remove('hidden');
+    placeByKnot(quickAsk);
+    setIgnoreSafe(false);
+    quickInput.value = '';
+    quickInput.focus();
+    syncKnotUi();
+  }
+  function closeQuickAsk() {
+    quickOpen = false;
+    quickAsk.classList.add('hidden');
+    quickInput.blur();
+    setIgnoreSafe(modalOpen() ? false : true);
+    syncKnotUi();
+  }
+  function sendQuickAsk() {
+    const intent = $('#quick-intent').value;
+    if ((intent === 'explain' || intent === 'fix' || (currentInspection && intent === 'guide')) && !(currentInspection && currentInspection.imageDataUrl)) {
+      $('#quick-mode-hint').textContent = 'No selected image yet. Point at the problem and press Ctrl+Shift+T, or choose Select region when available.';
+      quickInput.focus(); return;
+    }
+    const text = quickInput.value.trim() || (currentInspection && intent !== 'ask' ? (currentInspection.source === 'point-context' ? 'Briefly describe what you can see around my chosen spot, then ask what issue I need help with. Do not assume anything is broken.' : intent === 'fix' ? 'Help me fix this.' : intent === 'guide' ? 'Explain the next step for this selection.' : 'Explain this selection.') : '');
+    if (!text) { quickInput.focus(); return; }
+    closeQuickAsk();
+    if (currentInspection && intent !== 'ask') nus.inspectSubmit({ id: currentInspection.id, text: (intent === 'fix' ? 'Help me fix this: ' : '') + text, intent });
+    else if (intent === 'guide' && nus.guideAsk) nus.guideAsk({ text, source: 'typed' });
+    else { if (currentInspection) { currentInspection = null; nus.inspectCancel(); } nus.ask({ mode: 'ask', text, screen: false }); }
+  }
+  let currentInspection = null;
+  // The composer over a selection: on a fresh snapshot, and again for a
+  // follow-up about the same snapshot (Knot click or "Ask more" while the
+  // answer is up). Measured 2026-09-10: without the follow-up path a Knot
+  // click cleared the selection, so the promised same-snapshot follow-up
+  // had no way in from the UI.
+  function showInspectionComposer(p, followUp) {
+    if (!p) return;
+    currentInspection = p;
+    openQuickAsk();
+    $('#inspect-context').classList.remove('hidden');
+    $('#inspect-context').textContent = (p.source === 'point-context' ? 'Your chosen spot. This nearby-area preview is not a detected control.' : p.bbox ? (p.source === 'user-selected' ? 'Your region, not a verified control.' : 'Selected: ' + (p.name || p.type) + '.') : 'No control found. Select a region.') + (followUp ? ' Follow-up uses the same snapshot, no new capture.' : ' Send shares only the preview with Claude.') + ' Snapshot: ' + new Date(p.createdAt).toLocaleTimeString() + '.';
+    $('#inspect-preview').classList.toggle('hidden', !p.imageDataUrl);
+    if (p.imageDataUrl) $('#inspect-preview').src = p.imageDataUrl;
+    else $('#inspect-preview').removeAttribute('src');
+    $('#inspect-region').classList.toggle('hidden', !p.canReselect || !!followUp);
+    setQuickIntent(p.bbox ? 'explain' : 'ask');
+    quickInput.placeholder = followUp ? 'Ask more about this' : p.source === 'point-context' ? 'What’s happening here? What do you need?' : 'What do you want to understand?';
+    placeByKnot(quickAsk);
+  }
+  nus.on('inspect:ready', (p) => showInspectionComposer(p, false));
+  $('#inspect-preview').addEventListener('load', () => placeByKnot(quickAsk));
+  nus.on('inspect:cleared', () => {
+    currentInspection = null;
+    $('#inspect-context').classList.add('hidden');
+    $('#inspect-preview').classList.add('hidden'); $('#inspect-preview').removeAttribute('src');
+    $('#inspect-region').classList.add('hidden');
+    $('#region-picker').classList.add('hidden');
+    setQuickIntent('ask');
+    quickInput.placeholder = 'Ask Nūs anything';
+  });
+  nus.on('inspect:failed', p => {
+    hideHint();
+    openQuickAsk();
+    $('#inspect-context').classList.remove('hidden');
+    $('#inspect-context').textContent = p.message + ' Point at the problem and press Ctrl+Shift+T to retry, or Ask without sharing your screen.';
+    setQuickIntent('ask');
+    placeByKnot(quickAsk);
+  });
+  const regionPicker = $('#region-picker');
+  let regionStart = null;
+  $('#inspect-region').addEventListener('click', () => {
+    regionPicker.classList.remove('hidden'); setIgnoreSafe(false); regionPicker.tabIndex = 0; regionPicker.focus();
+  });
+  regionPicker.addEventListener('pointerdown', (e) => {
+    regionStart = { x: e.clientX, y: e.clientY }; regionPicker.setPointerCapture(e.pointerId);
+  });
+  regionPicker.addEventListener('pointermove', (e) => {
+    if (!regionStart) return;
+    const box = $('#region-box');
+    Object.assign(box.style, { left: Math.min(regionStart.x, e.clientX) + 'px', top: Math.min(regionStart.y, e.clientY) + 'px', width: Math.abs(regionStart.x - e.clientX) + 'px', height: Math.abs(regionStart.y - e.clientY) + 'px' });
+  });
+  regionPicker.addEventListener('pointerup', (e) => {
+    if (!regionStart || !currentInspection) return;
+    const z = zoomFactor();
+    const rect = { x: Math.min(regionStart.x, e.clientX) * z, y: Math.min(regionStart.y, e.clientY) * z, w: Math.abs(regionStart.x - e.clientX) * z, h: Math.abs(regionStart.y - e.clientY) * z };
+    regionStart = null; regionPicker.classList.add('hidden');
+    nus.inspectRegion({ id: currentInspection.id, rect });
+  });
+  regionPicker.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); regionStart = null; regionPicker.classList.add('hidden'); quickInput.focus(); } });
+  quickInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); currentInspection = null; if (nus.inspectCancel) nus.inspectCancel(); closeQuickAsk(); return; }
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    e.preventDefault();
+    sendQuickAsk();
+  });
+  $('#quick-send').addEventListener('click', sendQuickAsk);
+  $('#quick-talk').addEventListener('click', async () => { closeQuickAsk(); await nus.pttToggle(); });
+  $('#quick-record').addEventListener('click', () => { closeQuickAsk(); toggleCaptureFromUi(); });
+  $('#quiet-stop').addEventListener('click', () => { if (pttHeld) nus.pttToggle(); else if (captureOn()) toggleCaptureFromUi(); });
+  $('#quiet-cancel').addEventListener('click', () => { nus.pttCancel(); $('#quiet-recording').classList.add('hidden'); });
+  $('#quiet-retry').addEventListener('click', () => nus.pttRetry());
+  $('#quick-settings').addEventListener('click', () => { closeQuickAsk(); openSettings(); });
+  let exportKey = null;
+  async function openSaved() {
+    closeQuickAsk();
+    $('#saved-scrim').classList.remove('hidden');
+    $('#saved-export').classList.add('hidden');
+    $('#saved-status').textContent = '';
+    setIgnoreSafe(false);
+    const list = $('#saved-list'); list.replaceChildren();
+    try {
+      const entries = await nus.walkthroughList();
+      if (!Array.isArray(entries)) throw new Error('Saved walkthroughs are unavailable.');
+      if (!entries.length) list.textContent = 'No saved walkthroughs yet. Choose Keep after guidance to save one.';
+      for (const entry of entries) {
+        const row = document.createElement('div'); row.className = 'saved-item';
+        const title = document.createElement('strong'); title.textContent = entry.task;
+        const detail = document.createElement('small'); detail.textContent = `${entry.app.process} · ${entry.steps} step${entry.steps === 1 ? '' : 's'}${entry.stale ? ' · Needs a fresh walkthrough' : ''}`;
+        const preview = document.createElement('button'); preview.textContent = 'Preview Jarvis export';
+        preview.onclick = async () => {
+          const result = await nus.walkthroughPreview(entry.key);
+          if (!result.ok) { $('#saved-status').textContent = result.error; return; }
+          exportKey = result.vaultOk ? entry.key : null; $('#saved-destination').textContent = result.vaultOk ? 'Destination: ' + result.dir : 'Jarvis vault not found. Set its location before exporting.'; $('#saved-export-confirm').disabled = !result.vaultOk; $('#saved-preview').textContent = result.content; $('#saved-export').classList.remove('hidden');
+        };
+        const forget = document.createElement('button'); forget.textContent = 'Forget walkthrough';
+        forget.onclick = async () => { const result = await nus.walkthroughForget(entry.key); if (result.ok) openSaved(); else $('#saved-status').textContent = result.error; };
+        row.append(title, detail, preview, forget); list.append(row);
+      }
+    } catch (e) { $('#saved-status').textContent = e.message || 'Could not load saved walkthroughs.'; }
+    $('#saved-close').focus();
+  }
+  function closeSaved() { $('#saved-scrim').classList.add('hidden'); exportKey = null; openQuickAsk(); }
+  $('#quick-saved').addEventListener('click', openSaved);
+  $('#saved-close').addEventListener('click', closeSaved);
+  $('#saved-scrim').addEventListener('click', e => { if (e.target === $('#saved-scrim')) closeSaved(); });
+  $('#saved-history').addEventListener('click', () => nus.desktopHistory());
+  $('#saved-export-confirm').addEventListener('click', async () => {
+    if (!exportKey) return;
+    const b = $('#saved-export-confirm'); b.disabled = true;
+    try { const result = await nus.walkthroughExport(exportKey); $('#saved-status').textContent = result.ok ? 'Exported to your Jarvis vault.' : result.error; if (result.ok) { exportKey = null; $('#saved-export').classList.add('hidden'); } }
+    catch (_) { $('#saved-status').textContent = 'Export failed. Please try again.'; } finally { b.disabled = false; }
+  });
+  let recordingPttShortcut = false;
+  $('#shortcut-ptt-save').addEventListener('click', () => { recordingPttShortcut = true; $('#shortcut-ptt').value = 'Press a new shortcut'; $('#shortcut-ptt').focus(); });
+  $('#shortcut-ptt').addEventListener('keydown', async e => {
+    if (!recordingPttShortcut) return;
+    e.preventDefault(); e.stopPropagation();
+    if (e.key === 'Escape') { recordingPttShortcut = false; fillSettings(); return; }
+    const next = keyEventToAccelerator(e);
+    if (next.error) { $('#ptt-shortcut-status').textContent = next.error; return; }
+    const result = await nus.shortcutPttSet(next.accelerator);
+    $('#ptt-shortcut-status').textContent = result.ok ? 'Voice shortcut updated.' : result.error;
+    if (result.ok) { recordingPttShortcut = false; settings._pttShortcut = result.accelerator; settings.shortcuts.ptt = result.accelerator; $('#shortcut-ptt').value = result.accelerator.replace('CommandOrControl', nus.platform === 'darwin' ? 'Command' : 'Ctrl'); }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#saved-scrim').classList.contains('hidden')) { e.preventDefault(); closeSaved(); } });
+  $('#quick-more').addEventListener('click', (e) => { e.stopPropagation(); closeQuickAsk(); showTiles(); });
+
+  // Wind back: Esc, a click on the Knot, a bubble's own dismiss, or main.
+  function dismissGuide(reason) {
+    stopSpeaking();
+    hideBubble();
+    pendingBubble = null;
+    keepChip.classList.add('hidden');
+    if (quickOpen) closeQuickAsk();
+    if (strand && strand.getState() !== 'idle') { setGuideState('winding'); strand.rewind(); }
+    else setGuideState(null);
+    if (nus.guideDismiss) nus.guideDismiss(reason);
+  }
+
+  // The consent chip: Skip is the default and the timeout; Keep is explicit.
+  function showKeepChip(sessionId) {
+    keepSession = sessionId;
+    $('#keep-text').textContent = 'Save this task and its steps locally? No audio or screenshots.';
+    $('#keep-yes').classList.remove('hidden');
+    $('#keep-no').classList.remove('hidden');
+    keepChip.classList.remove('hidden');
+    placeByKnot(keepChip);
+    clearTimeout(keepTimer);
+    keepTimer = setTimeout(() => answerKeep(false, true), 12000);
+  }
+  async function answerKeep(keep, auto) {
+    clearTimeout(keepTimer);
+    if (keepChip.classList.contains('hidden')) return;
+    if (keep) {
+      let result;
+      try { result = await nus.guideKeep(keepSession); } catch (_) { result = { ok: false }; }
+      if (!result || !result.ok) { $('#keep-text').textContent = 'Could not save. Try Keep again or Skip.'; return; }
+    } else if (nus.guideSkip) nus.guideSkip(keepSession);
+    $('#keep-text').textContent = keep ? 'Kept in Nūs. Jarvis export is in Saved.' : (auto ? 'Forgotten.' : 'Forgotten. Nothing kept.');
+    $('#keep-yes').classList.add('hidden');
+    $('#keep-no').classList.add('hidden');
+    keepTimer = setTimeout(() => keepChip.classList.add('hidden'), auto ? 500 : 1600);
+  }
+  $('#keep-yes').addEventListener('click', (e) => { e.stopPropagation(); answerKeep(true, false); });
+  $('#keep-no').addEventListener('click', (e) => { e.stopPropagation(); answerKeep(false, false); });
+
+  // The app hint: the Knot loosens a few pixels and says three words. It
+  // goes away on its own; clicking it opens the quick ask.
+  const knotHint = $('#knot-hint');
+  let hintTimer = null;
+  nus.on('guide:hint', (p) => {
+    if (!p || !p.text) return;
+    knotHint.textContent = p.text;
+    knotHint.title = p.hint || '';
+    knotHint.classList.remove('hidden');
+    placeByKnot(knotHint);
+    if (knot3d && knot3d.setUnravel && !(strand && strand.getState() !== 'idle')) knot3d.setUnravel(0.14);
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(hideHint, Number(p.ms) || 7000);
+  });
+  function hideHint() {
+    clearTimeout(hintTimer);
+    if (knotHint.classList.contains('hidden')) return;
+    knotHint.classList.add('hidden');
+    if (knot3d && knot3d.setUnravel && !(strand && strand.getState() !== 'idle')) knot3d.setUnravel(0);
+  }
+  knotHint.addEventListener('click', (e) => { e.stopPropagation(); hideHint(); openQuickAsk(); });
+
+  nus.on('guide:state', (p) => setGuideState(p && p.state, p && p.task));
+  nus.on('context:used', (p) => {
+    const labels = (p.sources || []).filter((s) => !s.omitted).map((s) => s.source + (s.freshness === 'possibly-stale' ? ' (may be stale)' : ''));
+    $('#context-used').textContent = labels.length ? 'Context: ' + labels.join(', ') : 'Context: this conversation only';
+  });
+  nus.on('guide:target', (p) => {
+    if (!strand || !p || !p.bbox) return;
+    guideVersion = { sessionId: p.sessionId, generation: p.generation };
+    hideBubble();
+    keepChip.classList.add('hidden');
+    collapsePanelIfCovering(p.bbox);
+    const task = p.task || 'guide';
+    setGuideState('unwinding', task);
+    pendingBubble = {
+      sessionId: p.sessionId,
+      kicker: p.kicker != null ? p.kicker : (p.step ? 'step ' + p.step + ' of ' + (p.stepCount || '?') : ''),
+      text: p.instruction || p.label || '',
+      hint: p.hint || '',
+      actions: p.actions || [],
+      task,
+      anchor: 'tip',
+      speak: p.speak,
+    };
+    strand.setTarget(dipRectToCss(p.bbox), { task });
+    // Text and actions are usable while the strand travels.
+    if (pendingBubble) { showBubble(pendingBubble); pendingBubble = null; }
+  });
+  nus.on('guide:bubble', (p) => {
+    if (!p) return;
+    if (p.task) guideTask = p.task;
+    showBubble(Object.assign({}, p, { anchor: p.anchor || 'knot' }));
+  });
+  nus.on('guide:done', (p) => {
+    guideVersion = null;
+    hideBubble();
+    pendingBubble = null;
+    const after = () => { if (p && p.offerKeep) showKeepChip(p.sessionId || null); };
+    if (strand && strand.getState() !== 'idle') { afterRewind = after; setGuideState('winding'); strand.rewind(); }
+    else { setGuideState(null); after(); }
+  });
+
   // ---- boot --------------------------------------------------------------
   (async function boot() {
     settings = await nus.settingsGet();
+    applyMotionPreference();
+    applyCorner(settings.knotCorner || 'br', false);
+    // Founder machines get a debug handle so a DevTools session can drive the
+    // Knot and the strand directly (used by the capture rig and the harness).
+    if (settings._founderTools) window.__nus = { knot: knot3d, strand, setGuideState, syncKnotUi, applyCorner, openQuickAsk, closeQuickAsk };
     assistShortcut = (settings.shortcuts && settings.shortcuts.assist) || DEFAULT_ASSIST_SHORTCUT;
     syncAssistShortcutLabels();
     // Founder tooling (stealth, packs, résumé) exists only on machines that
@@ -885,6 +1518,8 @@ function createPreviewBridge() {
     sparReset: async () => true,
     deepQuery: async () => '',
     ask: () => {}, micPcm: () => {}, systemPcm: () => {}, setIgnoreMouse: () => {}, openPane: () => {}, log: () => {},
+    guideAsk: () => {}, guideDismiss: () => {}, guideKeep: () => {}, guideSkip: () => {}, strandArrived: () => {},
+    knotCornerSet: async () => true,
     getZoomLevel: () => 0,
     on: (channel, callback) => listeners.set(channel, callback),
   };

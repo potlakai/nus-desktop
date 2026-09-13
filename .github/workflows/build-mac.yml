@@ -1,0 +1,80 @@
+# Builds the macOS app. A Mac bundle cannot be produced on Windows, so this is
+# the only way Nūs gets a .dmg. Manual trigger only, and it never touches a
+# release: the dmgs land as run artifacts, get tested on a real Mac, and are
+# attached to the release by hand (docs/release.md §5). A release is public the
+# moment it exists, so that step stays a human command.
+#
+# Needs five repository secrets, set once:
+#   NUS_SUPABASE_URL, NUS_SUPABASE_ANON_KEY,
+#   NUS_GCAL_CLIENT_ID, NUS_GCAL_CLIENT_SECRET, NUS_OUTLOOK_CLIENT_ID
+# They render the gitignored src/config.js (scripts/write-config.js).
+name: build-mac
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      # No Developer ID yet: electron-builder must not go looking for one in
+      # the runner keychain, and afterPack ad-hoc signs instead.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write src/config.js from secrets
+        env:
+          NUS_SUPABASE_URL: ${{ secrets.NUS_SUPABASE_URL }}
+          NUS_SUPABASE_ANON_KEY: ${{ secrets.NUS_SUPABASE_ANON_KEY }}
+          NUS_GCAL_CLIENT_ID: ${{ secrets.NUS_GCAL_CLIENT_ID }}
+          NUS_GCAL_CLIENT_SECRET: ${{ secrets.NUS_GCAL_CLIENT_SECRET }}
+          NUS_OUTLOOK_CLIENT_ID: ${{ secrets.NUS_OUTLOOK_CLIENT_ID }}
+        run: node scripts/write-config.js
+
+      - name: Test
+        run: npm test
+
+      - name: Build dmgs (arm64 + x64)
+        run: npm run dist:mac
+
+      - name: Scan the packed asar
+        run: node scripts/package-security-check.js dist/mac-arm64/Nus.app/Contents/Resources/app.asar
+
+      - name: Signature and Gatekeeper report
+        run: |
+          codesign -dv --verbose=2 dist/mac-arm64/Nus.app 2>&1 || true
+          echo "--- spctl (expected to reject: ad-hoc, not notarized) ---"
+          spctl --assess --type execute --verbose=2 dist/mac-arm64/Nus.app 2>&1 || true
+
+      - name: Smoke the arm64 app
+        env:
+          NUS_SMOKE_DATA_DIR: ${{ runner.temp }}/nus-smoke
+        run: |
+          out=$(dist/mac-arm64/Nus.app/Contents/MacOS/Nus --smoke 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q 'smoke ok' || { echo 'smoke did not report ok' >&2; exit 1; }
+
+      - name: List artifacts
+        run: ls -la dist/*.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nus-mac-dmgs
+          path: |
+            dist/Nus-arm64.dmg
+            dist/Nus-x64.dmg
+          if-no-files-found: error
+          retention-days: 14

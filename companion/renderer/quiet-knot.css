@@ -1,0 +1,62 @@
+/* Quiet Knot, chosen by Pranav. Preserve the mark; reveal tools on request. */
+#quick-ask { display: block; width: min(340px, calc(100vw - 128px)); padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+.quiet-composer { display: flex; align-items: center; gap: 6px; padding: 9px 10px 9px 14px; border: 1px solid #50596e; border-radius: 16px; background: #191e2d; box-shadow: 0 10px 36px #0005; }
+#quick-input { font-size: 13px; line-height: 28px; }
+#quick-input::placeholder { color: #bbc4d6; }
+.quiet-composer button { flex: none; min-width: 32px; height: 32px; padding: 4px; border: 0; border-radius: 9px; background: #2b3245; color: #edf1fa; cursor: pointer; font: 12px var(--font); }
+.quiet-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; padding-top: 6px; }
+.quiet-actions { width: fit-content; margin: 6px 0 0 auto; padding: 0 3px; background: #191e2d; border: 1px solid #50596e; border-radius: 10px; }
+.quiet-actions button, #quick-more { width: auto; height: auto; border: 0; border-radius: 7px; background: transparent; padding: 6px 9px; color: #c1cadd; font: 12px var(--font); cursor: pointer; }
+.quiet-actions button:hover { background: #2b3245; color: #fff; }
+#app #toolbar:not(.tour-open) #knot-bloom { display: none; }
+#orb, #orb.k3d { --knot-accent: #d6dbea; }
+#toolbar[data-knot-state='listening'] #orb { --knot-accent: #d6dbea; }
+#toolbar[data-knot-state='thinking'] #orb { --knot-accent: #8c96ff; }
+#orb.k3d { box-shadow: none; }
+#quiet-recording { position: fixed; z-index: 7; display: flex; align-items: center; gap: 9px; max-width: calc(100vw - 16px); padding: 8px 10px 8px 13px; border-radius: 13px; background: #1a2030; border: 1px solid #69758c; color: #e7edf9; font: 12px var(--font); pointer-events: auto; }
+.quiet-rec-dot { width: 7px; height: 7px; border-radius: 50%; background: #e8a19d; }
+#quiet-stop { border: 1px solid #65718c; background: #30394e; color: #fff; border-radius: 8px; padding: 5px 12px; font: 12px var(--font); cursor: pointer; }
+#guide-bubble { background: #1b2130; border: 1px solid #5e6d91; }
+.gb-kicker { font-size: 11px; letter-spacing: .06em; font-weight: 500; }
+.gb-hint { font-size: 12px; color: #bac4d8; }
+#keep-chip { background: #201f30; border: 1px solid #76658f; border-radius: 14px; flex-wrap: wrap; max-width: calc(100vw - 16px); }
+#keep-yes { background: #39324d; color: #e8e1f3; }
+#keep-no { background: #e4ddec; color: #262032; }
+#saved-scrim { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: #0006; pointer-events: auto; }
+#saved-sheet { width: min(470px, calc(100vw - 24px)); max-height: calc(100vh - 30px); overflow-y: auto; background: #191e2c; color: #ecf0f7; border: 1px solid #515b73; border-radius: 18px; padding: 18px; font: 13px/1.5 var(--font); }
+#saved-title { margin: 0; font-size: 20px; font-weight: 500; }
+.saved-item { padding: 13px 0; border-bottom: 1px solid #394154; }
+.saved-item strong { display: block; font-size: 14px; font-weight: 500; }
+.saved-item small { display: block; color: #b8c4d8; margin: 4px 0 8px; font-size: 12px; }
+#saved-sheet button { border: 1px solid #525f7a; background: #2d374e; color: #e6edf9; border-radius: 8px; padding: 6px 10px; margin-right: 6px; cursor: pointer; font: 12px var(--font); }
+#saved-history { margin-top: 16px; }
+#saved-status { color: #cfbcf1; margin-top: 10px; }
+#saved-preview { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 var(--font); background: #111622; padding: 13px; border-radius: 9px; }
+#settings { background: #191e2c; }
+.s-label { font-size: 11px; letter-spacing: .06em; }
+.s-note, .s-hint { font-size: 12px; color: #bdc6d9; }
+#shortcut-ptt { min-width: 0; flex: 1; padding: 8px; }
+#shortcut-ptt-save { padding: 6px 12px; border-radius: 8px; border: 1px solid #4b5875; background: #2c354a; color: #e5edfa; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #aabaff !important; outline-offset: 3px; }
+@media(prefers-reduced-motion:reduce) { #guide-bubble, #keep-chip, #quick-ask, #knot-hint { animation: none; } }
+.reduced-motion #guide-bubble, .reduced-motion #keep-chip, .reduced-motion #quick-ask, .reduced-motion #knot-hint { animation: none; transition: none; }
+#quiet-voice-wave { display: flex; width: 66px; height: 20px; gap: 1px; }
+#quiet-voice-wave i { width: 2px; height: 20px; background: #D6DBEA; transform: scaleY(.08); }
+#region-picker { position: fixed; inset: 0; z-index: 100; cursor: crosshair; pointer-events: auto; background: #0002; }
+#region-picker span { position: absolute; top: 15px; left: 20px; background: #1a2030; color: white; padding: 10px; }
+#region-box { position: absolute; border: 2px dashed #D6DBEA; pointer-events: none; }
+#inspect-context { padding: 8px; font-size: 12px; color: #D6DBEA; }
+#quick-intent { max-width: 155px; color: #D6DBEA; background: #1a2030; border: 1px solid #69758c; border-radius: 5px; }
+#guide-followup { display: flex; gap: 6px; margin-top: 10px; }
+#guide-followup input { min-width: 0; flex: 1; padding: 7px; color: #edf1fa; background: #111725; border: 1px solid #69758c; border-radius: 6px; }
+#guide-followup button { color: #edf1fa; background: #30394e; border: 1px solid #69758c; border-radius: 6px; }
+#context-used { font-size: 11px; color: #aab6c9; padding: 3px 8px; }
+.quiet-actions { flex-wrap: wrap; }
+#inspect-preview { display: block; max-width: 100%; max-height: 110px; object-fit: contain; margin: 6px auto; border: 1px solid #69758c; border-radius: 6px; }
+#inspect-preview.hidden { display: none; }
+#inspect-context { padding: 8px; border-radius: 9px; background: #191f30; color: #e6ebf7; border: 1px solid #46516a; }
+#quick-ask > #context-used { padding: 5px 8px; margin: 4px 0; border-radius: 7px; background: #191f30; color: #c3ccdf; }
+#quick-modes { display: flex; width: 100%; gap: 4px; padding: 4px 0; }
+#quick-modes button { flex: 1; min-height: 32px; border: 1px solid transparent; color: #d6dbea; }
+#quick-modes button[aria-pressed="true"] { background: #364360; border-color: #a8b9e2; color: white; }
+#quick-mode-hint { margin: 5px 0 0; padding: 7px 9px; border-radius: 8px; background: #191e2d; color: #c3ccdf; font: 12px/1.4 var(--font); }

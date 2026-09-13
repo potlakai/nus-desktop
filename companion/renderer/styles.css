@@ -62,7 +62,6 @@ html, body {
 }
 #stack { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; max-height: 100%; }
 #toolbar, #panel-wrap, #settings-scrim, #onboard-scrim, #daily-line { pointer-events: auto; }
-#toolbar { -webkit-app-region: drag; }   /* the orb row is the window's drag handle */
 .no-drag, button, input, textarea { -webkit-app-region: no-drag; }
 
 /* ============================ The orb ============================ */
@@ -108,11 +107,7 @@ html, body {
 }
 #orb-controls button:hover { background: rgba(255,255,255,0.10); }
 #stop-btn.active { color: #ff6b6b; }
-.tb-grip {
-  -webkit-app-region: drag;
-  color: var(--tx-mut); font-size: 12px; letter-spacing: -2px;
-  padding: 0 6px 0 2px; cursor: grab; user-select: none;
-}
+/* The drag grip is gone: the Knot picks a corner instead of being dragged. */
 
 /* ============================ Tiles ============================ */
 #panel-wrap { position: relative; width: min(440px, 92vw); }
@@ -502,7 +497,7 @@ button:focus { outline: none; }
 }
 #orb { --knot-accent: #506CFF; --knot-accent-soft: rgba(68,94,255,.58); }
 #orb.busy { --knot-accent: #5F73FF; --knot-accent-soft: rgba(95,115,255,.72); }
-#orb.listening { --knot-accent: #69E2CF; --knot-accent-soft: rgba(105,226,207,.72); }
+#orb.listening { --knot-accent: #D6DBEA; --knot-accent-soft: rgba(214,219,234,.6); }
 #orb.spar { --knot-accent: #D9A758; --knot-accent-soft: rgba(217,167,88,.65); }
 .knot-thread { stroke-width: 5.1; }
 .knot-shadow { stroke: #0A0D19; stroke-width: 7.4; opacity: .94; }
@@ -649,11 +644,11 @@ button:focus { outline: none; }
 #knot-bloom #capture-chip.off { display: none; }
 
 #orb.listening {
-  border-color: rgba(105,226,207,.38);
-  box-shadow: 0 18px 44px rgba(0,0,0,.56), 0 0 30px rgba(105,226,207,.16), inset 0 1px 0 rgba(255,255,255,.12);
+  border-color: rgba(214,219,234,.38);
+  box-shadow: 0 18px 44px rgba(0,0,0,.56), 0 0 30px rgba(214,219,234,.16), inset 0 1px 0 rgba(255,255,255,.12);
 }
 #orb.listening .knot-blue { animation-duration: 2.8s; }
-#orb.listening .knot-halo { border-color: rgba(105,226,207,.36); animation-duration: 1.5s; }
+#orb.listening .knot-halo { border-color: rgba(214,219,234,.36); animation-duration: 1.5s; }
 #orb.busy .knot-cream { animation-duration: 2.1s; }
 #orb.busy .knot-blue { animation-duration: 1.55s; }
 #orb.busy .nus-knot { animation: knotTilt 2.4s ease-in-out infinite; }
@@ -702,7 +697,7 @@ button:focus { outline: none; }
    floats; states speak through a soft glow instead of a dark disc. */
 #orb.k3d { background: transparent; border-color: transparent; box-shadow: none; overflow: visible; }
 #orb.k3d:hover, #knot-shell:focus-within #orb.k3d { border-color: transparent; box-shadow: 0 0 26px rgba(80,108,255,.20); }
-#orb.k3d.listening { box-shadow: 0 0 26px rgba(105,226,207,.24); }
+#orb.k3d.listening { box-shadow: 0 0 26px rgba(214,219,234,.22); }
 #orb.k3d.busy { box-shadow: 0 0 28px rgba(140,150,255,.26); }
 
 /* Mode clusters: labeled, breathing room, no dot separators. */
@@ -754,17 +749,16 @@ html:not(.founder) [data-founder] { display: none !important; }
   opacity: .55;
 }
 
-/* The Knot can never be pushed off-screen. */
-#stack { justify-content: flex-end; overflow: hidden; }
+/* The Knot can never be pushed off-screen. The stack stays bounded by the
+   window but never clips: the Knot's glow and the state halos spill past the
+   76px shell on purpose. */
+#stack { justify-content: flex-end; overflow: visible; }
 #panel-wrap { min-height: 0; }
 #messages { max-height: min(50vh, calc(100vh - 340px)); }
 
-/* Drag region: only the Knot shell moves the window; the invisible toolbar
-   band no longer exists as a click surface. */
-#toolbar { -webkit-app-region: no-drag; }
-#knot-shell { -webkit-app-region: drag; }
-#knot-shell button, #knot-bloom { -webkit-app-region: no-drag; }
-.tb-grip { -webkit-app-region: drag; cursor: grab; }
+/* No drag region at all: the window covers the work area and the Knot lives
+   in a corner. The corner picker in the bloom is the only way it moves. */
+#toolbar, #knot-shell, #knot-shell button, #knot-bloom { -webkit-app-region: no-drag; }
 
 /* ===== Tutorial in the Knot's own language ===== */
 #onboard-scrim { display: flex; align-items: flex-end; justify-content: flex-start; padding: 0 0 132px 14px; background: rgba(0,0,0,.28); }
@@ -820,3 +814,142 @@ html:not(.founder) [data-founder] { display: none !important; }
 .ob-primary:hover { background: #6478ff; }
 .user-bubble { background: var(--cobalt); color: #fff; }
 .ai-caret { background: var(--knot-accent, var(--cobalt)); }
+
+
+/* ============================ The Knot strand ============================ */
+/* The thread's canvas covers the window under every other surface and never
+   takes the mouse. Task colour rides on --thread-accent: the strand reads it
+   from its canvas, the bubble from itself. Amber is reserved for the Knot's
+   own "reading your screen" glow and is never a thread colour. */
+#strand-layer { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none; }
+[data-task] { --thread-accent: #D6DBEA; }
+[data-task="guide"] { --thread-accent: #7890FF; }
+[data-task="nudge"] { --thread-accent: #69E2CF; }
+[data-task="ask"] { --thread-accent: #D6DBEA; }
+[data-task="remember"] { --thread-accent: #A78BFA; }
+
+/* Knot glow by state. Thread colour = task, Knot glow = state. */
+#orb[data-state="listening"] { --knot-accent: #D6DBEA; --knot-accent-soft: rgba(214,219,234,.6); }
+#orb[data-state="thinking"], #orb[data-state="speaking"] { --knot-accent: #8C96FF; --knot-accent-soft: rgba(140,150,255,.7); }
+#orb[data-state="reading"] { --knot-accent: #E0B663; --knot-accent-soft: rgba(224,182,99,.75); }
+#orb.k3d[data-state="reading"] { box-shadow: 0 0 34px rgba(224,182,99,.34); }
+#orb.k3d[data-state="listening"] { box-shadow: 0 0 26px rgba(214,219,234,.22); }
+#orb.k3d[data-state="pointing"], #orb.k3d[data-state="unwinding"] { box-shadow: 0 0 22px rgba(120,144,255,.16); }
+#orb.k3d[data-state="keeping"] { box-shadow: 0 0 30px rgba(167,139,250,.32); }
+/* "Remember this": the Knot tightens as it stores the line. */
+#orb[data-state="keeping"] #knot-canvas { animation: knotTighten 760ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes knotTighten { 0% { transform: scale(1); } 45% { transform: scale(.8); } 75% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+/* Guide bubble at the thread tip (or beside the Knot when there is no thread). */
+#guide-bubble {
+  position: fixed; z-index: 6;
+  max-width: 288px; padding: 10px 13px 9px;
+  border-radius: 12px;
+  color: var(--tx-1); font-family: var(--font); font-size: 13.5px; line-height: 1.42;
+  pointer-events: auto;
+  animation: fadeUp 200ms ease both;
+}
+.gb-kicker { margin-bottom: 5px; color: var(--thread-accent, #90A5FF); font: 700 8.5px/1 var(--font); letter-spacing: .16em; text-transform: uppercase; }
+.gb-kicker:empty { display: none; }
+.gb-text { -webkit-user-select: text; user-select: text; }
+.gb-hint { margin-top: 5px; color: rgba(243,240,232,.45); font-size: 10.5px; line-height: 1.35; }
+.gb-hint:empty { display: none; }
+.gb-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.gb-actions:empty { display: none; }
+.gb-actions button {
+  border: 1px solid rgba(242,239,230,.14); border-radius: 999px;
+  padding: 5px 11px; background: rgba(255,255,255,.06); color: var(--tx-2);
+  font: 600 11.5px var(--font); cursor: pointer;
+}
+.gb-actions button.primary { background: var(--thread-accent, var(--cobalt)); border-color: transparent; color: #0B1020; }
+.gb-actions button:hover { background: rgba(255,255,255,.12); color: #fff; }
+.gb-actions button.primary:hover { filter: brightness(1.08); color: #0B1020; }
+
+/* The one-tap consent chip after a session. Skip is the default. */
+#keep-chip {
+  position: fixed; z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px 7px 13px; border-radius: 999px;
+  color: var(--tx-1); font-family: var(--font); font-size: 12.5px;
+  pointer-events: auto; animation: fadeUp 200ms ease both;
+}
+#keep-chip button { border: 0; border-radius: 999px; padding: 5px 11px; font: 600 12px var(--font); cursor: pointer; }
+#keep-yes { background: var(--cobalt); color: #fff; }
+#keep-no { background: rgba(255,255,255,.08); color: var(--tx-2); }
+#keep-chip button:hover { filter: brightness(1.1); }
+
+/* Corner picker: four dots in the bloom foot, the lit one is where the Knot lives. */
+#corner-pick {
+  display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px;
+  width: 24px; height: 24px; margin-left: 5px; padding: 3px;
+  border-radius: 6px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03);
+}
+#knot-bloom #orb-controls #corner-pick button {
+  width: auto; height: auto; min-width: 0; padding: 0; border: 0; border-radius: 2px;
+  background: rgba(255,255,255,.16); cursor: pointer; transition: background 140ms ease;
+}
+#knot-bloom #orb-controls #corner-pick button:hover { background: rgba(255,255,255,.4); }
+#knot-bloom #orb-controls #corner-pick button.on { background: var(--accent); }
+
+/* ============================ Corners ============================ */
+/* The stack hugs whichever corner the Knot is pinned to. Tiles, the daily
+   line and the bloom all open toward the screen centre. */
+#app { padding: 0 0 14px 22px; }
+#app[data-corner="br"] { align-items: flex-end; padding: 0 22px 14px 0; }
+#app[data-corner="tl"] { justify-content: flex-start; padding: 14px 0 0 22px; }
+#app[data-corner="tr"] { justify-content: flex-start; align-items: flex-end; padding: 14px 22px 0 0; }
+#app[data-corner="tl"] #stack, #app[data-corner="tr"] #stack { flex-direction: column-reverse; justify-content: flex-start; }
+#app[data-corner="br"] #stack, #app[data-corner="tr"] #stack { align-items: flex-end; }
+#app[data-corner="br"] #toolbar, #app[data-corner="tr"] #toolbar { justify-content: flex-end; }
+#app[data-corner="tl"] #toolbar, #app[data-corner="tr"] #toolbar { align-items: flex-start; }
+#app[data-corner="tl"] #orb, #app[data-corner="tr"] #orb { bottom: auto; top: 0; }
+#app[data-corner="br"] #knot-bloom, #app[data-corner="tr"] #knot-bloom {
+  left: auto; right: 88px; transform-origin: right center;
+  border-radius: 18px 12px 12px 18px; padding: 10px 22px 9px 11px;
+  transform: translateX(18px) scaleX(.84);
+}
+#app[data-corner="tl"] #knot-bloom, #app[data-corner="tr"] #knot-bloom { bottom: auto; top: 1px; }
+#app[data-corner="br"] #knot-shell:hover #knot-bloom, #app[data-corner="br"] #knot-shell:focus-within #knot-bloom, #app[data-corner="br"] #toolbar.panel-open #knot-bloom, #app[data-corner="br"] #toolbar[data-knot-state='listening'] #knot-bloom, #app[data-corner="br"] #toolbar[data-knot-state='thinking'] #knot-bloom, #app[data-corner="br"] #toolbar.tour-open #knot-bloom,
+#app[data-corner="tr"] #knot-shell:hover #knot-bloom, #app[data-corner="tr"] #knot-shell:focus-within #knot-bloom, #app[data-corner="tr"] #toolbar.panel-open #knot-bloom, #app[data-corner="tr"] #toolbar[data-knot-state='listening'] #knot-bloom, #app[data-corner="tr"] #toolbar[data-knot-state='thinking'] #knot-bloom, #app[data-corner="tr"] #toolbar.tour-open #knot-bloom { transform: none; }
+#app[data-corner="br"] .tile, #app[data-corner="tr"] .tile { transform-origin: 86% 100%; }
+#app[data-corner="tl"] .tile { transform-origin: 14% 0; }
+#app[data-corner="tr"] .tile { transform-origin: 86% 0; }
+#app[data-corner="br"] #panel-wrap::after, #app[data-corner="tr"] #panel-wrap::after { left: auto; right: 34px; }
+#app[data-corner="tl"] #panel-wrap::after, #app[data-corner="tr"] #panel-wrap::after { bottom: auto; top: -10px; background: linear-gradient(to bottom, var(--cobalt), transparent); }
+#app[data-corner="tl"] #daily-line, #app[data-corner="tr"] #daily-line { margin: 10px 0 0 0; }
+/* The tutorial card sits by whichever corner the Knot is in. */
+#app[data-corner="br"] ~ #onboard-scrim { justify-content: flex-end; padding: 0 14px 132px 0; }
+#app[data-corner="tl"] ~ #onboard-scrim { align-items: flex-start; padding: 132px 0 0 14px; }
+#app[data-corner="tr"] ~ #onboard-scrim { align-items: flex-start; justify-content: flex-end; padding: 132px 14px 0 0; }
+
+/* The quick ask: a single line by the Knot. No tiles, no verbs, no chrome. */
+#quick-ask {
+  position: fixed; z-index: 6;
+  display: flex; align-items: center; gap: 4px;
+  width: min(380px, 62vw); padding: 5px 5px 5px 14px;
+  border-radius: 999px; pointer-events: auto;
+  animation: fadeUp 160ms ease both;
+}
+#quick-input {
+  flex: 1; min-width: 0; border: 0; outline: none; background: transparent;
+  color: var(--tx-1); font-family: var(--font); font-size: 14px; line-height: 26px;
+  -webkit-user-select: text; user-select: text;
+}
+#quick-input::placeholder { color: rgba(243,240,232,.42); }
+#quick-more {
+  width: 28px; height: 28px; border: 0; border-radius: 50%;
+  background: rgba(255,255,255,.06); color: rgba(243,240,232,.7);
+  font-size: 15px; line-height: 1; cursor: pointer;
+}
+#quick-more:hover { background: rgba(255,255,255,.12); color: #fff; }
+
+/* App hint: a three-word pill by the Knot. Click = ask. */
+#knot-hint {
+  position: fixed; z-index: 6;
+  padding: 6px 12px; border-radius: 999px;
+  color: var(--tx-1); font-family: var(--font); font-size: 12px; line-height: 1.2;
+  cursor: pointer; pointer-events: auto;
+  animation: fadeUp 200ms ease both;
+}
+#knot-hint::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 7px 1px 0; border-radius: 50%; background: #69E2CF; }
+#knot-hint:hover { border-color: rgba(105,226,207,.45); }

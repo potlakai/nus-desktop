@@ -27,9 +27,13 @@ test('local STT spawns whisper with bare-transcript flags and no hardcoded user 
 
 test('streaming CLI runner keeps the subscription billing rule', () => {
   // Both spawn paths must strip a stray API key so claude -p bills the
-  // subscription. Two occurrences: runCli and runCliStream.
-  const strips = aiJs.match(/delete env\.ANTHROPIC_API_KEY/g) || [];
-  assert.ok(strips.length >= 2, 'runCli AND runCliStream must delete ANTHROPIC_API_KEY');
+  // subscription. One helper (cliEnv) does the delete; runCli and runCliStream
+  // must both spawn with it and neither may build its own env.
+  assert.match(aiJs, /function cliEnv\(\)[\s\S]*?delete env\.ANTHROPIC_API_KEY/, 'cliEnv must delete ANTHROPIC_API_KEY');
+  const usesHelper = aiJs.match(/env: cliEnv\(\), windowsHide: true/g) || [];
+  assert.ok(usesHelper.length >= 2, 'runCli AND runCliStream must spawn with cliEnv()');
+  const outsideHelper = aiJs.replace(/function cliEnv\(\)[\s\S]*?\n\}/, '');
+  assert.ok(!/\{ \.\.\.process\.env \}/.test(outsideHelper), 'no spawn path may build its own env');
   assert.match(aiJs, /stream-json/);
 });
 

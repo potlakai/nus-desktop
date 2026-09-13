@@ -1,6 +1,11 @@
 const { app, BrowserWindow, ipcMain, Notification, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { findProtocolUrl, registerProtocolClient, routeProtocolUrl, dataDirFromArgv, friendlySignInError } = require('./protocol');
+const SMOKE = process.argv.includes('--smoke');
+// Set the profile before importing modules that cache paths at load time.
+if (SMOKE && process.env.NUS_SMOKE_DATA_DIR) app.setPath('userData', path.resolve(process.env.NUS_SMOKE_DATA_DIR));
+else if (dataDirFromArgv()) app.setPath('userData', path.resolve(dataDirFromArgv()));
 const { open, api, setSaveStateListener } = require('./db');
 const logic = require('./logic');
 const { decomposeTask, nextScheduledAt, parseIcs } = require('./smart');
@@ -17,7 +22,6 @@ const sttLocal = require('./stt-local');
 const assistant = require('./assistant');
 const vaultNotes = require('./vault-notes');
 const { initAutoUpdate } = require('./updater');
-const { findProtocolUrl, registerProtocolClient, routeProtocolUrl, dataDirFromArgv, friendlySignInError } = require('./protocol');
 const acquisition = require('./acquisition');
 const { installCrashHandlers } = require('./crash');
 const { createQuitGuard } = require('./quit-guard');
@@ -25,12 +29,7 @@ const { createLicense } = require('./license');
 const { createLimits } = require('./limits');
 const companionApp = require('../companion');
 
-const SMOKE = process.argv.includes('--smoke');
 const RENDERER_PREFERENCE_KEYS = new Set(['gpa_scale', 'brain_viewport', 'brain_layout', 'email_accounts', 'email_default', 'onboarded', 'focus_areas', 'auth_prompted']);
-if (SMOKE && process.env.NUS_SMOKE_DATA_DIR) app.setPath('userData', path.resolve(process.env.NUS_SMOKE_DATA_DIR));
-// An isolated profile for first-run tests and screenshots. Only honoured when
-// set explicitly, so a normal launch never wanders off the real userData.
-else if (dataDirFromArgv()) app.setPath('userData', path.resolve(dataDirFromArgv()));
 const crashHandlers = installCrashHandlers(app, dialog);
 
 let gcalCache = [];
@@ -59,7 +58,13 @@ let usageLimits = null;
 let pendingProtocolUrl = findProtocolUrl(process.argv);
 
 try {
-  if (!registerProtocolClient(app)) console.error('[nus] Windows did not register the OAuth callback protocol');
+  // On macOS the scheme comes from CFBundleURLTypes in Info.plist (electron-builder
+  // `protocols`), and the URL arrives through 'open-url' below, not argv.
+  // NUS_NO_PROTOCOL=1 lets a dev launch (`electron .`) run without re-pointing
+  // the machine's nus-desktop:// handler at the dev copy, which otherwise
+  // breaks sign-in links for the installed app until it is reinstalled.
+  if (process.env.NUS_NO_PROTOCOL === '1') console.log('[nus] protocol registration skipped (NUS_NO_PROTOCOL=1)');
+  else if (!registerProtocolClient(app)) console.error('[nus] the OS did not register the nus-desktop:// protocol');
 } catch (error) {
   crashHandlers.record('protocol-registration-failed', error);
 }
@@ -770,8 +775,14 @@ app.whenReady().then(async () => {
     },
     onStateChange: (status) => sendToDesktop('companion:state', status),
     onOutboxEvent: () => { try { ingestCompanionEvents(); } catch (e) { console.error('[nus] live ingest failed', e); } },
+    // The desktop's own AI (Claude Code if installed, else the Anthropic key)
+    // as the Companion's fallback for guide pointing when it has no key of
+    // its own. One prompt in, text out; the CLI can read an image file.
+    desktopComplete: (prompt, imageDataUrl) => ai.complete(prompt, { guidance: true, imageDataUrl }),
     audioRoot: () => path.join(app.getPath('userData'), 'companion', 'audio'),
     showDesktop: showDesktopWindow,
+    showVoiceSetup: () => { showDesktopWindow(); if (win.webContents.isLoading()) win.webContents.once('did-finish-load', () => sendToDesktop('desktop:voice-setup', {})); else sendToDesktop('desktop:voice-setup', {}); },
+    showHistory: () => { showDesktopWindow(); if (win.webContents.isLoading()) win.webContents.once('did-finish-load', () => sendToDesktop('desktop:history', {})); else sendToDesktop('desktop:history', {}); },
     startDesktopTour: () => sendToDesktop('desktop:tour', {}),
     // Live snapshot for the Companion's guide mode: same process, no file.
     getDesktopState: () => {
@@ -809,7 +820,15 @@ app.whenReady().then(async () => {
 
 // Same rule as the dashboard close: a live Companion keeps Nus running with no
 // windows, which is the whole point of an overlay that stays on your desktop.
-app.on('window-all-closed', () => { if (!companion || !companion.isEnabled()) app.quit(); });
+// On macOS closing the last window never quits: the app lives in the Dock and
+// Cmd+Q (from Electron's default menu) is the way out, as with every Mac app.
+app.on('window-all-closed', () => {
+  if (process.platform === 'darwin') return;
+  if (!companion || !companion.isEnabled()) app.quit();
+});
+// Dock click with no window open: bring the dashboard back.
+app.on('activate', () => { if (app.isReady()) showDesktopWindow(); });
+let awaitingCaptureQuit = false;
 app.on('before-quit', (event) => {
   // Closing the process must close the durable Companion session and charge
   // the elapsed allowance before the final database snapshot is written.
@@ -817,6 +836,14 @@ app.on('before-quit', (event) => {
   // Free user reset today's Companion usage.
   try { if (companion?.isCapturing()) companion.setCapturing(false); } catch (error) {
     console.error('[nus] companion shutdown failed', error);
+  }
+  if (companion?.isFinalizing()) {
+    event.preventDefault();
+    if (!awaitingCaptureQuit) {
+      awaitingCaptureQuit = true;
+      companion.drainCapture().finally(() => { awaitingCaptureQuit = false; app.quit(); });
+    }
+    return;
   }
   guardQuit(event);
 });
@@ -845,7 +872,8 @@ function ingestCompanionEvents() {
   try { payload = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return; }
   if (!payload || payload.schema_version !== 1 || payload.source !== 'companion' || !Array.isArray(payload.events)) return;
   const lastIngested = api.getPreferences().companion_last_ingested || '';
-  const fresh = payload.events.filter((event) => event.ts && event.ts > lastIngested);
+  const seen = new Set(api.getPreferences().companion_ingested_ids || []);
+  const fresh = payload.events.filter(event => event && event.ts && (event.id ? !seen.has(event.id) : event.ts > lastIngested));
   if (!fresh.length) return;
   for (const event of fresh) {
     api.addSource({
@@ -856,7 +884,9 @@ function ingestCompanionEvents() {
     });
     logActivity('companion_report', `Companion handled a ${event.mode || 'request'}${event.used_screenshot ? ' (with a screenshot)' : ''}`, { status: 'review' });
   }
-  api.setPreference('companion_last_ingested', fresh[fresh.length - 1].ts);
+  for (const event of fresh) if (event.id) seen.add(event.id);
+  api.setPreference('companion_ingested_ids', Array.from(seen).slice(-512));
+  api.setPreference('companion_last_ingested', fresh.reduce((last, event) => event.ts > last ? event.ts : last, lastIngested));
   writeBridge();
 }
 
@@ -1231,4 +1261,8 @@ const handlers = {
   },
 };
 
-for (const [channel, handler] of Object.entries(handlers)) ipcMain.handle(channel, handler);
+for (const [channel, handler] of Object.entries(handlers)) ipcMain.handle(channel, (event, ...args) => {
+  const contents = win && !win.isDestroyed() ? win.webContents : null;
+  if (!require('./ipc-origin').trustedSender(event, contents)) return { error: 'untrusted_sender' };
+  return handler(event, ...args);
+});

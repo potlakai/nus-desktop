@@ -1,5 +1,10 @@
 // Local speech-to-text via a bundled whisper.cpp binary. No cloud keys, no native modules:
-// we spawn whisper-cli.exe against a temp WAV and read the transcript from stdout.
+// we spawn whisper-cli against a temp WAV and read the transcript from stdout.
+//
+// Only the Windows build bundles the binary (vendor/whisper, see
+// electron-builder.config.js). On macOS nothing ships yet; a user who has
+// whisper.cpp installed (brew install whisper-cpp) can point NUS_WHISPER_DIR at
+// its bin directory and this finds `whisper-cli` there.
 'use strict';
 
 const fs = require('fs');
@@ -10,7 +15,7 @@ const { pcmToWav, rms16 } = require('../companion/src/wav');
 
 const MODEL_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin';
 const MODEL_NAMES = ['ggml-small.en-q5_1.bin', 'ggml-base.en-q5_1.bin'];
-const EXE_NAMES = ['whisper-cli.exe', 'main.exe'];
+const EXE_NAMES = process.platform === 'win32' ? ['whisper-cli.exe', 'main.exe'] : ['whisper-cli', 'main'];
 const WHISPER_TIMEOUT_MS = 30_000;
 const MIN_BYTES = 16000 * 2 * 0.4; // 0.4 s of 16 kHz Int16
 const RMS_GATE = 200;
@@ -85,8 +90,9 @@ async function ensureModel(onProgress) {
   return dest;
 }
 
-function runWhisper(exe, model, wavPath) {
+function runWhisper(exe, model, wavPath, signal) {
   return new Promise((resolve) => {
+    if (signal && signal.aborted) return resolve({ cancelled: true });
     const args = ['-m', model, '-f', wavPath, '-l', 'en', '-t', String(Math.max(1, Math.min(4, os.cpus().length - 1))), '-nt', '-np'];
     let child;
     try {
@@ -96,8 +102,19 @@ function runWhisper(exe, model, wavPath) {
     }
     let out = '';
     let done = false;
-    const finish = (result) => { if (!done) { done = true; resolve(result); } };
-    const timer = setTimeout(() => {
+    let timer;
+    const abort = () => {
+      try { child.kill(); } catch {}
+      finish({ cancelled: true });
+    };
+    const finish = (result) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', abort);
+      resolve(result);
+    };
+    timer = setTimeout(() => {
       try { child.kill(); } catch {}
       finish({ error: 'whisper_timeout' });
     }, WHISPER_TIMEOUT_MS);
@@ -109,39 +126,35 @@ function runWhisper(exe, model, wavPath) {
       if (code !== 0) return finish({ error: 'whisper_failed', detail: `exit ${code}` });
       finish({ text: out.replace(/\s+/g, ' ').trim() });
     });
+    if (signal) {
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
+    }
   });
 }
 
-// Serialize transcriptions: one whisper process at a time, at most one waiter.
-let inflight = Promise.resolve();
-let pending = 0;
+const { createTranscriptionQueue } = require('./transcription-queue');
+const transcriptionQueue = createTranscriptionQueue();
 
-async function transcribePcm(pcm) {
+async function transcribePcm(pcm, options = {}) {
   if (!Buffer.isBuffer(pcm)) pcm = Buffer.from(pcm);
   if (pcm.length < MIN_BYTES) return { text: '' };
   if (rms16(pcm) < RMS_GATE) return { text: '' };
   const exe = findBinary();
   const model = findModel();
   if (!exe || !model) return { error: 'stt_not_installed' };
-  if (pending >= 2) return { text: '' }; // drop when backed up
-  pending += 1;
-  const run = inflight.then(async () => {
+  return transcriptionQueue.enqueue(async () => {
+    if (options.signal && options.signal.aborted) return { cancelled: true };
     const dir = path.join(userDataDir || os.tmpdir(), 'voice-tmp');
     fs.mkdirSync(dir, { recursive: true });
     const wavPath = path.join(dir, `utt-${Date.now()}-${Math.floor(Math.random() * 1e6)}.wav`);
     fs.writeFileSync(wavPath, pcmToWav(pcm, 16000, 1));
     try {
-      return await runWhisper(exe, model, wavPath);
+      return await runWhisper(exe, model, wavPath, options.signal);
     } finally {
       try { fs.unlinkSync(wavPath); } catch {}
     }
-  });
-  inflight = run.catch(() => {});
-  try {
-    return await run;
-  } finally {
-    pending -= 1;
-  }
+  }, options);
 }
 
-module.exports = { init, status, ensureModel, transcribePcm };
+module.exports = { init, status, ensureModel, transcribePcm, cancel: (sessionId) => transcriptionQueue.cancel(sessionId) };

@@ -3,10 +3,20 @@ const path = require('path');
 const asar = require('@electron/asar');
 
 const root = path.resolve(__dirname, '..');
-const archive = path.join(root, 'dist', 'win-unpacked', 'resources', 'app.asar');
 
-if (!fs.existsSync(archive)) {
-  console.error(JSON.stringify({ ok: false, error: 'packaged_app_missing' }));
+// The packed asar sits in a different place per target. An explicit path wins
+// (CI passes the mac bundle); otherwise the first unpacked build found is used.
+const candidates = process.argv[2]
+  ? [path.resolve(process.argv[2])]
+  : [
+    path.join(root, 'dist', 'win-unpacked', 'resources', 'app.asar'),
+    path.join(root, 'dist', 'mac-arm64', 'Nus.app', 'Contents', 'Resources', 'app.asar'),
+    path.join(root, 'dist', 'mac', 'Nus.app', 'Contents', 'Resources', 'app.asar'),
+  ];
+const archive = candidates.find((candidate) => fs.existsSync(candidate));
+
+if (!archive) {
+  console.error(JSON.stringify({ ok: false, error: 'packaged_app_missing', looked: candidates.map((c) => path.relative(root, c)) }));
   process.exit(1);
 }
 
@@ -18,7 +28,8 @@ const forbiddenPaths = entries.filter((entry) =>
   || /^(?:deno\.lock|AGENTS\.md)$/i.test(entry)
 );
 
-const required = ['src/license.js', 'src/limits.js', 'src/main.js', 'renderer/index.html'];
+const required = ['src/license.js', 'src/limits.js', 'src/main.js', 'src/ipc-origin.js', 'src/guide-input.js', 'renderer/index.html', 'companion/index.js', 'companion/preload.js', 'companion/renderer/index.html', 'companion/renderer/knot3d.js', 'companion/renderer/quiet-knot.css', 'companion/renderer/strand.js', 'companion/src/guide/session.js', 'companion/src/guide/sensitive.js'];
+required.push('companion/src/selected-assistance.js', 'companion/src/inspection-input.js', 'companion/src/companion-context.js', 'src/transcription-queue.js');
 const missingPaths = required.filter((entry) => !entries.includes(entry));
 const ownedText = entries.filter((entry) =>
   /^(?:src|renderer|companion)\//.test(entry)
@@ -36,10 +47,12 @@ const patterns = [
   ['aws_access_key', /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g],
 ];
 const secretFindings = [];
+const unreadablePaths = [];
 
 for (const entry of ownedText) {
   let source;
-  try { source = asar.extractFile(archive, entry).toString('utf8'); } catch { continue; }
+  try { source = asar.extractFile(archive, path.normalize(entry)).toString('utf8'); }
+  catch { unreadablePaths.push(entry); continue; }
   for (const [kind, pattern] of patterns) {
     pattern.lastIndex = 0;
     const count = [...source.matchAll(pattern)].length;
@@ -48,10 +61,11 @@ for (const entry of ownedText) {
 }
 
 const report = {
-  ok: forbiddenPaths.length === 0 && missingPaths.length === 0 && secretFindings.length === 0,
+  ok: forbiddenPaths.length === 0 && missingPaths.length === 0 && secretFindings.length === 0 && unreadablePaths.length === 0,
   archive: path.relative(root, archive),
   packagedEntries: entries.length,
-  ownedTextFilesScanned: ownedText.length,
+  ownedTextFilesScanned: ownedText.length - unreadablePaths.length,
+  unreadablePaths,
   forbiddenPaths,
   missingPaths,
   secretFindings,

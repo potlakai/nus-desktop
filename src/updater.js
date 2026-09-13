@@ -15,6 +15,11 @@ function initAutoUpdate({ onError } = {}) {
   if (!app.isPackaged) return { started: false, reason: 'not_packaged' };
   // electron-builder sets this only for the portable target.
   if (process.env.PORTABLE_EXECUTABLE_DIR) return { started: false, reason: 'portable' };
+  // The Mac build is ad-hoc signed, and electron-updater refuses to apply an
+  // update to an app without a Developer ID signature (and there is no
+  // latest-mac.yml or zip in the release to point it at). Mac users re-download
+  // until the build is notarized; then add the zip target and drop this line.
+  if (process.platform === 'darwin') return { started: false, reason: 'mac_unsigned' };
 
   let autoUpdater;
   try {

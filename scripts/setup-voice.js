@@ -50,6 +50,11 @@ function prune(dir) {
 }
 
 async function main() {
+  if (process.platform !== 'win32') {
+    console.error('setup:voice downloads the Windows whisper.cpp build only; the Mac app ships without local voice for now.');
+    console.error('On macOS: brew install whisper-cpp, then start Nus with NUS_WHISPER_DIR=$(brew --prefix)/bin and it finds whisper-cli there.');
+    process.exit(1);
+  }
   fs.mkdirSync(vendorDir, { recursive: true });
   fs.mkdirSync(modelDir, { recursive: true });
 

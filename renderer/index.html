@@ -23,7 +23,7 @@
         <p>The desktop brain now feeds your Companion.</p>
         <div class="signal-route"><span>Desk</span><i></i><span>Companion</span></div>
       </section>
-      <button class="rail-storage" id="rail-storage" data-view="settings" type="button" title="Local database size. Everything stays on this device.">
+      <button class="rail-storage" id="rail-storage" data-view="settings" type="button" title="Local database size">
         <span class="rail-storage-head">Storage<b id="rail-storage-value">0 KB</b></span>
         <span class="rail-storage-track"><i id="rail-storage-bar"></i></span>
       </button>
@@ -210,7 +210,7 @@
         <div class="companion-panel">
           <section class="dash-card companion-live">
             <div class="section-head"><div><div class="section-kicker">On-screen agent</div><h2 id="companion-state-title">Companion</h2></div><span id="companion-state-badge" class="status-badge">Checking</span></div>
-            <p id="companion-state-copy" class="companion-copy">The Nūs Knot floats over your screen, listens on request, and answers from your briefing packs. It ships inside Nūs, so there is nothing else to install.</p>
+            <p id="companion-state-copy" class="companion-copy">The Nūs Knot floats over your screen, points out the next step, and listens when you choose Talk or Record. Screen guidance never clicks or types for you. It ships inside Nūs; keyless voice needs a one-time model download.</p>
             <div class="companion-actions">
               <button id="companion-show" class="primary-button" type="button">Show overlay</button>
               <button id="companion-hide" class="quiet-button" type="button">Hide overlay</button>
@@ -219,7 +219,7 @@
               <button id="companion-capture" class="quiet-button" type="button">Start listening</button>
               <button id="companion-power" class="danger-button" type="button">Turn off Companion</button>
             </div>
-            <p class="companion-hint">The Companion stays on your desktop after you close this window, and the hotkeys keep working: <b>Ctrl+Shift+Space</b> hide or show · <b>Ctrl+Shift+X</b> panic (stop and vanish). The Knot mark alone hides from the button above. Bring it back from the tray icon any time. Turning it off removes it completely, releases the hotkeys, and it stays off until you turn it back on here.</p>
+            <p class="companion-hint">The Companion stays on your desktop after you close this window, and the hotkeys keep working: <b data-hotkey>Ctrl+Shift+Space</b> hide or show · <b data-hotkey>Ctrl+Shift+X</b> panic (stop and vanish). The Knot mark alone hides from the button above. Bring it back from the tray icon any time. Turning it off removes it completely, releases the hotkeys, and it stays off until you turn it back on here.</p>
           </section>
           <section class="dash-card companion-chat">
             <div class="section-head"><div><div class="section-kicker">Chat</div><h2>Ask Nūs anything, in a thread</h2></div></div>
@@ -313,8 +313,8 @@
             <section class="setting-card" id="companion-ai-card">
               <div>
                 <div class="section-kicker">Companion AI key</div>
-                <h3 id="companion-ai-title">The on-screen Knot needs its own key</h3>
-                <p id="companion-ai-copy">The desktop app uses Claude (above). The Companion overlay, which sees your screen and listens, runs on its own provider so live answers stay fast and cheap. Paste a Google Gemini key here (free tier at aistudio.google.com/apikey) and the Knot starts working immediately. It is encrypted on this device. You can also set it from the Knot's own gear icon.</p>
+                <h3 id="companion-ai-title">Screen guidance can use desktop Claude</h3>
+                <p id="companion-ai-copy">Screen guidance can use your desktop Claude connection when no Companion key is set. A Gemini key enables the Companion provider and cloud speech fallback. Keys are encrypted on this device. For keyless voice, click Talk on the Knot and complete local voice setup.</p>
                 <div class="auth-form">
                   <label class="field"><span>Gemini API key</span><input id="companion-ai-key" type="password" placeholder="AIza…" autocomplete="off" /></label>
                   <div class="sheet-actions"><span id="companion-ai-result"></span><div><button id="companion-ai-save" class="primary-button" type="button">Save key</button><button id="companion-ai-clear" class="quiet-button hidden" type="button">Remove key</button></div></div>
@@ -342,7 +342,7 @@
               </div>
               <span id="storage-badge" class="status-badge">Local</span>
             </section>
-            <section class="setting-card"><div><div class="section-kicker">Privacy</div><h3>Device-first knowledge</h3><p>Imports stay on this computer. The only external call is syllabus reading through the AI provider you configure above, and only when you import.</p></div><span class="status-badge good">On device</span></section>
+            <section class="setting-card"><div><div class="section-kicker">Privacy</div><h3>Device-first knowledge</h3><p>Imports and saved history are stored on this computer. AI requests send relevant content to your configured provider. Screen guidance sends a screenshot when reading a step. Voice uses local transcription when available; a configured cloud speech provider may receive audio as fallback. Connected services and exports have their own data flows.</p></div><span class="status-badge good">On device</span></section>
           </div>
         </div>
       </section>
@@ -410,7 +410,7 @@
     <span id="save-banner-text"></span>
   </div>
   <div id="toast" class="toast" role="status"></div>
-  <script src="../companion/renderer/knot3d.js?v=atlas-12"></script>
+  <script src="../companion/renderer/knot3d.js?v=atlas-14"></script>
   <script src="app.js?v=atlas-12"></script>
 </body>
 </html>

@@ -12,6 +12,16 @@ if (previewApi) Object.assign(previewApi, {
   onLicenseReturn: () => {},
 });
 const api = window.nus || previewApi;
+// OS-specific copy. The Companion shortcuts are CommandOrControl, so on a Mac
+// the label is ⌘; the settings path for microphone permission differs too.
+const IS_MAC = (api && api.platform) === 'darwin';
+const MOD = IS_MAC ? '⌘' : 'Ctrl';
+const MIC_SETTINGS = IS_MAC ? 'System Settings, Privacy & Security, Microphone' : 'Windows Settings, Privacy, Microphone';
+function localizeHotkeys(){
+  if(!IS_MAC)return;
+  document.querySelectorAll('[data-hotkey]').forEach((el)=>{el.textContent=el.textContent.replace(/^Ctrl\+/,'⌘+');});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',localizeHotkeys);else localizeHotkeys();
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const reducedMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -506,7 +516,8 @@ $('#import-primary').addEventListener('click',importSyllabusFlow);
 $('#source-import').addEventListener('click',()=>setView('integrations'));
 
 const AI_ERRORS={no_ai:'Connect an AI provider first. Taking you to Settings.',empty_text:'No readable text in that file. Scanned PDFs need selectable text.',bad_json:'The AI reply was not readable. Try the import again.',read_failed:'Could not read that file.',storage_limit:'Nūs local storage is full. Remove an import before adding another.',limit_syllabus_imports:'Free includes three AI syllabus imports. Upgrade to Pro for more.',limit_questions:'Free includes ten Ask or chat questions each day. Upgrade to Pro or come back tomorrow.',limit_connected_accounts:'Free includes one connected account. Disconnect the current account or upgrade to Pro.',limit_automation_rules:'Free includes one automation rule. Remove it or upgrade to Pro.',limit_companion_minutes:'Free Companion listening is used for today. Upgrade to Pro or come back tomorrow.',limit_companion_history:'Free includes seven days of Companion history. Upgrade to Pro for full history.',cli_timeout:'Claude Code took too long. Try again.',cli_failed:'Claude Code returned an error.',cli_spend_limit:'Your Claude subscription hit its spend limit. Add an Anthropic API key in Settings, or raise the limit in Claude Code.',cli_not_logged_in:'Claude Code is installed but signed out. Open a terminal, run "claude", then /login, or paste an Anthropic API key in Settings.',cli_spawn_failed:'Claude Code could not start.',api_failed:'The Anthropic API returned an error.',api_refused:'The AI declined this content.',api_timeout:'The API call timed out. Try again.',api_network:'Network problem reaching Anthropic.',unexpected_reply:'The provider answered, but not as expected.',source_missing:'That import is no longer on file.',course_name_required:'The course needs a name.',target_not_found:'I could not find that item. Try its exact name.',incomplete_command:'I need a bit more: which item, and what date?',unknown_intent:'That request did not survive the trip. Try again.'};
-function aiError(code,detail){const base=AI_ERRORS[code]||`Import failed (${code}).`;return detail?`${base} (${String(detail).slice(0,120)})`:base;}
+Object.assign(AI_ERRORS, { voice_setup_required:'Complete voice setup in Nūs before recording.', capture_finalizing:'Nūs is saving the last words. Please wait a moment.', companion_busy:'Finish your guide or voice question before recording.' });
+function aiError(code,detail){const base=AI_ERRORS[code]||`Request failed (${code}).`;return detail?`${base} (${String(detail).slice(0,120)})`:base;}
 
 // Multi-file import: the picker allows several syllabi at once. The first is
 // extracted immediately; the rest wait in state.importQueue and run one review
@@ -901,9 +912,9 @@ async function renderCompanionAiState(){
   const badge=$('#companion-ai-badge'); if(!badge)return;
   const status=await api.companionAiStatus?.().catch(()=>null);
   const has=Boolean(status?.keys?.gemini||status?.keys?.openai);
-  badge.textContent=has?'Key saved':'Needs a key';
+  badge.textContent=has?'Key saved':'Desktop fallback';
   badge.classList.toggle('good',has);
-  $('#companion-ai-title').textContent=has?'The Companion is ready to answer':'The on-screen Knot needs its own key';
+  $('#companion-ai-title').textContent=has?'Companion provider configured':'Screen guidance can use desktop Claude';
   $('#companion-ai-clear')?.classList.toggle('hidden',!status?.keys?.gemini);
 }
 $('#companion-ai-save')?.addEventListener('click',async()=>{
@@ -939,7 +950,7 @@ async function renderStorage(){
   $('#rail-storage')?.classList.toggle('full',pct>80);
   if(!$('#storage-title'))return;
   $('#storage-title').textContent=`${formatBytes(used)} of ${formatBytes(status.capBytes)} local space`;
-  $('#storage-copy').textContent=`Database ${formatBytes(status.dbBytes)}, of which imported source text is ${formatBytes(status.sourceBytes)}. Everything stays on this device. Back it up, export it, or delete it any time.`;
+  $('#storage-copy').textContent=`Database ${formatBytes(status.dbBytes)}, of which imported source text is ${formatBytes(status.sourceBytes)}. These files are stored on this device. AI features may send relevant content to your configured provider.`;
   $('#storage-bar').style.width=`${Math.max(pct,1)}%`;
   const badge=$('#storage-badge');
   if(pct>80){badge.textContent='Nearly full';badge.classList.remove('good');}
@@ -1444,9 +1455,9 @@ const APP_GUIDE=[
   {match:/where.*(map|graph|brain)|mind ?map|constellation/,go:'brain',label:'Open the Map',answer:'The Map is item 02 in the rail. Every course, source, and open task is a node you can drag; scroll to zoom around your cursor, drag the canvas to pan, and Center map reframes everything.'},
   {match:/turn off|remove|disable|get rid.*(companion|knot|overlay)|companion.*(off|remove)/,go:'companion',label:'Open Knot settings',answer:'Turn off Companion, on the Knot > Companion pane, removes it completely: capture stops, the overlay closes, and the hotkeys go back to your system. It stays off across restarts until you press Turn on Companion in the same place.'},
   {match:/close|quit|exit|background|still running|stays open/,go:'companion',label:'Open Knot settings',answer:'Closing the dashboard leaves the Companion running on your desktop with every hotkey live, the same way it works after a restart. The tray icon reopens the dashboard or quits Nūs entirely, and Turn off Companion on this pane removes the overlay for good.'},
-  {match:/stealth|invisible|hide.*(companion|overlay|knot)/,go:'companion',label:'Open Knot settings',answer:'Ctrl+Shift+Space hides the whole Companion, Ctrl+Shift+X stops listening and vanishes. The Knot mark alone can be hidden or shown from this pane, and this pane is always the way back.'},
+  {match:/stealth|invisible|hide.*(companion|overlay|knot)/,go:'companion',label:'Open Knot settings',answer:`${MOD}+Shift+Space hides the whole Companion, ${MOD}+Shift+X stops listening and vanishes. The Knot mark alone can be hidden or shown from this pane, and this pane is always the way back.`},
   {match:/history|transcript|recording|session/,go:'history',label:'Open History',answer:'Every Companion capture session lands under Knot > History: full transcript, search, and upload into your Jarvis vault with a preview before anything is written.'},
-  {match:/gemini|companion.*(key|api)|key.*companion|overlay.*key/,go:'settings',label:'Open Settings',answer:'The Companion needs its own key, separate from the desktop app\'s Claude. In Settings, the "Companion AI key" card sits right under AI provider: paste a Google Gemini key there (free tier at aistudio.google.com/apikey) and the Knot starts answering. One Gemini key covers both its answers and speech-to-text for listening. The Knot\'s gear icon sets the same key.'},
+  {match:/gemini|companion.*(key|api)|key.*companion|overlay.*key/,go:'settings',label:'Open Settings',answer:'Screen guidance can use desktop Claude when no Companion key is set. The Companion AI key card in Settings adds Gemini for Companion answers and cloud speech fallback. For keyless voice, click Talk on the Knot and complete local voice setup.'},
   {match:/api key|anthropic|claude key|which model/,go:'settings',label:'Open Settings',answer:'Two keys, two jobs. Desktop app: Claude, found automatically if Claude Code is installed, otherwise an Anthropic API key in Settings > AI provider. It runs on Sonnet so syllabus reading stays affordable. Companion overlay: its own Gemini key in the Companion AI key card just below.'},
   {match:/gmail/,go:'email',label:'Open Email',answer:'Gmail needs no connection: draft the email in the Email tab, then press Open in Gmail. The finished draft opens in a Gmail compose window in your browser with everything filled in, and you press send there.'},
   {match:/email|professor|outlook/,go:'email',label:'Open Email',answer:'Email has its own tab in the rail. Connect Outlook read-only for the inbox brief and your writing style; the professor drafter works even without connecting, and any draft can open straight into Gmail with the Open in Gmail button.'},
@@ -1983,9 +1994,11 @@ function renderVoiceSetup(status){
   const noBinary=!status||!status.binary;
   thread.innerHTML=`<div class="voice-setup">
     <strong>Set up free local voice</strong>
-    <span>Nūs transcribes speech on this computer with an open source Whisper model. Audio never leaves your machine.</span>
+    <span>Nūs transcribes speech on this computer with an open source Whisper model. This local engine transcribes on this device. The Companion can also use a configured cloud speech provider as fallback.</span>
     ${noBinary
-      ?'<span>The voice engine is missing from this build. Run <b>npm run setup:voice</b> in the app folder, then reopen this panel.</span>'
+      ?(IS_MAC
+        ?'<span>Local voice is not bundled on macOS. Companion speech needs a configured provider, and verified screen pointing is unavailable there.</span>'
+        :'<span>The voice engine is missing from this build. Install a complete Nūs build, or configure a speech provider in Companion Settings.</span>')
       :'<button id="voice-setup-go" class="primary-button" type="button">Download voice model (57 MB)</button>'}
     <small id="voice-setup-status"></small>
   </div>`;
@@ -1994,7 +2007,7 @@ async function beginListening(){
   try{await startVoiceMic();}
   catch(err){
     const msg=err&&err.name==='NotAllowedError'
-      ?'Microphone blocked. Allow it in Windows Settings, Privacy, Microphone, then try again.'
+      ?`Microphone blocked. Allow it in ${MIC_SETTINGS}, then try again.`
       :err&&err.name==='NotFoundError'
         ?'No microphone found. Plug one in and try again.'
         :'Microphone failed: '+((err&&err.message)||'unknown error');
@@ -2128,7 +2141,7 @@ $('#vault-cancel')?.addEventListener('click',()=>$('#vault-scrim').classList.add
 
 function renderInbox(){
   const box=$('#inbox-brief'); if(!box)return;
-  if(!state.outlook?.connected){box.innerHTML='<div class="empty-state">Connect email in Settings to see what needs a reply. <button class="text-button" data-goto-email>Open email settings</button></div>';return;}
+  if(!state.outlook?.connected){box.innerHTML='<div class="empty-state">Connect Outlook on the Email page to see what needs a reply. <button class="text-button" data-goto-email>Open Email</button></div>';return;}
   if(state.inbox?.error){box.innerHTML='<div class="empty-state">Could not reach your inbox just now.</div>';return;}
   const messages=state.inbox?.messages||[];
   box.innerHTML=messages.length?messages.map((m)=>`<div class="inbox-row${m.unread?' unread':''}"><div><strong>${esc(m.from_name)}</strong><small>${esc(m.subject)} · ${esc(m.preview)}</small></div><span class="feed-time">${relativeTime(m.received_at)}</span></div>`).join(''):'<div class="empty-state">Inbox is quiet.</div>';
@@ -2213,6 +2226,8 @@ $('#today-list').addEventListener('click',async(event)=>{
   await load();showToast('Marked done.');
 });
 $('#view-history').addEventListener('click',()=>setView('history'));
+window.nus?.onDesktopHistory?.(()=>setView('history'));
+window.nus?.onDesktopVoiceSetup?.(async()=>{setView('today');renderVoiceSetup(await api.voiceStatus?.().catch(()=>null));$('#voice-panel')?.scrollIntoView({block:'nearest'});});
 $('#ask-go').addEventListener('click',()=>{const value=askInput.value.trim();if(!value)return;askInput.value='';submitToNus(value);});
 askInput.addEventListener('keydown',(event)=>{
   if(event.key==='Escape'){askAnswer.classList.add('hidden');state.proposal=null;renderProposal();return;}
@@ -2246,13 +2261,13 @@ const tourSteps=[
   {view:'calendar',rail:'calendar',title:'Calendar is the month as it is',body:'Confirmed deadlines, your smart tasks, and anything you imported, in one grid. Click a day to pull its agenda up beside it.'},
   {view:'tasks',rail:'tasks',title:'Smart tasks turn pressure into steps',body:'Give Nūs an outcome and it proposes a small path you can edit. Nothing schedules itself and nothing runs without you checking it off.'},
   {view:'sources',rail:'semester',title:'Knowledge is what Nūs has read',body:'Under Semester, next to the overview. Courses, unfiled items, and raw imports each keep their own count, so you always know what Nūs read versus what you handed it.'},
-  {view:'companion',rail:'companion',title:'The Knot rides on top of everything',body:'The Nūs Knot floats over your screen, answers "What should I do?" from your real semester, and listens when you ask it to. Ctrl+Shift+Space hides it, Ctrl+Shift+X stops and vanishes in one stroke.',action:{label:'Show me the Knot',run:async()=>{await api.companionControl?.('tour');}}},
+  {view:'companion',rail:'companion',title:'The Knot rides on top of everything',body:`The Nūs Knot floats over your screen, answers "What should I do?" from your real semester, and listens when you ask it to. ${MOD}+Shift+Space hides it, ${MOD}+Shift+X stops and vanishes in one stroke.`,action:{label:'Show me the Knot',run:async()=>{await api.companionControl?.('tour');}}},
   {view:'history',rail:'companion',title:'Every session is kept',body:'Transcripts from the Companion land here, searchable, with the briefing pack that was live at the time. Any session can be uploaded into your Jarvis vault as a note, and you see the exact markdown before it is written.'},
   {view:'settings',rail:'settings',title:'Settings is where the wiring lives',body:'Your two AI keys, email and calendar connections, Companion options, and your school\'s GPA scale all live here. The next three steps cover the ones you actually have to do.'},
   {view:'settings',rail:'settings',title:'Key 1 of 2: Claude, for the desktop app',body:'The AI provider card on this page. Claude reads your syllabi and powers the Ask bar and the chat thread. If Claude Code is installed on this machine, Nūs finds it automatically and there is nothing to paste. If not, put an Anthropic API key in that card. It is encrypted on this device and only ever used to call Anthropic.'},
   {view:'settings',rail:'settings',title:'Key 2 of 2: Gemini, for the Companion',body:'The Companion AI key card, right below the AI provider one. The floating Knot is a separate agent: it sees your screen and listens, so it runs on its own provider to stay fast and cheap. Paste a Google Gemini key there (the free tier at aistudio.google.com/apikey is enough) and the Knot starts answering with AI. Even without it, "What should I do?" answers from your semester on this machine. The Knot\'s own gear icon sets the same key if you prefer.'},
   {view:'settings',rail:'settings',title:'Fix your GPA scale',body:'Scroll to the GPA scale card, or click Data in the left column. Every school maps percentages to letters differently, so match that table to your syllabus or the registrar once. Semester setup and every GPA projection read from it, and Nūs never guesses a missing row.'},
-  {view:'companion',rail:'companion',title:'Driving the Companion',action:{label:'Show me the Knot',run:()=>{api.companionControl?.('tour');}},body:'On screen: click the Knot, then press "What should I do?" or type anything. Ctrl+Enter asks from anywhere, even with no key set. Ctrl+Shift+Space hides or shows it, Ctrl+Shift+X stops listening and vanishes. It keeps running with the hotkeys live after you close this dashboard, and the tray icon brings the dashboard back. Turn off Companion on this pane removes it entirely.'},
+  {view:'companion',rail:'companion',title:'Driving the Companion',action:{label:'Show me the Knot',run:()=>{api.companionControl?.('tour');}},body:`On screen: click the Knot, then press "What should I do?" or type anything. ${MOD}+Enter asks from anywhere, even with no key set. ${MOD}+Shift+Space hides or shows it, ${MOD}+Shift+X stops listening and vanishes. It keeps running with the hotkeys live after you close this dashboard, and the ${IS_MAC?'menu bar':'tray'} icon brings the dashboard back. Turn off Companion on this pane removes it entirely.`},
   {view:'today',rail:null,title:'You are set',body:'That is the tour. Anything you import lands in a review table before it is saved, so nothing enters your semester without you seeing it. You can replay this walkthrough any time from Settings.',done:true},
 ];
 

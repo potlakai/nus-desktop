@@ -249,7 +249,9 @@ test('both API keys are reachable from the desktop app and explained', () => {
   const tour = appJs.slice(appJs.indexOf('const tourSteps=['), appJs.indexOf('let focusPicked='));
   assert.match(tour, /Key 1 of 2/, 'the tour covers the desktop key');
   assert.match(tour, /Key 2 of 2/, 'and the Companion key');
-  assert.match(tour, /Ctrl\+Shift\+Space/, 'and the Companion commands');
+  // The label is ${MOD} (Ctrl on Windows, ⌘ on macOS) since the shortcut is CommandOrControl.
+  assert.match(tour, /\$\{MOD\}\+Shift\+Space/, 'and the Companion commands');
+  assert.match(appJs, /const MOD = IS_MAC \? '⌘' : 'Ctrl'/, 'MOD follows the platform the preload reports');
 });
 
 test('click-through has exactly one state, so the overlay cannot latch dead', () => {
