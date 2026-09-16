@@ -9,7 +9,7 @@ function guideInput(prompt, imageDataUrl) {
   }
   return {
     content,
-    cliArgs: ['--input-format', 'stream-json', '--tools=', '--strict-mcp-config', '--no-session-persistence', '--setting-sources='],
+    cliArgs: ['--input-format', 'stream-json', '--tools=', '--strict-mcp-config', '--no-session-persistence', '--setting-sources=', '--effort', 'low'],
     stdin: JSON.stringify({ type: 'user', message: { role: 'user', content } }) + '\n',
   };
 }

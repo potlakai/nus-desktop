@@ -4,7 +4,6 @@
 // nus-context.js, pointed the other direction.
 const fs = require('fs');
 const path = require('path');
-const { randomUUID } = require('crypto');
 
 const MAX_EVENTS = 40;
 const MAX_TEXT = 4000;
@@ -20,9 +19,7 @@ function appendEvent(baseDir, event) {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (parsed && parsed.schema_version === 1 && Array.isArray(parsed.events)) events = parsed.events;
   } catch {}
-  if (event.id && events.some(e => e.id === event.id)) return true;
   events.push({
-    id: String(event.id || randomUUID()),
     ts: new Date().toISOString(),
     mode: String(event.mode || ''),
     used_screenshot: Boolean(event.used_screenshot),
@@ -32,9 +29,7 @@ function appendEvent(baseDir, event) {
   if (events.length > MAX_EVENTS) events = events.slice(-MAX_EVENTS);
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    const tmp = file + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify({ schema_version: 1, product: 'Nūs', source: 'companion', events }, null, 2));
-    fs.renameSync(tmp, file);
+    fs.writeFileSync(file, JSON.stringify({ schema_version: 1, product: 'Nūs', source: 'companion', events }, null, 2));
     return true;
   } catch {
     return false;

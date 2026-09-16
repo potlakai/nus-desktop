@@ -837,11 +837,13 @@ app.on('before-quit', (event) => {
   try { if (companion?.isCapturing()) companion.setCapturing(false); } catch (error) {
     console.error('[nus] companion shutdown failed', error);
   }
-  if (companion?.isFinalizing()) {
+  // Optional: the Companion may not expose a capture drain (v0.2.6 restored the
+  // day-1 Companion, which stops capture synchronously above).
+  if (typeof companion?.isFinalizing === 'function' && companion.isFinalizing()) {
     event.preventDefault();
     if (!awaitingCaptureQuit) {
       awaitingCaptureQuit = true;
-      companion.drainCapture().finally(() => { awaitingCaptureQuit = false; app.quit(); });
+      Promise.resolve(typeof companion.drainCapture === 'function' ? companion.drainCapture() : null).finally(() => { awaitingCaptureQuit = false; app.quit(); });
     }
     return;
   }

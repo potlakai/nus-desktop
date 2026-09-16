@@ -7,7 +7,7 @@ function stripDataUrl(dataUrl) {
   return m ? { mime: m[1], b64: m[2] } : null;
 }
 
-async function streamOpenAI({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken, baseURL, signal }) {
+async function streamOpenAI({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken, baseURL }) {
   if (DEBUG) console.log('[DEBUG LLM] streamOpenAI called', { model, baseURL, hasImage: !!imageDataUrl, maxTokens });
   const OpenAI = require('openai');
   const client = new OpenAI({ apiKey, baseURL });
@@ -25,7 +25,7 @@ async function streamOpenAI({ apiKey, model, system, turns, imageDataUrl, maxTok
   });
   if (DEBUG) console.log('[DEBUG LLM] streamOpenAI sending request to OpenAI SDK with messages count:', messages.length);
   try {
-    const stream = await client.chat.completions.create({ model, messages, stream: true, max_tokens: maxTokens }, { signal });
+    const stream = await client.chat.completions.create({ model, messages, stream: true, max_tokens: maxTokens });
     let full = '';
     for await (const part of stream) {
       const d = part.choices && part.choices[0] && part.choices[0].delta && part.choices[0].delta.content;
@@ -39,7 +39,7 @@ async function streamOpenAI({ apiKey, model, system, turns, imageDataUrl, maxTok
   }
 }
 
-async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken, signal }) {
+async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken }) {
   if (DEBUG) console.log('[DEBUG LLM] streamAnthropic called', { model, hasImage: !!imageDataUrl, maxTokens });
   const Anthropic = require('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey });
@@ -56,7 +56,7 @@ async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, max
   });
   if (DEBUG) console.log('[DEBUG LLM] streamAnthropic sending request to Anthropic SDK with messages count:', messages.length);
   try {
-    const stream = await client.messages.create({ model, max_tokens: maxTokens, system, messages, stream: true }, { signal });
+    const stream = await client.messages.create({ model, max_tokens: maxTokens, system, messages, stream: true });
     let full = '';
     for await (const ev of stream) {
       if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') { full += ev.delta.text; onToken(ev.delta.text); }
@@ -69,7 +69,7 @@ async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, max
   }
 }
 
-async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken, signal }) {
+async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken }) {
   if (DEBUG) console.log('[DEBUG LLM] streamGemini called', { model, hasImage: !!imageDataUrl, maxTokens });
   const { GoogleGenAI } = require('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
@@ -85,7 +85,7 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
   if (DEBUG) console.log('[DEBUG LLM] streamGemini sending request to Google SDK with contents count:', contents.length);
   try {
     const stream = await ai.models.generateContentStream({
-      model, contents, config: { systemInstruction: system, abortSignal: signal }
+      model, contents, config: { systemInstruction: system }
     });
     let full = '';
     let lastFinishReason = 'UNKNOWN';
@@ -108,7 +108,7 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
 // where the SDK supports it (Gemini); elsewhere the prompt carries the
 // contract and the caller parses tolerantly. Used for pointing, where a
 // small, fast, structured reply matters more than tokens on screen.
-async function completeGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, json, signal }) {
+async function completeGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, json }) {
   const { GoogleGenAI } = require('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
   const contents = turns.map((t, i) => {
@@ -120,7 +120,11 @@ async function completeGemini({ apiKey, model, system, turns, imageDataUrl, maxT
     }
     return { role: t.role === 'assistant' ? 'model' : 'user', parts };
   });
-  const config = { systemInstruction: system, maxOutputTokens: maxTokens, temperature: 0.2, abortSignal: signal };
+  // Gemini 3.x Flash thinks by default and the thinking counts against
+  // maxOutputTokens: a 400-token budget came back as an EMPTY reply on every
+  // guide step (2026-09-15). Thinking off for Flash, and a floor on the budget.
+  const config = { systemInstruction: system, maxOutputTokens: Math.max(Number(maxTokens) || 0, 1024), temperature: 0.2 };
+  if (/flash/i.test(String(model))) config.thinkingConfig = { thinkingBudget: 0 };
   if (json) config.responseMimeType = 'application/json';
   const res = await ai.models.generateContent({ model, contents, config });
   return (res && typeof res.text === 'string') ? res.text : (res && res.text) || '';

@@ -24,6 +24,7 @@
   const PULSE_SPEED = 260;      // px/s of a travelling light
   const PULSE_HALF = 42;        // px of strand lit around a light
   const PULSE_PERIOD = 2600;    // ms between lights while pointing
+  const POINTING_LOOP_MS = 30000; // how long a settled pointer keeps breathing before it holds still
   const UNWIND_MS = 650, UNWIND_PER_PX = 0.25;
   const REWIND_MS = 420, REWIND_PER_PX = 0.12;
 
@@ -76,6 +77,7 @@
     let accent = [120, 144, 255], accentAt = 0;
     const pulses = [];
     let lastPulseAt = 0;
+    let pointingSince = 0;        // when the tip settled; the breathing loop runs from here
     let arrived = false;
 
     function size() {
@@ -216,9 +218,14 @@
       const k = clamp((now - moveAt) / moveMs, 0, 1);
       progress = fromP + (toP - fromP) * (toP > fromP ? easeInOut(k) : easeOut(k));
       if (knot.setUnravel) knot.setUnravel(clamp(progress * 1.6, 0, 1));
-      if (state === 'unwinding' && k >= 1 && !arrived) { arrived = true; state = 'pointing'; onArrive(); }
+      if (state === 'unwinding' && k >= 1 && !arrived) {
+        arrived = true; state = 'pointing';
+        // The tip light marks the arrival; the first travelling light leaves one period later.
+        pointingSince = now; lastPulseAt = now; pulses.length = 0;
+        onArrive();
+      }
       if (state === 'rewinding' && k >= 1) {
-        state = 'idle'; progress = 0; pulses.length = 0; tipPoint = null; target = null; path = []; oldPath = []; control = null;
+        state = 'idle'; progress = 0; pulses.length = 0; lastPulseAt = 0; pointingSince = 0; tipPoint = null; target = null; path = []; oldPath = []; control = null;
         drawDebug();
         stop();
         onRewound();
@@ -273,7 +280,14 @@
         pulses.length = 0;
         pulses.push({ len: Math.max(0, visible - 14), lead: true });
       } else if (state === 'pointing') {
-        pulses.length = 0;
+        // A light leaves the Knot every PULSE_PERIOD and runs to the tip at
+        // PULSE_SPEED, so a settled pointer still reads as alive and directional.
+        if (!lastPulseAt || now - lastPulseAt >= PULSE_PERIOD) { lastPulseAt = now; pulses.push({ at: now }); }
+        for (let i = pulses.length - 1; i >= 0; i--) {
+          const pulse = pulses[i];
+          pulse.len = pulse.lead ? pulse.len : ((now - pulse.at) / 1000) * PULSE_SPEED;
+          if (pulse.lead || pulse.len > visible + PULSE_HALF) pulses.splice(i, 1);
+        }
       } else if (state === 'rewinding') {
         pulses.length = 0;
       }
@@ -294,7 +308,9 @@
       const targetStrength = state === 'pointing' ? 1 : (state === 'unwinding' ? smooth((progress - 0.9) / 0.1) : smooth((progress - 0.85) / 0.15));
       drawTarget(now, targetStrength);
       drawDebug();
-      if (state === 'pointing' && now - blendAt >= 300) { stop(); return; }
+      // A settled pointer breathes (ring, strand, travelling lights) for a
+      // while, then holds still to spare the CPU. Retargeting restarts it.
+      if (state === 'pointing' && now - blendAt >= 300 && (reduced || now - pointingSince >= POINTING_LOOP_MS)) { stop(); return; }
       loop();
     }
 
@@ -320,6 +336,7 @@
           // Already out: stay out, the path blend carries the tip to the new box.
           moveTo(1, 1, now);
           arrived = true;
+          pointingSince = now; lastPulseAt = now; pulses.length = 0;
           if (reduced) draw(now);
           else start();
           onArrive();

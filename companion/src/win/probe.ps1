@@ -27,6 +27,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 public static class NusWin {
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+  [DllImport("user32.dll")] public static extern long GetWindowLongPtrW(IntPtr h, int i);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vk);
@@ -38,8 +40,6 @@ public static class NusWin {
   [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint flags);
   [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr h, uint cmd);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
-  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
-  [DllImport("user32.dll")] public static extern long GetWindowLongPtrW(IntPtr h, int i);
   [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; }
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L; public int T; public int R; public int B; }
   public static string Title(IntPtr h) { var sb = new StringBuilder(1024); GetWindowTextW(h, sb, 1024); return sb.ToString(); }
@@ -47,11 +47,6 @@ public static class NusWin {
   public static int[] Cursor() { POINT p; GetCursorPos(out p); return new int[] { p.X, p.Y }; }
   public static int[] Rect(IntPtr h) { RECT r; if (!GetWindowRect(h, out r)) return null; return new int[] { r.L, r.T, r.R, r.B }; }
   public static bool Down(int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
-  // WS_EX_TRANSPARENT: the window never receives mouse input, so it is never
-  // "the window under the cursor" nor "the app in front" (another Companion
-  // instance, Discord/GeForce style overlays; measured 2026-09-10 with the
-  // installed Nus 0.2.3 running beside the dev tree).
-  public static bool ClickThrough(IntPtr h) { return ((long)GetWindowLongPtrW(h, -20) & 0x20) != 0; }
   // Top-level window under a point, skipping windows owned by `ignorePid`
   // (the Companion's own transparent overlay covers the whole work area).
   public static IntPtr TopWindowAt(int x, int y, uint ignorePid) {
@@ -61,7 +56,7 @@ public static class NusWin {
     h = GetAncestor(h, 2);
     int guard = 0;
     while (h != IntPtr.Zero && guard++ < 512) {
-      if (IsWindowVisible(h) && Pid(h) != ignorePid && !ClickThrough(h)) {
+      if (IsWindowVisible(h) && Pid(h) != ignorePid) {
         RECT r;
         if (GetWindowRect(h, out r) && x >= r.L && x < r.R && y >= r.T && y < r.B) return h;
       }
@@ -87,7 +82,6 @@ $cache.Add($AE::AutomationIdProperty)
 $cache.Add($AE::BoundingRectangleProperty)
 $cache.Add($AE::IsOffscreenProperty)
 $cache.Add($AE::ProcessIdProperty)
-$cache.Add($AE::IsPasswordProperty)
 $cache.TreeScope = [System.Windows.Automation.TreeScope]::Element
 
 # Controls a person can act on. Containers are descended, not reported.
@@ -107,7 +101,6 @@ function Type-Name($el, $cached) {
   try {
     $ct = if ($cached) { $el.Cached.ControlType } else { $el.Current.ControlType }
     $n = $ct.ProgrammaticName
-    if (-not $n) { return '' }   # File Explorer exposes elements with a null programmatic name; a null key aborted the whole walk
     if ($n -like 'ControlType.*') { return $n.Substring(12) }
     return $n
   } catch { return '' }
@@ -128,9 +121,7 @@ function Describe($el, $cached, $id) {
   try { $name = [string]$props.Name } catch {}
   try { $auto = [string]$props.AutomationId } catch {}
   try { $procId = [int]$props.ProcessId } catch {}
-  $password = $false
-  try { $password = [bool]$props.IsPassword } catch { $password = $true }
-  return @{ id=$id; name=$name; type=(Type-Name $el $cached); automationId=$auto; rect=(Rect-Of $el $cached); pid=$procId; isPassword=$password }
+  return @{ id=$id; name=$name; type=(Type-Name $el $cached); automationId=$auto; rect=(Rect-Of $el $cached); pid=$procId }
 }
 
 # The window the user is working in. When our own window (the overlay the
@@ -143,7 +134,7 @@ function Get-Foreground($ignore) {
     $skipped = $true
     $n = [NusWin]::GetWindow($h, 2); $guard = 0
     while ($n -ne [IntPtr]::Zero -and $guard++ -lt 512) {
-      if ([NusWin]::IsWindowVisible($n) -and [NusWin]::Pid($n) -ne [uint32]$ignore -and -not [NusWin]::ClickThrough($n)) {
+      if ([NusWin]::IsWindowVisible($n) -and [NusWin]::Pid($n) -ne [uint32]$ignore) {
         $t = [NusWin]::Title($n)
         $rr = [NusWin]::Rect($n)
         if ($t -and $t -ne 'Program Manager' -and $rr -and ($rr[2] - $rr[0]) -gt 120 -and ($rr[3] - $rr[1]) -gt 80) { $h = $n; break }
@@ -248,18 +239,13 @@ function Handle($req) {
           if ($area -lt $bestArea) { $best = $e; $bestArea = $area }
         }
       }
-      $wr = [NusWin]::Rect($h)
-      $winArea = if ($wr) { [double]($wr[2] - $wr[0]) * [double]($wr[3] - $wr[1]) } else { 0 }
-      if (-not $best -or ($winArea -gt 0 -and $bestArea -gt 0.25 * $winArea)) {
-        # Nothing interactive contains the point, or the only one is most of
-        # the window (a chat message list, a document body; measured 2026-09-10
-        # in ChatGPT: "Chat messages"): fall back to UIA's own hit test, the
-        # deepest element under the point, as long as it is smaller and not
-        # our overlay.
+      if (-not $best) {
+        # Nothing interactive contains the point: fall back to UIA's own hit
+        # test, as long as it is not our overlay.
         try {
           $pt = New-Object System.Windows.Point ([double]$x), ([double]$y)
           $el = $AE::FromPoint($pt)
-          if ($el) { $d = Describe $el $false 0; if ($d.pid -ne $ignore -and $d.rect -and (-not $best -or ([double]$d.rect.w * [double]$d.rect.h) -lt $bestArea)) { $best = $d; $best.fallback = $true } }
+          if ($el) { $d = Describe $el $false 0; if ($d.pid -ne $ignore -and $d.rect) { $best = $d; $best.fallback = $true } }
         } catch {}
       }
       return @{ element=$best; hwnd=[int64]$h; window=@{ title=[NusWin]::Title($h); pid=[int][NusWin]::Pid($h) }; searched=$r.elements.Count; truncated=$r.truncated; ms=$r.ms }

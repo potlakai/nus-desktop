@@ -4,7 +4,6 @@
 // "did the screen change" hash, and the "was that click on the target" test.
 // Pure functions; Electron's screen conversions are injected.
 'use strict';
-const { sensitiveTarget } = require('./sensitive');
 
 const CHANGE_THRESHOLD = 6;      // hamming bits out of 256
 
@@ -65,27 +64,29 @@ function iou(a, b) {
 //   found:    probe uia.find result for the label, or null
 //   verified: false when no probe exists (model-only pointing, marked so)
 function reconcile({ target, elements, bboxPhys, fromPoint, found, verified = true }) {
-  if (sensitiveTarget(target) || sensitiveTarget(fromPoint) || sensitiveTarget(found)) return null;
   if (!target) return null;
   if (target.kind === 'element') {
     const el = (elements || []).find((e) => Number(e.id) === Number(target.id));
-    return el && el.rect && !sensitiveTarget(el) ? { rect: el.rect, name: el.name || '', type: el.type || '', source: 'element', verified: true } : null;
+    return el && el.rect ? { rect: el.rect, name: el.name || '', type: el.type || '', source: 'element', verified: true } : null;
   }
   if (target.kind !== 'bbox' || !bboxPhys) return null;
   const label = target.label || '';
   if (fromPoint && fromPoint.rect) {
     const nameOk = label && tokenOverlap(fromPoint.name, label) >= 0.5;
     const boxOk = iou(fromPoint.rect, bboxPhys) >= 0.3;
-    if (nameOk && boxOk) return { rect: fromPoint.rect, name: fromPoint.name || label, type: fromPoint.type || '', source: 'frompoint-name', verified: true };
+    if (nameOk || boxOk) return { rect: fromPoint.rect, name: fromPoint.name || label, type: fromPoint.type || '', source: nameOk ? 'frompoint-name' : 'frompoint-box', verified: true };
   }
-  if (found && found.rect && tokenOverlap(found.name, label) >= 0.5 && iou(found.rect, bboxPhys) >= 0.3) {
+  if (found && found.rect && iou(found.rect, bboxPhys) >= 0.3) {
     return { rect: found.rect, name: found.name || label, type: found.type || '', source: 'find', verified: true };
   }
-  if (!verified) {
-    // No probe on this machine: the model's box, flagged as unverified.
-    return { rect: bboxPhys, name: label, type: '', source: 'model', verified: false };
-  }
-  return null;
+  // Windows could not confirm the box: no probe on this machine, or an app that
+  // exposes nothing useful to UI Automation (video editors, games, many
+  // Electron apps). Point at the model's box anyway, flagged so the bubble says
+  // it is a guess. Pranav, 2026-09-15: refusing helped nobody in CapCut; a
+  // marked guess keeps the walkthrough moving and the re-read after the click
+  // catches a miss.
+  void verified;
+  return { rect: bboxPhys, name: label, type: '', source: 'model', verified: false };
 }
 
 // 16x16 grayscale mean hash of a BGRA bitmap -> 32 bytes (256 bits).
@@ -118,11 +119,12 @@ function screenChanged(prev, next, threshold = CHANGE_THRESHOLD) {
   return hamming(prev.whole, next.whole) > threshold;
 }
 
-// Keep slack close to each edge; a wide control must not accept distant clicks.
+// A click counts when it lands within the target's radius (physical px).
 function clickHits(point, rect) {
   if (!point || !rect) return false;
-  return point.x >= rect.x - 12 && point.x <= rect.x + rect.w + 12 &&
-    point.y >= rect.y - 12 && point.y <= rect.y + rect.h + 12;
+  const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+  const r = Math.max(24, Math.hypot(rect.w, rect.h) / 2 + 12);
+  return Math.hypot(point.x - cx, point.y - cy) <= r;
 }
 
 module.exports = { normRectFromPhys, physRectFromNorm, physRectToWindow, tokenOverlap, iou, reconcile, bitmapHash, hamming, screenChanged, clickHits, CHANGE_THRESHOLD };

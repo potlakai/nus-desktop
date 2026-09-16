@@ -34,10 +34,11 @@ test('an element id from the list is the preferred, verified target', () => {
 
 test('unknown ids, low confidence, oversized or out-of-range boxes are rejected', () => {
   assert.equal(validatePoint({ instruction: 'x', target: { kind: 'element', id: 9 }, confidence: 0.9 }, elements).ok, false);
-  assert.equal(validatePoint({ instruction: 'x', target: { kind: 'element', id: 1 }, confidence: 0.3 }, elements).reason, 'low confidence');
+  assert.equal(validatePoint({ instruction: 'x', target: { kind: 'element', id: 1 }, confidence: 0.2 }, elements).reason, 'low confidence');
+  assert.equal(validatePoint({ instruction: 'x', target: { kind: 'element', id: 1 }, confidence: 0.35 }, elements).ok, true, 'a hedged pick from the Windows list is pointed at (labelled a guess), 2026-09-15');
   assert.equal(validatePoint({ instruction: 'x', target: { kind: 'bbox', x: 0.1, y: 0.1, w: 0.6, h: 0.6 }, confidence: 0.9 }, elements).reason, 'bbox too large');
   assert.equal(validatePoint({ instruction: 'x', target: { kind: 'bbox', x: 0.9, y: 0.1, w: 0.3, h: 0.1 }, confidence: 0.9 }, elements).reason, 'bbox out of range');
-  assert.equal(validatePoint({ instruction: 'x', target: { kind: 'bbox', x: 0.1, y: 0.1, w: 0.1, h: 0.1, label: 'Save' }, confidence: 0.65 }, elements, { verified: false }).reason, 'low confidence', 'model-only pointing needs more confidence');
+  assert.equal(validatePoint({ instruction: 'x', target: { kind: 'bbox', x: 0.1, y: 0.1, w: 0.1, h: 0.1, label: 'Save' }, confidence: 0.45 }, elements, { verified: false }).reason, 'low confidence', 'model-only pointing needs more confidence');
   assert.equal(validatePoint({ instruction: 'x', target: { kind: 'bbox', x: 0.1, y: 0.1, w: 0.1, h: 0.1, label: 'Save' }, confidence: 0.65 }, elements).ok, true);
   assert.equal(validatePoint({ instruction: '', target: null }, elements).ok, false);
   assert.equal(validatePoint(null, elements).ok, false);

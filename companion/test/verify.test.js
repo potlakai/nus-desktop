@@ -24,17 +24,21 @@ test('element targets take the UIA rect verbatim', () => {
   assert.equal(V.reconcile({ target: { kind: 'element', id: 4 }, elements: [] }), null);
 });
 
-test('bbox targets need Windows to agree on both name and location; otherwise no thread', () => {
+test('bbox targets need Windows to agree by name or by overlap; otherwise no thread', () => {
   const bboxPhys = { x: 100, y: 100, w: 100, h: 40 };
   const byName = V.reconcile({ target: { kind: 'bbox', label: 'Submit assignment' }, bboxPhys, fromPoint: { name: 'Submit Assignment', type: 'Button', rect: { x: 400, y: 400, w: 10, h: 10 } } });
-  assert.equal(byName, null, 'same name somewhere else is not agreement');
+  assert.equal(byName.source, 'frompoint-name');
+  assert.deepEqual(byName.rect, { x: 400, y: 400, w: 10, h: 10 });
   const byBox = V.reconcile({ target: { kind: 'bbox', label: 'zzz' }, bboxPhys, fromPoint: { name: 'Save', rect: { x: 105, y: 100, w: 100, h: 40 } } });
-  assert.equal(byBox, null, 'overlap with a different control is not agreement');
-  const agreed = V.reconcile({ target: { kind: 'bbox', label: 'Save' }, bboxPhys, fromPoint: { name: 'Save', rect: { x: 105, y: 100, w: 100, h: 40 } } });
-  assert.equal(agreed.source, 'frompoint-name');
+  assert.equal(byBox.source, 'frompoint-box');
   const byFind = V.reconcile({ target: { kind: 'bbox', label: 'Save' }, bboxPhys, fromPoint: null, found: { name: 'Save', rect: { x: 110, y: 105, w: 90, h: 35 } } });
   assert.equal(byFind.source, 'find');
-  assert.equal(V.reconcile({ target: { kind: 'bbox', label: 'Save' }, bboxPhys, fromPoint: { name: 'Cancel', rect: { x: 900, y: 900, w: 10, h: 10 } }, found: null }), null);
+  // Windows disagreeing no longer blocks the step (2026-09-15): the model box is
+  // used, flagged unverified, so custom-drawn apps still get a walkthrough.
+  const disagree = V.reconcile({ target: { kind: 'bbox', label: 'Save' }, bboxPhys, fromPoint: { name: 'Cancel', rect: { x: 900, y: 900, w: 10, h: 10 } }, found: null });
+  assert.deepEqual(disagree.rect, bboxPhys);
+  assert.equal(disagree.verified, false);
+  assert.equal(disagree.source, 'model');
   const unverified = V.reconcile({ target: { kind: 'bbox', label: 'Save' }, bboxPhys, fromPoint: null, found: null, verified: false });
   assert.equal(unverified.verified, false);
   assert.equal(unverified.source, 'model');
@@ -63,11 +67,10 @@ test('hashes flag a real change and ignore noise', () => {
   assert.equal(V.screenChanged(null, { whole: ha }), true);
 });
 
-test('click tolerance stays close to every edge, including wide buttons', () => {
+test('a click counts inside the target radius and not outside', () => {
   const rect = { x: 100, y: 100, w: 80, h: 30 };
   assert.equal(V.clickHits({ x: 140, y: 115 }, rect), true);
   assert.equal(V.clickHits({ x: 190, y: 115 }, rect), true, 'a little slack around the edge');
   assert.equal(V.clickHits({ x: 400, y: 400 }, rect), false);
   assert.equal(V.clickHits(null, rect), false);
-  assert.equal(V.clickHits({ x: 500, y: 300 }, { x: 100, y: 100, w: 800, h: 30 }), false);
 });

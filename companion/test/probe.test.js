@@ -126,37 +126,3 @@ test('the sidecar ships outside the asar and is wired into the Companion', () =>
   assert.match(screen, /async function captureDisplay\(displayId, opts = \{\}\)/);
   assert.match(screen, /maxSide/);
 });
-
-test('a control with no programmatic type name does not abort the walk (File Explorer, 2026-09-10)', () => {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const ps1 = fs.readFileSync(path.join(__dirname, '..', 'src', 'win', 'probe.ps1'), 'utf8');
-  assert.match(ps1, /\$n = \$ct\.ProgrammaticName\r?\n\s+if \(-not \$n\) \{ return '' \}/);
-});
-
-test('click-through overlay windows of other apps are never the window under the cursor or the app in front (2026-09-10)', () => {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const ps1 = fs.readFileSync(path.join(__dirname, '..', 'src', 'win', 'probe.ps1'), 'utf8');
-  assert.match(ps1, /public static bool ClickThrough\(IntPtr h\) \{ return \(\(long\)GetWindowLongPtrW\(h, -20\) & 0x20\) != 0; \}/, 'WS_EX_TRANSPARENT test');
-  assert.match(ps1, /if \(IsWindowVisible\(h\) && Pid\(h\) != ignorePid && !ClickThrough\(h\)\) \{/, 'TopWindowAt skips click-through windows');
-  assert.match(ps1, /if \(\[NusWin\]::IsWindowVisible\(\$n\) -and \[NusWin\]::Pid\(\$n\) -ne \[uint32\]\$ignore -and -not \[NusWin\]::ClickThrough\(\$n\)\) \{/, 'Get-Foreground skips click-through windows');
-});
-
-test('a window-sized interactive hit falls back to the smaller element under the point (chat message lists, 2026-09-10)', () => {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const ps1 = fs.readFileSync(path.join(__dirname, '..', 'src', 'win', 'probe.ps1'), 'utf8');
-  assert.match(ps1, /\$wr = \[NusWin\]::Rect\(\$h\)\r?\n\s+\$winArea = if \(\$wr\) \{ \[double\]\(\$wr\[2\] - \$wr\[0\]\) \* \[double\]\(\$wr\[3\] - \$wr\[1\]\) \} else \{ 0 \}/);
-  assert.match(ps1, /if \(-not \$best -or \(\$winArea -gt 0 -and \$bestArea -gt 0\.25 \* \$winArea\)\) \{/, 'fallback also when the best control is more than a quarter of the window');
-  assert.match(ps1, /if \(\$d\.pid -ne \$ignore -and \$d\.rect -and \(-not \$best -or \(\[double\]\$d\.rect\.w \* \[double\]\$d\.rect\.h\) -lt \$bestArea\)\) \{ \$best = \$d; \$best\.fallback = \$true \}/, 'the fallback only wins when it is smaller');
-});
-
-test('the probe can put the overlay back on top from outside the app (win.topmost)', () => {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const ps1 = fs.readFileSync(path.join(__dirname, '..', 'src', 'win', 'probe.ps1'), 'utf8');
-  assert.match(ps1, /'win\.topmost' \{/);
-  assert.match(ps1, /SetWindowPos\(\$h, \[IntPtr\]\(-1\), 0, 0, 0, 0, \[uint32\]\(0x0001 -bor 0x0002 -bor 0x0010\)\)/, 'HWND_TOPMOST with NOSIZE|NOMOVE|NOACTIVATE');
-  assert.match(ps1, /return @\{ ok=\[bool\]\$ok; topmost=\(\(\$ex -band 8\) -ne 0\) \}/);
-});

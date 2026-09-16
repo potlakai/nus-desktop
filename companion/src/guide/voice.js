@@ -21,17 +21,4 @@ function classifyUtterance(text) {
   return { kind: 'ask', text: t };
 }
 
-const PARTIAL_WINDOW_S = 20;
-// Incremental preview: the audio after the frozen head is transcribed on each
-// pass; once that segment is longer than windowS it is frozen into the head
-// (its text kept, its end remembered) so every pass stays bounded.
-// -> { head: frozen text or null, pcm: the audio to transcribe now, freeze }
-function partialWindow(whole, partialHead, windowS) {
-  const bytes = windowS * 16000 * 2;
-  const headEnd = partialHead && partialHead.text ? Math.min(whole.length, partialHead.endSample * 2) : 0;
-  const pcm = headEnd ? whole.subarray(headEnd) : whole;
-  return { head: headEnd ? partialHead.text : null, pcm, freeze: pcm.length >= bytes };
-}
-
-module.exports = { cleanTranscript, classifyUtterance, partialWindow, PARTIAL_WINDOW_S };
-
+module.exports = { cleanTranscript, classifyUtterance };

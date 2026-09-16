@@ -1,0 +1,6 @@
+/* Knot look only (from quiet-knot.css, 2026-09-15): silver at rest, violet-blue thinking.
+   Amber reading is re-asserted because #orb.k3d would otherwise beat styles.css. */
+#orb, #orb.k3d { --knot-accent: #d6dbea; }
+#toolbar[data-knot-state='listening'] #orb { --knot-accent: #d6dbea; }
+#toolbar[data-knot-state='thinking'] #orb { --knot-accent: #8c96ff; }
+#toolbar[data-knot-state='reading'] #orb { --knot-accent: #E0B663; }

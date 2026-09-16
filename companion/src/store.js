@@ -26,7 +26,6 @@ const DEFAULTS = {
   deepQueryUrl: 'http://127.0.0.1:8765/api/ask',
   // Read replies aloud. On for rehearsal, off during a real call.
   speakReplies: false,
-  reducedMotion: false,
   // Explicit opt-in. When false, the Companion can show that Nūs is linked but
   // never sends the shared semester snapshot to an external model provider.
   shareNusContextWithProvider: false,
@@ -58,6 +57,11 @@ const DEFAULTS = {
   snoozes: {},
   // Master switch for the Knot speaking first (plan nudges, app hints).
   proactive: true,
+  // Proactive nudges the user said "not now" to: trigger key -> the day
+  // (YYYY-MM-DD) it stays quiet. Cleared naturally by the date changing.
+  snoozes: {},
+  // Master switch for the Knot speaking first (plan nudges, app hints).
+  proactive: true,
   // Which display the overlay covers (Electron display id); null = primary.
   knotDisplayId: null,
   // Date (YYYY-MM-DD) the proactive daily line was last shown, so it fires
@@ -72,7 +76,8 @@ const DEFAULTS = {
   models: {
     openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' },
     anthropic: { fast: 'claude-haiku-4-5', smart: 'claude-sonnet-5' },
-    gemini: { fast: 'gemini-2.5-flash', smart: 'gemini-2.5-pro' },
+    // 2026-09-15: gemini-2.5-* returns 404 "no longer available to new users".
+    gemini: { fast: 'gemini-3.6-flash', smart: 'gemini-3.6-pro' },
     nvidia: { fast: 'meta/llama-3.2-11b-vision-instruct', smart: 'meta/llama-3.2-90b-vision-instruct' }
   }
 };
@@ -86,6 +91,15 @@ const RETIRED_MODELS = {
   anthropic: {
     'claude-3-5-haiku-latest': 'claude-haiku-4-5',
     'claude-3-5-sonnet-latest': 'claude-sonnet-5',
+  },
+  // 2026-09-16: gemini-2.5-* and 2.0 return 404 for new users; a v0.2.5
+  // settings file that ever opened Settings carries them.
+  gemini: {
+    'gemini-2.5-flash': 'gemini-3.6-flash',
+    'gemini-2.5-pro': 'gemini-3.6-pro',
+    'gemini-2.0-flash': 'gemini-3.6-flash',
+    'gemini-1.5-flash': 'gemini-3.6-flash',
+    'gemini-1.5-pro': 'gemini-3.6-pro',
   },
 };
 
@@ -206,21 +220,20 @@ function load() {
 function save() {
   try {
     const json = JSON.stringify(data, null, 2);
-    const tmp = FILE + '.tmp';
     if (safeStorage.isEncryptionAvailable()) {
       const payload = safeStorage.encryptString(json).toString('base64');
-      fs.writeFileSync(tmp, JSON.stringify({ encrypted: true, payload }), { mode: 0o600 });
+      fs.writeFileSync(FILE, JSON.stringify({ encrypted: true, payload }), { mode: 0o600 });
     } else {
-      fs.writeFileSync(tmp, json, { mode: 0o600 });
+      fs.writeFileSync(FILE, json, { mode: 0o600 });
     }
-    fs.renameSync(tmp, FILE);
-    return true;
-  } catch (e) { return false; }
+  } catch (e) { /* ignore */ }
 }
 
 module.exports = {
   getSettings() { return load(); },
-  setSettings(patch) { load(); const previous = data; data = deepMerge(data, patch || {}); if (!save()) { data = previous; throw new Error('Could not save Companion settings'); } return data; },
+  setSettings(patch) { load(); data = deepMerge(data, patch || {}); save(); return data; },
   // One-time note if the standalone Companion's settings could not be migrated.
-  migrationNote() { load(); return migrationNote; }
+  migrationNote() { load(); return migrationNote; },
+  // Pure helper, exported for the test suite.
+  _retireDeadModels: retireDeadModels,
 };

@@ -51,7 +51,7 @@ function createWalkthroughs(opts = {}) {
       const tmp = file + '.tmp';
       fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
       fs.renameSync(tmp, file);
-    } catch (e) { log('save failed: ' + e.message); data = load(); throw e; }
+    } catch (e) { log('save failed: ' + e.message); }
   }
 
   function get(key) { return data.walkthroughs.find((w) => w.key === key) || null; }
@@ -86,11 +86,10 @@ function createWalkthroughs(opts = {}) {
     const proc = String(process || '').toLowerCase();
     if (!proc || !task) return null;
     const exact = get(keyFor(proc, task));
-    if (exact && !exact.stale && (!BROWSERS.has(proc) || (title && exact.app.title && tokenOverlap(exact.app.title, title) >= 0.5))) return exact;
+    if (exact && !exact.stale) return exact;
     let best = null, bestScore = 0;
     for (const w of data.walkthroughs) {
       if (w.stale || w.app.process !== proc) continue;
-      if (BROWSERS.has(proc) && (!title || !w.app.title || tokenOverlap(w.app.title, title) < 0.5)) continue;
       let score = tokenOverlap(w.task, task);
       // In a browser the process says nothing about the site: the tab title has to agree too.
       if (BROWSERS.has(proc) && title && w.app.title && tokenOverlap(w.app.title, title) < 0.5) score *= 0.5;

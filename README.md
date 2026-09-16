@@ -103,11 +103,17 @@ The Knot floats on your desktop, keeps running after you close the dashboard,
 and comes back from the tray. **Turn off Companion** on the Knot pane removes
 it completely and releases the hotkeys until you turn it back on.
 
+Click the Knot and type what you need ("show me how to add a chart"), or hold
+the push-to-talk key and say it. The Knot reads the screen once, a strand runs
+to the one control to click, and a bubble at the tip says the step. Click it
+and the Knot re-reads the screen for the next step; Esc winds it back. When
+the task is done you can Keep the steps, and the same ask in the same app
+replays them without a model call.
+
 Point at a button, an error, or any spot on the Knot's display and press
-`Ctrl+Shift+T`: a strand runs from the Knot to that spot and you get a small
-preview of the nearby area. Choose Ask (no screen at all), Explain, Fix, or
-Guide, type a line or just press Enter, and only that preview goes to Claude
-when you press Send. Sensitive fields such as password boxes are refused.
+`Ctrl+Shift+T`: the strand runs to that control, you type a question about it,
+and the answer lands at the tip with "Walk me through it" to turn it into a
+step-by-step guide. Sensitive fields such as password boxes are refused.
 Pointing works on the display the Knot lives on; other monitors are next.
 
 | Keys | Action |

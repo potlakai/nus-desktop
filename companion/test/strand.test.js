@@ -87,6 +87,6 @@ test('dismissal always winds back before the Knot goes idle, and Skip is the def
   assert.match(js, /strand\.rewind\(\)/);
   assert.match(js, /keepTimer = setTimeout\(\(\) => answerKeep\(false, true\), 12000\)/);
   assert.match(main, /Escape/, 'the harness releases Esc when the thread is home');
-  assert.match(main, /registerInspectionShortcut\(globalShortcut, inspectAtCursor\)/, 'public pointing shortcut registration is checked');
+  assert.match(main, /CommandOrControl\+Shift\+T/, 'founder harness hotkey');
   assert.match(main, /'commandorcontrol\+shift\+t'/, 'reserved so the ask shortcut cannot take it');
 });

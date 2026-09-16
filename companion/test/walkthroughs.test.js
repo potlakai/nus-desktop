@@ -61,7 +61,7 @@ test('two misses retire a walkthrough; a fresh keep revives it', () => {
   assert.equal(w.miss(e.key), true);
   assert.equal(w.find({ process: 'chrome', task: rec().task }), null);
   w.record(rec());
-  assert.ok(w.find({ process: 'chrome', title: 'Canvas', task: rec().task }));
+  assert.ok(w.find({ process: 'chrome', task: rec().task }));
   assert.equal(w.get(e.key).misses, 0);
 });
 

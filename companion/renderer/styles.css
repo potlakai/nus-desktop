@@ -953,3 +953,7 @@ html:not(.founder) [data-founder] { display: none !important; }
 }
 #knot-hint::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 7px 1px 0; border-radius: 50%; background: #69E2CF; }
 #knot-hint:hover { border-color: rgba(105,226,207,.45); }
+
+/* While the one-line composer is open the capsule stays folded: the two used
+   to overlap by the Knot (Pranav, 2026-09-15). */
+#toolbar.quick-open #knot-bloom { opacity: 0 !important; transform: translateX(-18px) scaleX(.84) !important; pointer-events: none !important; }

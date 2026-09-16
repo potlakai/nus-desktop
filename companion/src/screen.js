@@ -30,8 +30,7 @@ async function captureDisplay(displayId, opts = {}) {
   const pxWidth = Math.floor(display.size.width * scale), pxHeight = Math.floor(display.size.height * scale);
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: pxWidth, height: pxHeight } });
   if (!sources.length) return null;
-  const src = sources.find((s) => String(s.display_id) === String(display.id));
-  if (!src) return null; // Do not silently capture a different monitor.
+  const src = sources.find((s) => String(s.display_id) === String(display.id)) || sources[0];
   let img = src.thumbnail;
   if (!img || img.isEmpty()) return null;
   const size = img.getSize();
