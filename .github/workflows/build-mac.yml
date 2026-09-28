@@ -48,7 +48,7 @@ jobs:
         run: npm test
 
       - name: Build dmgs (arm64 + x64)
-        run: npm run dist:mac
+        run: npm run dist:mac -- --publish never
 
       - name: Scan the packed asar
         run: node scripts/package-security-check.js dist/mac-arm64/Nus.app/Contents/Resources/app.asar
