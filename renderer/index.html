@@ -303,6 +303,18 @@
               </div>
               <span id="stats-badge" class="status-badge good">On</span>
             </section>
+            <section class="setting-card" id="memory-card">
+              <div>
+                <div class="section-kicker">What Nūs knows</div>
+                <h3>About you</h3>
+                <p>Facts Nūs uses to answer like someone who knows you: your name, school, courses, how you like to be helped. Kept on this device and never sent anywhere but your own AI. Card and identity numbers are kept private and never put in a prompt.</p>
+                <div id="memory-list" class="memory-list"></div>
+                <form id="memory-add" class="memory-form"><select id="memory-key" aria-label="Kind"><option value="note">Note</option><option value="name.full">Name</option><option value="school">School</option><option value="major">Major</option><option value="year">Year</option><option value="email">Email</option></select><input id="memory-value" placeholder="I take CS 2110 with Professor Lee" aria-label="Fact" maxlength="500"><button type="submit" class="ghost">Add</button></form>
+                <details class="memory-import-box"><summary>Bring what ChatGPT or Claude already knows</summary><p class="muted">Copy the prompt, paste it into your assistant, then paste its answer here.</p><div class="memory-form"><button type="button" id="memory-prompt" class="ghost">Copy the prompt</button><select id="memory-source" aria-label="Source"><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="gemini">Gemini</option></select></div><textarea id="memory-paste" rows="4" placeholder="name: ...&#10;school: ...&#10;one fact per line"></textarea><div class="memory-form"><button type="button" id="memory-import" class="ghost">Import</button><button type="button" id="memory-forget-source" class="ghost" hidden>Remove imported</button></div></details>
+                <div class="sheet-actions"><span id="memory-note"></span></div>
+              </div>
+              <span id="memory-badge" class="status-badge">Local</span>
+            </section>
             <section class="setting-card" id="bridge-card"><div><div class="section-kicker">Companion</div><h3 id="bridge-title">Checking shared context…</h3><p id="bridge-copy">The overlay reads a minimal semester snapshot, never the database file.</p></div><span id="bridge-badge" class="status-badge">Checking</span></section>
             <section class="setting-card" id="sync-card" hidden>
               <div>

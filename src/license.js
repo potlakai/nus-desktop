@@ -1,4 +1,5 @@
 const OFFLINE_GRACE_MS = 72 * 60 * 60 * 1000;
+const REFRESH_TIMEOUT_MS = 4000;
 
 // Funnel events used to be inserted into public.events from here, keyed on the
 // signed-in user, which meant anonymous installs (most of them) never counted.
@@ -60,10 +61,13 @@ function createLicense({ auth, config, cacheStore, fetchImpl = global.fetch, clo
     }
 
     try {
+      // A slow or paused Supabase must never hold the app: the cached state
+      // answers after the timeout and the next refresh tries again.
       const response = await fetchImpl(`${config.supabase.url}/rest/v1/rpc/entitlement`, {
         method: 'POST',
         headers: authHeaders(token),
         body: '{}',
+        signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(REFRESH_TIMEOUT_MS) : undefined,
       });
       if (!response.ok) throw new Error(`entitlement_${response.status}`);
       const payload = await response.json();

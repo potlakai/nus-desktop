@@ -4,6 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
+// Line endings are normalised: git stores LF, but a checkout with
+// core.autocrlf gives CRLF, and some contracts below match across lines.
+const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8').replace(/\r\n/g, '\n');
 const html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
 const js = fs.readFileSync(path.join(root, 'renderer', 'renderer.js'), 'utf8');
@@ -75,7 +78,7 @@ test('a double-click on the Knot is one activation and never dismisses the compo
 });
 
 test('the overlay re-asserts always-on-top after a fullscreen app strips it', () => {
-  const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
+  const main = read('index.js');
   assert.match(main, /function reassertTopmost\(\)/);
   assert.match(main, /if \(!win\.isAlwaysOnTop\(\)\) restoreTopmost\('guard'\); \} catch/, 'only re-assert when the OS bit is gone: an unconditional call strips it');
   assert.match(main, /win\.on\('focus', reassertTopmost\)/, 'a Knot click is the moment the bit can be restored');
@@ -85,14 +88,14 @@ test('the overlay re-asserts always-on-top after a fullscreen app strips it', ()
 });
 
 test('showing the overlay restores a stripped always-on-top bit', () => {
-  const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
+  const main = read('index.js');
   assert.match(main, /function showOverlayWindow\(\) \{\n\s+if \(!win \|\| win\.isDestroyed\(\)\) return;\n\s+if \(process\.platform === 'win32' && !win\.isAlwaysOnTop\(\)\) win\.show\(\);\n\s+else win\.showInactive\(\);/);
   assert.equal((main.match(/\bshowOverlayWindow\(\);/g) || []).length, 3, 'toggle, force show and re-enable all share it');
 });
 
 test('a stripped topmost bit is restored through the probe, with Electron as the fallback', () => {
-  const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
-  const ps = fs.readFileSync(path.join(root, 'src', 'win', 'probe.ps1'), 'utf8');
+  const main = read('index.js');
+  const ps = read('src', 'win', 'probe.ps1');
   assert.match(main, /const r = await probe\.request\('win\.topmost', \{ hwnd \}, 1500\);/);
   assert.match(main, /try \{ if \(win && !win\.isDestroyed\(\)\) win\.setAlwaysOnTop\(true\); \} catch \(_\) \{\}/, 'Electron call stays as the fallback');
   assert.match(ps, /'win\.topmost' \{/, 'the probe answers win.topmost');

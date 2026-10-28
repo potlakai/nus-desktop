@@ -7,6 +7,7 @@ const os = require('os');
 const path = require('path');
 const { app } = require('electron');
 const secrets = require('./secrets');
+const { createClaudePool } = require('./claude-pool');
 
 const MODEL = 'claude-sonnet-5';
 const KEY_NAME = 'anthropic_api_key';
@@ -291,23 +292,24 @@ function runCliStream(cliPath, prompt, onEvent, { partials = true } = {}) {
 
 // Streamed completion with tool events. onEvent receives {type:'delta'|'tool'},
 // and the resolved value carries the final text or error like complete().
-async function completeStream(prompt, onEvent) {
+async function completeStream(prompt, onEvent, options = {}) {
   const cliPath = await detectCli();
   const apiKey = secrets.getSecret(KEY_NAME);
+  const onDelta = (text) => onEvent({ type: 'delta', text });
   let result;
   if (cliPath) {
-    result = await runCliStream(cliPath, prompt, onEvent);
+    if (poolUnsupported) result = await runCliStream(cliPath, prompt, onEvent);
+    else {
+      result = await runPooled(cliPath, prompt, { ...options, onDelta });
+      if (result.error === 'cli_unsupported') { poolUnsupported = true; result = await runCliStream(cliPath, (options.system ? options.system + '\n\n' : '') + prompt, onEvent); }
+    }
     if (result.error === 'retry_without_partials') {
-      result = await runCliStream(cliPath, prompt, onEvent, { partials: false });
+      result = await runCliStream(cliPath, (options.system ? options.system + '\n\n' : '') + prompt, onEvent, { partials: false });
     }
     if (result.error === 'cli_spawn_failed') cliPathCache = undefined;
-    if (result.error && apiKey) {
-      result = await runApi(apiKey, prompt);
-      if (result.text) onEvent({ type: 'delta', text: result.text });
-    }
+    if (result.error && apiKey) result = await runApiStream(apiKey, prompt, onDelta, options);
   } else if (apiKey) {
-    result = await runApi(apiKey, prompt);
-    if (result.text) onEvent({ type: 'delta', text: result.text });
+    result = await runApiStream(apiKey, prompt, onDelta, options);
   } else {
     result = { error: 'no_ai' };
   }
@@ -315,12 +317,26 @@ async function completeStream(prompt, onEvent) {
   return result;
 }
 
-async function runApi(apiKey, prompt) {
+// The request body for the API path. A stable system prompt is marked for
+// the prompt cache, so only the student context and the question are read
+// fresh; a screenshot (data URL) rides as an image block.
+function apiBody(prompt, opts, stream) {
+  const content = [];
+  const m = opts && opts.image ? /^data:(image\/[a-z]+);base64,(.+)$/i.exec(String(opts.image)) : null;
+  if (m) content.push({ type: 'image', source: { type: 'base64', media_type: m[1].toLowerCase(), data: m[2] } });
+  content.push({ type: 'text', text: prompt });
+  const body = { model: (opts && opts.model) || MODEL, max_tokens: (opts && opts.maxTokens) || 8192, messages: [{ role: 'user', content: m ? content : prompt }] };
+  if (opts && opts.system) body.system = [{ type: 'text', text: String(opts.system), cache_control: { type: 'ephemeral' } }];
+  if (stream) body.stream = true;
+  return body;
+}
+
+async function runApi(apiKey, prompt, opts) {
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 8192, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify(apiBody(prompt, opts, false)),
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
     if (!response.ok) {
@@ -332,6 +348,46 @@ async function runApi(apiKey, prompt) {
     if (data.stop_reason === 'refusal') return { error: 'api_refused' };
     const block = (data.content || []).find((item) => item.type === 'text');
     return { text: block ? block.text : '' };
+  } catch (error) {
+    return { error: error.name === 'TimeoutError' ? 'api_timeout' : 'api_network', detail: String(error.message || '').slice(0, 300) };
+  }
+}
+
+// The same call, streamed: text deltas arrive as the model writes them
+// (server-sent events), so the key path paints like the CLI path does.
+async function runApiStream(apiKey, prompt, onDelta, opts) {
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify(apiBody(prompt, opts, true)),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      let type = `http_${response.status}`;
+      try { type = (await response.json()).error?.type || type; } catch {}
+      return { error: 'api_failed', detail: type };
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '', text = '', stop = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
+        if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta' && ev.delta.text) { text += ev.delta.text; onDelta(ev.delta.text); }
+        else if (ev.type === 'message_delta' && ev.delta && ev.delta.stop_reason) stop = ev.delta.stop_reason;
+        else if (ev.type === 'error') return { error: 'api_failed', detail: String((ev.error && ev.error.type) || 'stream_error') };
+      }
+    }
+    if (stop === 'refusal') return { error: 'api_refused' };
+    return { text };
   } catch (error) {
     return { error: error.name === 'TimeoutError' ? 'api_timeout' : 'api_network', detail: String(error.message || '').slice(0, 300) };
   }
@@ -381,18 +437,65 @@ function logAiError(code, detail) {
   try { fs.appendFileSync(path.join(app.getPath('userData'), 'ai-errors.log'), line); } catch {}
 }
 
+// -------- the warm pool --------
+// Claude Code processes started ahead of the question (src/claude-pool.js):
+// no tools, no MCP servers, safe mode, nothing persisted, an empty
+// app-owned cwd. Until now the normal path ran the CLI with its tools on and
+// the user's own settings loaded, with userData as its cwd. A screenshot or a
+// prompt rides in on stdin; nothing has to sit on disk. A CLI too old for the
+// flags drops back to runCli for the rest of the run.
+let pool = null;
+let poolUnsupported = process.env.NUS_CLI_POOL === '0';
+function getPool(cliPath) {
+  if (!pool) {
+    const cwd = path.join(app.getPath('userData'), 'claude-cwd');
+    try { fs.mkdirSync(cwd, { recursive: true }); } catch {}
+    pool = createClaudePool({ cliPath, cwd, env: cliEnv(), promptDir: path.join(app.getPath('userData'), 'prompts'), log: (m) => console.log('[ai] pool', m), prewarm: process.env.NUS_CLI_PREWARM !== '0' });
+    app.on('before-quit', () => { try { pool.close(); } catch {} });
+  }
+  return pool;
+}
+async function runPooled(cliPath, prompt, opts) {
+  const content = [];
+  if (opts && opts.image) content.push({ type: 'image', dataUrl: opts.image });
+  content.push({ type: 'text', text: prompt });
+  const startedAt = Date.now();
+  const r = await getPool(cliPath).run({ model: (opts && opts.model) || MODEL, effort: opts && opts.effort, system: opts && opts.system, content, onDelta: opts && opts.onDelta, timeoutMs: CLI_TIMEOUT_MS });
+  if (r.text != null) console.log('[ai] pool ' + ((opts && opts.model) || MODEL) + (r.warm ? ' warm' : ' cold') + ' wall=' + (Date.now() - startedAt) + 'ms');
+  return r;
+}
+// Start a spare for the prompt the next question will use, before it is asked.
+async function warm(opts = {}) {
+  if (poolUnsupported) return false;
+  const cliPath = await detectCli();
+  if (!cliPath) return false;
+  try { return getPool(cliPath).warm({ model: opts.model || MODEL, effort: opts.effort, system: opts.system }); } catch { return false; }
+}
+
+// options.system:  a stable system prompt (cached on both paths).
+// options.image:   a data URL screenshot, sent as an image block.
+// options.onDelta: streamed text as it arrives (pooled CLI and API paths).
+// options.guidance: the hosted Companion's pointing call, on its own path.
 async function complete(prompt, options = {}) {
   const guide = options.guidance ? require('./guide-input').guideInput(prompt, options.imageDataUrl) : null;
   const cliPath = await detectCli();
   const apiKey = secrets.getSecret(KEY_NAME);
   let result;
   if (cliPath) {
-    result = await runCli(cliPath, prompt, guide);
+    if (guide || poolUnsupported) result = await runCli(cliPath, prompt, guide);
+    else {
+      result = await runPooled(cliPath, prompt, options);
+      if (result.error === 'cli_unsupported') {
+        console.log('[ai] this Claude Code build lacks the pool flags; using the plain CLI path');
+        poolUnsupported = true;
+        result = await runCli(cliPath, (options.system ? options.system + '\n\n' : '') + prompt, null);
+      }
+    }
     if (result.error === 'cli_spawn_failed') cliPathCache = undefined;
     // A broken CLI should never strand a user who also gave us a key.
-    if (result.error && apiKey) result = await runApi(apiKey, guide ? guide.content : prompt);
+    if (result.error && apiKey) result = await runApi(apiKey, guide ? guide.content : prompt, guide ? null : options);
   } else if (apiKey) {
-    result = await runApi(apiKey, guide ? guide.content : prompt);
+    result = await runApi(apiKey, guide ? guide.content : prompt, guide ? null : options);
   } else {
     result = { error: 'no_ai' };
   }
@@ -414,4 +517,4 @@ async function extractSyllabus(text) {
   return parseModelJson(result.text);
 }
 
-module.exports = { status, setApiKey, clearApiKey, testConnection, extractSyllabus, complete, completeStream, cancelStream, parseJsonBlock, MODEL };
+module.exports = { status, setApiKey, clearApiKey, testConnection, extractSyllabus, complete, completeStream, cancelStream, warm, parseJsonBlock, MODEL };

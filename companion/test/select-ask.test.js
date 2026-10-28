@@ -9,7 +9,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
+// Line endings are normalised: git stores LF, but a checkout with
+// core.autocrlf gives CRLF, and some contracts below match across lines.
+const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8').replace(/\r\n/g, '\n');
+const main = read('index.js');
 const js = fs.readFileSync(path.join(root, 'renderer', 'renderer.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
 const preload = fs.readFileSync(path.join(root, 'preload.js'), 'utf8');
