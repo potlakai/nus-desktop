@@ -53,11 +53,19 @@ jobs:
       - name: Scan the packed asar
         run: node scripts/package-security-check.js dist/mac-arm64/Nus.app/Contents/Resources/app.asar
 
-      - name: Signature and Gatekeeper report
+      # An unsealed bundle opens as "damaged" with no Open Anyway, so it fails
+      # the build. spctl still rejects (ad-hoc, not notarized); that is expected,
+      # but "code has no resources" means the seal is missing.
+      - name: Signature and Gatekeeper check
         run: |
-          codesign -dv --verbose=2 dist/mac-arm64/Nus.app 2>&1 || true
-          echo "--- spctl (expected to reject: ad-hoc, not notarized) ---"
-          spctl --assess --type execute --verbose=2 dist/mac-arm64/Nus.app 2>&1 || true
+          for app in dist/mac-arm64/Nus.app dist/mac/Nus.app; do
+            echo "=== $app"
+            info=$(codesign -dv --verbose=4 "$app" 2>&1); echo "$info"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            echo "$info" | grep -q 'Sealed Resources version=' || { echo "$app has no sealed resources" >&2; exit 1; }
+            gk=$(spctl --assess --type execute --verbose=2 "$app" 2>&1 || true); echo "$gk"
+            if echo "$gk" | grep -qi 'no resources'; then echo "$app: Gatekeeper sees no resources" >&2; exit 1; fi
+          done
 
       - name: Smoke the arm64 app
         env:
