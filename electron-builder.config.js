@@ -36,18 +36,15 @@ const azure = ['AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'NUS
 const appleSigned = ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']
   .every((name) => Boolean(process.env[name]));
 
-// Ad-hoc sign the packed .app when no real identity signed it. Runs only for
-// the darwin target. Idempotent: a bundle that already carries a signature
-// (Developer ID or a previous ad-hoc pass) is left alone.
+// Ad-hoc sign the packed .app when no Developer ID will sign it. Runs only for
+// the darwin target. Always re-signs: Electron's arm64 binary arrives with a
+// linker-only signature that passes `codesign -dv` but seals no resources, and
+// macOS calls that bundle "damaged" with no Open Anyway (v0.2.6 and v0.2.7).
 function adHocSignMac(context) {
-  if (context.electronPlatformName !== 'darwin') return;
+  if (context.electronPlatformName !== 'darwin' || appleSigned) return;
   const appPath = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
-  try {
-    execFileSync('codesign', ['-dv', appPath], { stdio: 'ignore' });
-    console.log(`[electron-builder] ${path.basename(appPath)} is already signed; leaving it.`);
-    return;
-  } catch {}
   execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], { stdio: 'inherit' });
+  execFileSync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath], { stdio: 'inherit' });
   console.log(`[electron-builder] ad-hoc signed ${path.basename(appPath)} (no Developer ID in the environment).`);
 }
 
