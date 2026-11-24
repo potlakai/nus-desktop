@@ -16,11 +16,11 @@ function isAvailable() {
 function setSecret(key, value) {
   if (!secretsDir) throw new Error('secrets: not initialized');
   if (!isAvailable()) {
-    fs.writeFileSync(path.join(secretsDir, `${key}.plain`), String(value), 'utf8');
+    fs.writeFileSync(path.join(secretsDir, `${key}.plain`), String(value), { mode: 0o600 });
     return;
   }
   const buf = safeStorage.encryptString(String(value));
-  fs.writeFileSync(path.join(secretsDir, `${key}.enc`), buf);
+  fs.writeFileSync(path.join(secretsDir, `${key}.enc`), buf, { mode: 0o600 });
 }
 
 function getSecret(key) {

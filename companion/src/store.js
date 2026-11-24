@@ -57,11 +57,6 @@ const DEFAULTS = {
   snoozes: {},
   // Master switch for the Knot speaking first (plan nudges, app hints).
   proactive: true,
-  // Proactive nudges the user said "not now" to: trigger key -> the day
-  // (YYYY-MM-DD) it stays quiet. Cleared naturally by the date changing.
-  snoozes: {},
-  // Master switch for the Knot speaking first (plan nudges, app hints).
-  proactive: true,
   // Which display the overlay covers (Electron display id); null = primary.
   knotDisplayId: null,
   // Date (YYYY-MM-DD) the proactive daily line was last shown, so it fires
@@ -72,13 +67,15 @@ const DEFAULTS = {
   // it off from the desktop Knot pane is the only thing that removes it, and
   // that choice persists until the user turns it back on.
   companionEnabled: true,
-  apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '' },
+  apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '', ollama: '' },
   models: {
     openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' },
     anthropic: { fast: 'claude-haiku-4-5', smart: 'claude-sonnet-5' },
     // 2026-09-15: gemini-2.5-* returns 404 "no longer available to new users".
     gemini: { fast: 'gemini-3.6-flash', smart: 'gemini-3.6-pro' },
-    nvidia: { fast: 'meta/llama-3.2-11b-vision-instruct', smart: 'meta/llama-3.2-90b-vision-instruct' }
+    nvidia: { fast: 'meta/llama-3.2-11b-vision-instruct', smart: 'meta/llama-3.2-90b-vision-instruct' },
+    // Local models run through Ollama's OpenAI-compatible API at localhost:11434.
+    ollama: { fast: 'llama3.2', smart: 'llama3.1' }
   }
 };
 
@@ -192,7 +189,7 @@ function load() {
       legacyPlaintext = true;
     }
   }
-  catch { data = deepMerge(DEFAULTS, {}); }
+  catch (e) { console.log('[companion] settings unreadable, starting fresh:', e && e.message); data = deepMerge(DEFAULTS, {}); }
 
   // First run: point at the vault's most recently built briefing so the app is
   // useful before anything is typed into Settings. Set JARVIS_VAULT to override.
@@ -202,8 +199,9 @@ function load() {
   }
 
   // Auto-switch provider if the current one has no key, but another one does.
+  if (!data.apiKeys || typeof data.apiKeys !== 'object') data.apiKeys = deepMerge({}, DEFAULTS.apiKeys);
   if (!data.apiKeys[data.provider]) {
-    const validProviders = ['openai', 'anthropic', 'gemini', 'nvidia'];
+    const validProviders = ['openai', 'anthropic', 'gemini', 'nvidia', 'ollama'];
     const active = validProviders.find(p => data.apiKeys[p]);
     if (active) {
       data.provider = active;
