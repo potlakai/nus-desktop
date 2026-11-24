@@ -682,3 +682,12 @@ body.ready .workspace { opacity: 1; transform: none; }
 .onboard-card[data-step="focus"] .onboard-knot { width: 190px; height: 190px; right: 36px; top: 54px; transform: none; }
 .onboard-card.has-knot::after { opacity: .07; }
 .coach-scrim.spotlit { backdrop-filter: none; }
+
+/* What Nus knows: the facts list and the import controls on the Settings card. */
+.memory-list { display: grid; gap: 8px; margin: 10px 0; }
+.memory-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 8px 10px; border: 1px solid var(--line, rgba(255,255,255,.08)); border-radius: 10px; }
+.memory-row span { line-height: 1.35; }
+.memory-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.memory-form input { flex: 1; min-width: 200px; }
+.memory-import-box { margin-top: 10px; }
+#memory-paste { width: 100%; margin-top: 8px; font: inherit; }

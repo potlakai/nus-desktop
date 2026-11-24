@@ -907,6 +907,7 @@ async function renderSettings(){
   renderCompanionAiState();
   renderGpaScale();
   renderStorage();
+  renderMemoryState();
 }
 
 // The Companion's provider key, managed from the desktop so the overlay is
@@ -1176,6 +1177,54 @@ async function setStatsEnabled(enabled) {
 }
 $('#stats-toggle')?.addEventListener('change', (event) => { setStatsEnabled(event.target.checked); });
 renderStatsState();
+
+// What Nūs knows about the student: one row per fact, private ones masked,
+// add and forget here, or paste in what another assistant already knows.
+function paintMemory(panel) {
+  const list = $('#memory-list');
+  if (!list || !panel) return;
+  const rows = panel.facts || [];
+  list.innerHTML = rows.length
+    ? rows.map((f) => `<div class="memory-row"><span><strong>${esc(f.label)}</strong> ${esc(f.value)}${f.sensitive ? ' <em class="muted">private</em>' : ''}<br><small class="muted">${esc((f.sources || []).join(', '))}</small></span><button type="button" class="ghost" data-memory-remove="${esc(f.id)}">Forget</button></div>`).join('')
+    : '<p class="muted">Nothing saved yet. Add a fact below, or tell the Knot to remember something.</p>';
+  const imports = Object.entries(panel.imports || {});
+  const drop = $('#memory-forget-source');
+  if (drop) { drop.hidden = !imports.length; if (imports.length) drop.textContent = 'Remove imported (' + imports.map(([s, i]) => s + ' ' + i.added).join(', ') + ')'; }
+  const badge = $('#memory-badge'); if (badge) badge.textContent = rows.length ? rows.length + (rows.length === 1 ? ' fact' : ' facts') : 'Empty';
+}
+async function renderMemoryState() {
+  if (!api.memoryPanel) { $('#memory-card')?.setAttribute('hidden', ''); return; }
+  try { paintMemory(await api.memoryPanel()); } catch {}
+}
+const memoryNote = (text) => { const n = $('#memory-note'); if (n) n.textContent = text; };
+$('#memory-add')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const value = $('#memory-value').value.trim();
+  if (!value) return;
+  try { paintMemory(await api.memoryAdd($('#memory-key').value, value)); $('#memory-value').value = ''; memoryNote('Saved.'); } catch { memoryNote('Could not save that.'); }
+});
+$('#memory-list')?.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-memory-remove]');
+  if (!button) return;
+  try { paintMemory(await api.memoryRemove(button.dataset.memoryRemove)); memoryNote('Forgotten.'); } catch { memoryNote('Could not forget that.'); }
+});
+$('#memory-prompt')?.addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(await api.memoryPrompt()); memoryNote('Prompt copied. Paste it into your assistant, then paste its answer above.'); } catch { memoryNote('Could not copy the prompt.'); }
+});
+$('#memory-import')?.addEventListener('click', async () => {
+  const text = $('#memory-paste').value.trim();
+  if (!text) { memoryNote('Paste the answer first.'); return; }
+  try {
+    const source = $('#memory-source').value;
+    const panel = await api.memoryImport(source, text);
+    paintMemory(panel); $('#memory-paste').value = '';
+    const i = panel && panel.imports && panel.imports[source];
+    memoryNote(i ? `Imported ${i.added} of ${i.count} facts.` : 'Imported.');
+  } catch { memoryNote('Could not import that.'); }
+});
+$('#memory-forget-source')?.addEventListener('click', async () => {
+  try { paintMemory(await api.memoryForgetSource($('#memory-source').value)); memoryNote('Imported facts removed.'); } catch { memoryNote('Could not remove those.'); }
+});
 
 function hideSourceAsk() {
   const row = $('#source-ask');
@@ -1481,6 +1530,8 @@ async function submitGlobalAsk(){
   try{
     const result=await api.assistantParse(text);
     if(handleLimit(result)){globalAnswer.classList.add('hidden');return;}
+    // One call answered it: the text is the answer, no second round trip.
+    if(!result.error&&!result.proposal&&result.text){globalAnswer.textContent=result.text;globalAnswer.classList.remove('hidden');return;}
     if(result.error||!result.proposal||!result.proposal.needs_confirm){await answerWithAi(result?.proposal?.command?.question||text,globalAnswer,Boolean(result.error));return;}
     state.proposal=result.proposal;setView('today');renderProposal();
   }finally{state.busy=false;renderHero();}
@@ -1786,6 +1837,10 @@ $('#companion-power')?.addEventListener('click', async()=>{
 });
 $('#companion-capture')?.addEventListener('click', async()=>{ const s=await api.companionControl?.(companionState.capturing?'capture-stop':'capture-start'); if(s?.error)reportAiError(s);if(s) companionState=s; paintCompanionPanel(); });
 api.onCompanionState?.((s)=>{ if(s){ companionState=s; if(state.view==='companion') paintCompanionPanel(); renderHero(); } });
+// The window opens before the license check and the calendar pull finish:
+// their results arrive here and repaint what they touch.
+api.onLicenseChanged?.((plan)=>{ renderLicenseState(plan).catch(()=>{}); });
+api.onStateRefresh?.(()=>{ load().catch(()=>{}); });
 
 // ---- Knot-pane chat: a persistent thread over the same AI pipeline. ----
 // Actionable requests come back with a proposal; the confirm buttons run the
@@ -2033,6 +2088,8 @@ api.onAiEvent?.((ev)=>{
     if(!voiceNusLine){voiceNusLine={role:'nus',text};voiceTurns.push(voiceNusLine);}
     voiceNusLine.text=text;delete voiceNusLine.pending;
     voiceNusLine=null;voicePendingAsk=false;
+    // The one-call turn carries the proposal, when there is one, on this event.
+    voiceProposal=ev.proposal||null;
     renderVoiceThread();
     syncVoiceIntoChat(lastVoiceUser(),text);
     speakReply(text);
@@ -2040,6 +2097,7 @@ api.onAiEvent?.((ev)=>{
   }
   if(ev.type==='error'){
     voicePendingAsk=false;voiceNusLine=null;
+    if(handleLimit({error:ev.error,upgrade:ev.upgrade})){stopVoice();return;}
     voiceNote(aiError(ev.error,ev.detail));
     setVoiceState('listening');
   }
@@ -2210,8 +2268,11 @@ async function submitToNus(text){
   try{
     const result=await api.assistantParse(text);
     if(result.error==='no_ai'||result.error==='cli_not_logged_in'){answerLocally(text);showToast(aiError(result.error));return;}
+    if(handleLimit(result))return;
     if(result.error){reportAiError(result);return;}
     const proposal=result.proposal;
+    // One call answered it: show the text; only a write needs the confirm card.
+    if(!proposal){if(result.text){askAnswer.textContent=result.text;askAnswer.classList.remove('hidden');}else answerLocally(text);return;}
     if(!proposal.needs_confirm){await answerWithAi(proposal.command.question||text,askAnswer);return;}
     state.proposal=proposal;renderProposal();
   }finally{state.busy=false;renderHero();}

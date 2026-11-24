@@ -99,6 +99,8 @@ contextBridge.exposeInMainWorld('nus', {
   onCompanionState: (cb) => ipcRenderer.on('companion:state', (_e, data) => cb(data)),
   onAuthChanged: (cb) => ipcRenderer.on('auth:changed', (_e, data) => cb(data)),
   onLicenseChanged: (cb) => ipcRenderer.on('license:changed', (_e, data) => cb(data)),
+  // Main finished a background refresh (calendar) after the window was up: pull the state again.
+  onStateRefresh: (cb) => ipcRenderer.on('state:refresh', (_e, data) => cb(data)),
   onDesktopTour: (cb) => ipcRenderer.on('desktop:tour', () => cb()),
   onDesktopHistory: (cb) => ipcRenderer.on('desktop:history', () => cb()),
   onDesktopVoiceSetup: (cb) => ipcRenderer.on('desktop:voice-setup', () => cb()),
@@ -110,4 +112,11 @@ contextBridge.exposeInMainWorld('nus', {
   voiceAsk: (messages) => ipcRenderer.invoke('voice:ask', messages),
   voiceCancel: () => ipcRenderer.invoke('voice:cancel'),
   onAiEvent: (cb) => ipcRenderer.on('ai:event', (_e, data) => cb(data)),
+  // What Nūs knows about the student (Settings card).
+  memoryPanel: () => ipcRenderer.invoke('memory:panel'),
+  memoryAdd: (key, value) => ipcRenderer.invoke('memory:add', key, value),
+  memoryRemove: (id) => ipcRenderer.invoke('memory:remove', id),
+  memoryImport: (source, text) => ipcRenderer.invoke('memory:import', source, text),
+  memoryForgetSource: (source) => ipcRenderer.invoke('memory:forget-source', source),
+  memoryPrompt: () => ipcRenderer.invoke('memory:prompt'),
 });

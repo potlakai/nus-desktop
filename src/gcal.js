@@ -6,6 +6,8 @@ const config = require('./config');
 
 const TOKEN_KEY = 'gcal_token';
 const REDIRECT_HOST = '127.0.0.1';
+// Every Google call is capped so a slow network never holds startup or a tick.
+const NETWORK_TIMEOUT_MS = 6000;
 let redirectPort = 8765;
 
 function isConfigured() {
@@ -105,7 +107,7 @@ async function exchangeCode(code, codeVerifier) {
     grant_type: 'authorization_code',
     code_verifier: codeVerifier,
   });
-  const resp = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  const resp = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS) });
   const data = await resp.json();
   if (data.error) throw new Error(data.error);
   return data;
@@ -145,7 +147,7 @@ async function refreshTokenIfNeeded(force = false) {
     refresh_token: token.refresh_token,
     grant_type: 'refresh_token',
   });
-  const resp = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  const resp = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS) });
   const data = await resp.json();
   if (data.error) return null;
   return storeToken(data, token);
@@ -169,6 +171,7 @@ async function apiCall(path, options = {}, retried = false) {
   const resp = await fetch(`https://www.googleapis.com/calendar/v3${path}`, {
     ...options,
     headers: { Authorization: `Bearer ${token.access_token}`, 'Content-Type': 'application/json', ...(options.headers || {}) },
+    signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS),
   });
   // A stale access token should heal itself once before bothering the user.
   if (resp.status === 401) {
