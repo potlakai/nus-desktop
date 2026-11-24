@@ -7,14 +7,16 @@ function stripDataUrl(dataUrl) {
   return m ? { mime: m[1], b64: m[2] } : null;
 }
 
-async function streamOpenAI({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken, baseURL }) {
+async function streamOpenAI({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken = () => {}, baseURL }) {
   if (DEBUG) console.log('[DEBUG LLM] streamOpenAI called', { model, baseURL, hasImage: !!imageDataUrl, maxTokens });
   const OpenAI = require('openai');
   const client = new OpenAI({ apiKey, baseURL });
   const messages = [{ role: 'system', content: system }];
+  let imageAttached = false;
   turns.forEach((t, i) => {
     const last = i === turns.length - 1;
     if (last && imageDataUrl && t.role === 'user') {
+      imageAttached = true;
       messages.push({ role: 'user', content: [
         { type: 'text', text: t.text },
         { type: 'image_url', image_url: { url: imageDataUrl } }
@@ -23,6 +25,9 @@ async function streamOpenAI({ apiKey, model, system, turns, imageDataUrl, maxTok
       messages.push({ role: t.role, content: t.text });
     }
   });
+  if (imageDataUrl && !imageAttached) {
+    messages.push({ role: 'user', content: [{ type: 'image_url', image_url: { url: imageDataUrl } }] });
+  }
   if (DEBUG) console.log('[DEBUG LLM] streamOpenAI sending request to OpenAI SDK with messages count:', messages.length);
   try {
     const stream = await client.chat.completions.create({ model, messages, stream: true, max_tokens: maxTokens });
@@ -39,7 +44,7 @@ async function streamOpenAI({ apiKey, model, system, turns, imageDataUrl, maxTok
   }
 }
 
-async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken }) {
+async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken = () => {} }) {
   if (DEBUG) console.log('[DEBUG LLM] streamAnthropic called', { model, hasImage: !!imageDataUrl, maxTokens });
   const Anthropic = require('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey });
@@ -54,6 +59,9 @@ async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, max
     }
     return { role: t.role, content: t.text };
   });
+  if (imageDataUrl && turns.length && !messages.some((m) => Array.isArray(m.content) && m.content.some((c) => c.type === 'image'))) {
+    messages.push({ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: stripDataUrl(imageDataUrl).mime, data: stripDataUrl(imageDataUrl).b64 } }] });
+  }
   if (DEBUG) console.log('[DEBUG LLM] streamAnthropic sending request to Anthropic SDK with messages count:', messages.length);
   try {
     const stream = await client.messages.create({ model, max_tokens: maxTokens, system, messages, stream: true });
@@ -69,7 +77,7 @@ async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, max
   }
 }
 
-async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken }) {
+async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken = () => {} }) {
   if (DEBUG) console.log('[DEBUG LLM] streamGemini called', { model, hasImage: !!imageDataUrl, maxTokens });
   const { GoogleGenAI } = require('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
@@ -82,6 +90,11 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
     }
     return { role: t.role === 'assistant' ? 'model' : 'user', parts };
   });
+  const hasImage = contents.some((c) => (c.parts || []).some((p) => p.inlineData));
+  if (imageDataUrl && !hasImage) {
+    const img = stripDataUrl(imageDataUrl);
+    if (img) contents.push({ role: 'user', parts: [{ inlineData: { mimeType: img.mime, data: img.b64 } }] });
+  }
   if (DEBUG) console.log('[DEBUG LLM] streamGemini sending request to Google SDK with contents count:', contents.length);
   try {
     const stream = await ai.models.generateContentStream({
@@ -135,7 +148,7 @@ function createLLM(settings) {
   const keys = settings.apiKeys || {};
   const apiKey = keys[provider];
   const tier = settings.smart ? 'smart' : 'fast';
-  const model = (settings.models[provider] || {})[tier];
+  const model = ((settings.models || {})[provider] || {})[tier];
   
   // Set to 4096 (effectively unlimited for a single response) 
   // since some SDKs like Anthropic require a maxTokens value.
@@ -151,16 +164,18 @@ function createLLM(settings) {
       const args = { apiKey, model, maxTokens, ...params };
       if (provider === 'openai') return streamOpenAI(args);
       if (provider === 'nvidia') return streamOpenAI({ ...args, baseURL: 'https://integrate.api.nvidia.com/v1' });
+      if (provider === 'ollama') return streamOpenAI({ ...args, baseURL: 'http://localhost:11434/v1' });
       if (provider === 'anthropic') return streamAnthropic(args);
       if (provider === 'gemini') return streamGemini(args);
       throw new Error('unknown provider: ' + provider);
     },
-    async complete(params) {
+    async complete(params = {}) {
       const args = { apiKey, model, maxTokens: params.maxTokens || 512, ...params, onToken: () => {} };
       if (provider === 'gemini') return completeGemini(args);
       // The other SDKs stream fine; collect and return.
       if (provider === 'openai') return streamOpenAI(args);
       if (provider === 'nvidia') return streamOpenAI({ ...args, baseURL: 'https://integrate.api.nvidia.com/v1' });
+      if (provider === 'ollama') return streamOpenAI({ ...args, baseURL: 'http://localhost:11434/v1' });
       if (provider === 'anthropic') return streamAnthropic(args);
       throw new Error('unknown provider: ' + provider);
     }

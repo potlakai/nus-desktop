@@ -594,9 +594,10 @@ function studentSummary() {
 function chatContext() {
   const courses = api.listCourses();
   const ranked = rankedToday();
+  const today = new Date().toISOString().slice(0, 10);
   const dayDiff = (d) => Math.floor((new Date(`${d}T23:59:59`) - new Date()) / 86400000);
-  const overdue = ranked.filter((r) => r.due_date && dayDiff(r.due_date) < 0);
-  const dueToday = ranked.filter((r) => r.due_date && dayDiff(r.due_date) === 0);
+  const overdue = ranked.filter((r) => r.due_date && r.due_date < today);
+  const dueToday = ranked.filter((r) => r.due_date && r.due_date === today);
   const week = ranked.filter((r) => { const d = r.due_date ? dayDiff(r.due_date) : null; return d !== null && d > 0 && d <= 7; });
   const tasks = api.listTasks().filter((t) => !t.done);
   const line = (r) => `${r.title} (${r.course_name || 'no course'}, due ${r.due_date})`;
