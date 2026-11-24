@@ -9,11 +9,15 @@ verify_jwt = true
 
 # Anonymous usage stats (TELEMETRY-CONTRACT.md). Installs have no Supabase
 # user, so the gateway does not require a JWT: `track` validates and
-# rate-limits on its own, `daily-metrics` is guarded by METRICS_TOKEN.
+# rate-limits on its own, `daily-metrics` and `install-ledger` are guarded by
+# METRICS_TOKEN.
 [functions.track]
 verify_jwt = false
 
 [functions.daily-metrics]
+verify_jwt = false
+
+[functions.install-ledger]
 verify_jwt = false
 
 [auth]
@@ -34,3 +38,17 @@ otp_expiry = 3600
 [auth.mfa.totp]
 enroll_enabled = true
 verify_enabled = true
+
+
+# Click-to-install bridge (2026-10-15). The site beacons download-button clicks
+# here; no user, no JWT.
+[functions.click]
+verify_jwt = false
+
+# Optional Google account for the Companion (docs/accounts-b.md, 2026-11-02).
+# Both take the signed-in user JWT: the gateway verifies it.
+[functions.link-install]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

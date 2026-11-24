@@ -315,9 +315,12 @@ test('schema, track function and client agree on event names and props keys', ()
   const schemaNames = quotedList(section, /name\s+text not null\s+check \(name in \(([\s\S]*?)\)\)/);
   const tsNames = quotedList(track, /const NAMES = new Set\(\[([\s\S]*?)\]\)/);
   const tsKeys = quotedList(track, /const PROP_KEYS = new Set\(\[([\s\S]*?)\]\)/);
-  assert.deepEqual(schemaNames, [...EVENT_NAMES].sort());
-  assert.deepEqual(tsNames, [...EVENT_NAMES].sort());
-  assert.deepEqual(tsKeys, [...PROP_KEYS].sort());
+  // The server is shared with the Companion, which sends names and keys the
+  // desktop never does (update channel 2026-11-04, Companion 0.1.16): schema and
+  // track agree exactly, and every desktop name and key is one they accept.
+  assert.deepEqual(schemaNames, tsNames);
+  for (const name of EVENT_NAMES) assert.ok(tsNames.includes(name), `server accepts desktop name ${name}`);
+  for (const key of PROP_KEYS) assert.ok(tsKeys.includes(key), `server accepts desktop key ${key}`);
   assert.match(section, /alter table public\.install_events enable row level security/);
   assert.doesNotMatch(section, /create policy[^;]*on public\.install_events/, 'no client policies, service role only');
   assert.match(section, /create unique index if not exists \w+\s+on public\.install_events \(install_id, name, day\)\s+where name in \('app_open'\)/);
