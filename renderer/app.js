@@ -1,7 +1,7 @@
 const isPreview = !window.nus;
 const previewApi = isPreview ? createPreviewApi() : null;
 if (previewApi) Object.assign(previewApi, {
-  licenseStatus: async () => ({ plan: 'free', isPro: false, source: 'preview', usage: { syllabusImports: { used: 1, limit: 3 }, questions: { used: 2, limit: 10 }, companionMs: { used: 180000, limit: 1200000 } } }),
+  licenseStatus: async () => ({ plan: 'personal', isPro: true, source: 'preview', usage: {} }),
   licenseRefresh: async () => previewApi.licenseStatus(),
   licenseCheckout: async () => ({ error: 'checkout_unavailable' }),
   licensePortal: async () => ({ error: 'portal_unavailable' }),
@@ -518,7 +518,7 @@ async function importDefault(){const result=await api.importSource('calendar_fil
 $('#import-primary').addEventListener('click',importSyllabusFlow);
 $('#source-import').addEventListener('click',()=>setView('integrations'));
 
-const AI_ERRORS={no_ai:'Connect an AI provider first. Taking you to Settings.',empty_text:'No readable text in that file. Scanned PDFs need selectable text.',bad_json:'The AI reply was not readable. Try the import again.',read_failed:'Could not read that file.',storage_limit:'Nūs local storage is full. Remove an import before adding another.',limit_syllabus_imports:'Free includes three AI syllabus imports. Upgrade to Pro for more.',limit_questions:'Free includes ten Ask or chat questions each day. Upgrade to Pro or come back tomorrow.',limit_connected_accounts:'Free includes one connected account. Disconnect the current account or upgrade to Pro.',limit_automation_rules:'Free includes one automation rule. Remove it or upgrade to Pro.',limit_companion_minutes:'Free Companion listening is used for today. Upgrade to Pro or come back tomorrow.',limit_companion_history:'Free includes seven days of Companion history. Upgrade to Pro for full history.',cli_timeout:'Claude Code took too long. Try again.',cli_failed:'Claude Code returned an error.',cli_spend_limit:'Your Claude subscription hit its spend limit. Add an Anthropic API key in Settings, or raise the limit in Claude Code.',cli_not_logged_in:'Claude Code is installed but signed out. Open a terminal, run "claude", then /login, or paste an Anthropic API key in Settings.',cli_spawn_failed:'Claude Code could not start.',api_failed:'The Anthropic API returned an error.',api_refused:'The AI declined this content.',api_timeout:'The API call timed out. Try again.',api_network:'Network problem reaching Anthropic.',unexpected_reply:'The provider answered, but not as expected.',source_missing:'That import is no longer on file.',course_name_required:'The course needs a name.',target_not_found:'I could not find that item. Try its exact name.',incomplete_command:'I need a bit more: which item, and what date?',unknown_intent:'That request did not survive the trip. Try again.'};
+const AI_ERRORS={no_ai:'Connect an AI provider first. Taking you to Settings.',empty_text:'No readable text in that file. Scanned PDFs need selectable text.',bad_json:'The AI reply was not readable. Try the import again.',read_failed:'Could not read that file.',storage_limit:'Nūs local storage is full. Remove an import before adding another.',cli_timeout:'Claude Code took too long. Try again.',cli_failed:'Claude Code returned an error.',cli_spend_limit:'Your Claude subscription hit its spend limit. Add an Anthropic API key in Settings, or raise the limit in Claude Code.',cli_not_logged_in:'Claude Code is installed but signed out. Open a terminal, run "claude", then /login, or paste an Anthropic API key in Settings.',cli_spawn_failed:'Claude Code could not start.',api_failed:'The Anthropic API returned an error.',api_refused:'The AI declined this content.',api_timeout:'The API call timed out. Try again.',api_network:'Network problem reaching Anthropic.',unexpected_reply:'The provider answered, but not as expected.',source_missing:'That import is no longer on file.',course_name_required:'The course needs a name.',target_not_found:'I could not find that item. Try its exact name.',incomplete_command:'I need a bit more: which item, and what date?',unknown_intent:'That request did not survive the trip. Try again.'};
 Object.assign(AI_ERRORS, { voice_setup_required:'Complete voice setup in Nūs before recording.', capture_finalizing:'Nūs is saving the last words. Please wait a moment.', companion_busy:'Finish your guide or voice question before recording.' });
 function aiError(code,detail){const base=AI_ERRORS[code]||`Request failed (${code}).`;return detail?`${base} (${String(detail).slice(0,120)})`:base;}
 
@@ -960,164 +960,50 @@ async function renderStorage(){
   else{badge.textContent=formatBytes(used);badge.classList.add('good');}
 }
 
+// Personal build: no account, so this only names the local profile in the rail.
 async function renderAuthState() {
-  const [authConfig, session] = await Promise.all([api.authConfig(), api.authSession()]);
-  const signedIn = Boolean(session && session.user);
-  const email = session?.user?.email || '';
-  $('#auth-form').classList.toggle('hidden', signedIn);
-  $('#auth-signedin').classList.toggle('hidden', !signedIn);
-  if (signedIn) {
-    $('#auth-user-email').textContent = email;
-    $('#auth-title').textContent = 'Signed in';
-    $('#auth-copy').textContent = 'Your semester stays on this device. Supabase holds only your identity and subscription status.';
-    $('#auth-badge').textContent = 'Signed in';
-    $('#auth-badge').classList.add('good');
-    $('#rail-name').textContent = email.split('@')[0];
-    $('#rail-avatar').textContent = email.slice(0, 1).toUpperCase();
-    $('#rail-mode').firstChild.textContent = 'Signed in';
-    $('#rail-signout')?.classList.remove('hidden');
-    $('#settings-name').textContent = email.split('@')[0];
-    $('#settings-email').textContent = email;
-  } else {
-    $('#auth-title').textContent = authConfig.supabase ? 'Sign in to Nūs' : 'Accounts are coming soon';
-    $('#auth-copy').textContent = authConfig.supabase
-      ? 'Google or email. Local mode stays available if you skip sign-in.'
-      : 'Nūs runs fully on this device today. Optional accounts ship in an update. Nothing you add now is lost.';
-    $('#auth-badge').textContent = 'Local';
-    $('#auth-badge').classList.remove('good');
-    $('#rail-name').textContent = 'You';
-    $('#rail-avatar').textContent = 'N';
-    $('#rail-mode').firstChild.textContent = 'Local profile';
-    $('#rail-plan')?.classList.add('hidden');
-    $('#rail-signout')?.classList.add('hidden');
-    $('#settings-name').textContent = 'Local';
-    $('#settings-email').textContent = 'Not signed in';
-    if (!authConfig.supabase) {
-      $('#auth-form').classList.add('hidden');
-    }
-  }
+  const name = $('#rail-name'); if (name) name.textContent = 'You';
+  const avatar = $('#rail-avatar'); if (avatar) avatar.textContent = 'J';
+  const mode = $('#rail-mode'); if (mode && mode.firstChild) mode.firstChild.textContent = 'Local profile';
+  $('#rail-plan')?.classList.add('hidden');
+  $('#rail-signout')?.classList.add('hidden');
+  const sname = $('#settings-name'); if (sname) sname.textContent = 'Local';
+  const smail = $('#settings-email'); if (smail) smail.textContent = 'This machine only';
 }
 
-const CAP_LABELS = {
-  syllabusImports: ['AI syllabus imports', (n) => String(n), 'lifetime'],
-  questions: ['Questions today', (n) => String(n), 'resets at midnight'],
-  companionMs: ['Companion minutes today', (n) => String(Math.floor(n / 60000)), 'resets at midnight'],
-};
 let licenseState = null;
-function usageMeter(key, row) {
-  const [label, fmt, note] = CAP_LABELS[key];
-  const used = Number(row?.used) || 0;
-  const limit = row?.limit;
-  if (!limit) return `<div class="usage-meter unlimited"><span>${label}</span><i style="--p:100%"></i><b>${fmt(used)} · unlimited</b></div>`;
-  const pct = Math.min(100, Math.round((used / limit) * 100));
-  return `<div class="usage-meter${pct >= 100 ? ' full' : pct >= 70 ? ' warm' : ''}" title="${note}"><span>${label}</span><i style="--p:${pct}%"></i><b>${fmt(used)}/${fmt(limit)}</b></div>`;
-}
 async function renderLicenseState(nextState) {
   if (!api.licenseStatus) return;
   const plan = nextState || await api.licenseStatus().catch(() => null);
   if (!plan) return;
   licenseState = plan;
-  const pro = Boolean(plan.isPro);
-  const usage = plan.usage || {};
-  $('#license-title').textContent = pro ? 'Nūs Pro' : 'Nūs Free';
-  $('#license-badge').textContent = pro ? 'Pro' : 'Free';
-  $('#license-badge').classList.toggle('good', pro);
-  $('#license-upgrade').classList.toggle('hidden', pro);
-  $('#license-portal').classList.toggle('hidden', !pro);
-  $('#rail-plan')?.classList.toggle('hidden', !pro);
-  if (pro) {
-    const ends = plan.currentPeriodEnd ? new Date(plan.currentPeriodEnd).toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) : null;
-    $('#license-copy').textContent = plan.cancelAtPeriodEnd && ends
-      ? `Pro stays active through ${ends}, then this account returns to Free.`
-      : `Imports, questions, connections, automations, and the Companion are uncapped.${ends ? ` Renews ${ends}.` : ''}`;
-    $('#license-usage').innerHTML = `<div class="usage-meter unlimited"><span>${plan.source === 'offline_cache' ? 'Verified recently. Offline grace active.' : 'Entitlement verified with your account.'}</span></div>`;
-    return;
-  }
-  // The account service could not be reached and no recent Pro cache exists.
-  // Say so; a silent "Free" reads as a lost subscription.
-  const unreachable = plan.source === 'offline_no_valid_cache';
-  $('#license-copy').textContent = unreachable
-    ? 'Could not reach the account service just now, so this session runs as Free. Everything local still works. Use Refresh plan once you are back online.'
-    : 'Free is a full local semester with honest caps. Pro lifts them.';
-  $('#license-usage').innerHTML = ['syllabusImports', 'questions', 'companionMs'].map((key) => usageMeter(key, usage[key])).join('');
+  // Personal build: one plan, no caps. Say where the data lives instead of
+  // showing meters against limits that do not exist.
+  const title = $('#license-title'); if (title) title.textContent = 'Personal build';
+  $('#license-badge')?.classList.add('hidden');
+  $('#license-upgrade')?.classList.add('hidden');
+  $('#license-portal')?.classList.add('hidden');
+  $('#rail-plan')?.classList.add('hidden');
+  const copy = $('#license-copy');
+  if (copy) copy.textContent = 'Uncapped: imports, questions, connections, automations, Voice and the Companion. No account, no subscription, no telemetry. Everything stays in the local database.';
+  const usage = $('#license-usage');
+  if (usage) usage.innerHTML = '<div class="usage-meter unlimited"><span>Operating locally</span><i style="--p:100%"></i><b>no limits</b></div>';
 }
 
-// ---- Upgrade sheet: every refused cap lands here, never in a toast. ----
-const upgradeScrim = $('#upgrade-scrim');
-const LIMIT_COPY = {
-  limit_syllabus_imports: ['Syllabus imports', 'Free includes three AI syllabus imports for the life of this install. You have used all three.'],
-  limit_questions: ['Questions today', 'Free includes ten Ask or chat questions a day. Today\'s ten are used. They reset at midnight.'],
-  limit_connected_accounts: ['Connected accounts', 'Free includes one connected account. Disconnect the current one, or go Pro to run Google Calendar and Outlook together.'],
-  limit_automation_rules: ['Automation rules', 'Free includes one automation rule. Remove it, or go Pro for as many as you want.'],
-  limit_companion_minutes: ['Companion minutes', 'Free Companion listening is twenty minutes a day, and today\'s are used. They reset at midnight.'],
-  limit_companion_history: ['Companion history', 'Free keeps seven days of Companion history. Pro keeps all of it.'],
-};
-let upgradeReason = null;
-function isLimitError(result) { return Boolean(result && (result.upgrade === true || String(result.error || '').startsWith('limit_'))); }
-function showUpgradeSheet(result) {
-  const code = String(result?.error || 'limit');
-  const [kicker, reason] = LIMIT_COPY[code] || ['Free limit reached', aiError(code)];
-  upgradeReason = code.replace(/^limit_/, '');
-  $('#upgrade-kicker').textContent = `Free limit: ${kicker}`;
-  $('#upgrade-reason').textContent = reason;
-  const signedIn = Boolean($('#auth-signedin') && !$('#auth-signedin').classList.contains('hidden'));
-  $('#upgrade-go').textContent = signedIn ? 'Upgrade to Pro' : 'Sign in to upgrade';
-  $('#upgrade-status').textContent = signedIn ? '' : 'Pro is tied to your Nūs account so it follows you to any PC.';
-  upgradeScrim.classList.remove('hidden');
-  requestAnimationFrame(() => upgradeScrim.classList.add('open'));
-  $('#upgrade-go').focus();
-}
-function closeUpgradeSheet() { upgradeScrim.classList.remove('open'); upgradeScrim.classList.add('hidden'); }
-function handleLimit(result) { if (!isLimitError(result)) return false; showUpgradeSheet(result); return true; }
-// One door for every provider or cap error: caps open the sheet, the rest toast.
-function reportAiError(result) { if (handleLimit(result)) return; showToast(aiError(result?.error, result?.detail)); }
-$('#upgrade-close').addEventListener('click', closeUpgradeSheet);
-$('#upgrade-later').addEventListener('click', closeUpgradeSheet);
-upgradeScrim.addEventListener('click', (event) => { if (event.target === upgradeScrim) closeUpgradeSheet(); });
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !upgradeScrim.classList.contains('hidden')) closeUpgradeSheet(); });
+// ---- Plan card: personal build ----
+// There is no Free tier and nothing to buy. The card reports the one true thing
+// (everything is uncapped); the upgrade sheet, Stripe checkout and billing
+// portal are gone from the DOM and from this file.
+//
+// A handful of call sites still ask "was that a plan refusal?" before falling
+// back to an ordinary error toast. They keep working: nothing can refuse now,
+// so the predicates answer no and every error takes the ordinary path.
+function closeUpgradeSheet() {}
+function handleLimit() { return false; }
 
-const CHECKOUT_ERRORS = {
-  sign_in_required: 'Sign in first. Pro is attached to your account.',
-  already_subscribed: 'This account already has Pro. Refreshing your plan.',
-  billing_not_configured: 'Checkout is not switched on yet on the server. Try again soon.',
-  network: 'No connection. Try again when you are back online.',
-  not_authenticated: 'Your session expired. Sign in again and retry.',
-  checkout_unavailable: 'Stripe could not open a checkout right now. Try again in a minute.',
-};
-async function startCheckout(reason, statusEl) {
-  const setStatus = (text) => { if (statusEl) statusEl.textContent = text; };
-  setStatus('Opening Stripe Checkout…');
-  const result = await api.licenseCheckout({ reason: reason || 'settings' });
-  if (result?.error === 'sign_in_required') { setStatus(''); closeUpgradeSheet(); focusSettingsCard('auth-card'); showToast(CHECKOUT_ERRORS.sign_in_required); return false; }
-  if (result?.error === 'already_subscribed') { setStatus(''); closeUpgradeSheet(); renderLicenseState(await api.licenseRefresh()); showToast(CHECKOUT_ERRORS.already_subscribed); return false; }
-  if (result?.error) { const text = CHECKOUT_ERRORS[result.error] || `Checkout failed (${result.error}).`; setStatus(text); showToast(text); return false; }
-  setStatus('Stripe Checkout is open in your browser. Pro turns on here the moment it completes.');
-  showToast('Stripe Checkout opened in your browser.');
-  return true;
-}
-$('#upgrade-go').addEventListener('click', async () => {
-  const button = $('#upgrade-go'); button.disabled = true;
-  try { await startCheckout(upgradeReason, $('#upgrade-status')); } finally { button.disabled = false; }
+$('#license-refresh')?.addEventListener('click', async () => {
+  renderLicenseState(await api.licenseRefresh());
 });
-$('#license-upgrade').addEventListener('click', async () => {
-  const button = $('#license-upgrade'); button.disabled = true;
-  try { await startCheckout('settings', null); } finally { button.disabled = false; }
-});
-$('#license-portal').addEventListener('click', async () => {
-  const button = $('#license-portal'); button.disabled = true; button.textContent = 'Opening…';
-  try {
-    const result = await api.licensePortal();
-    if (result?.error === 'no_subscription') showToast('No Stripe subscription is attached to this account yet.');
-    else if (result?.error) showToast(result.error === 'network' ? CHECKOUT_ERRORS.network : 'The billing portal could not open. Try again in a minute.');
-    else showToast('Stripe billing portal opened in your browser.');
-  } finally { button.disabled = false; button.textContent = 'Manage subscription'; }
-});
-$('#license-refresh').addEventListener('click', async () => {
-  const button = $('#license-refresh'); button.disabled = true; button.textContent = 'Checking…';
-  try { renderLicenseState(await api.licenseRefresh()); showToast(licenseState?.isPro ? 'Pro is active.' : 'Plan checked. Still on Free.'); }
-  finally { button.disabled = false; button.textContent = 'Refresh plan'; }
-});
-$('#auth-plan-link')?.addEventListener('click', () => focusSettingsCard('license-card'));
 
 // Optional setup code from the download page: campaign labels only, no
 // identity. Applied at most once per install; the main process enforces that.
@@ -1200,71 +1086,9 @@ $('#source-ask')?.addEventListener('click', async (event) => {
   hideSourceAsk();
   if (button.dataset.source !== 'skipped') showToast('Thanks. That is all it is used for.');
 });
-api.onLicenseLimit?.((result) => handleLimit(result));
-api.onLicenseActivated?.(async (plan) => {
-  closeUpgradeSheet();
-  await renderLicenseState(plan);
-  showToast(`Pro is active${plan?.email ? ` on ${plan.email}` : ''}. Caps are off.`);
-  pulseKnot();
-});
-api.onLicenseReturn?.(async (info) => {
-  if (info?.isPro) { closeUpgradeSheet(); await renderLicenseState(await api.licenseStatus()); showToast('Pro is active. Caps are off.'); pulseKnot(); }
-  else showToast('Welcome back. Checking your plan with Stripe…');
-});
-
-
-// Shared by the Settings card and the first-launch step. Each returns
-// { ok, message } and leaves the UI refresh to the caller.
-async function authEmailLogin(email, password) {
-  if (!email || !password) return { ok: false, message: 'Enter email and password.' };
-  const result = await api.loginEmail(email, password);
-  if (result.error) return { ok: false, message: result.error };
-  await renderAuthState();
-  await renderLicenseState(await api.licenseRefresh());
-  renderSyncState();
-  return { ok: true, message: 'Signed in.' };
-}
-async function authEmailSignup(email, password) {
-  if (!email || !password) return { ok: false, message: 'Enter email and password.' };
-  if (password.length < 8) return { ok: false, message: 'Password must be at least 8 characters.' };
-  const result = await api.signupEmail(email, password);
-  if (result.error) return { ok: false, message: result.error };
-  await renderAuthState();
-  await renderLicenseState(await api.licenseRefresh());
-  return { ok: true, pending: !result.session, message: result.session ? 'Account created and signed in.' : 'Check your email for the confirmation link, then sign in here.' };
-}
-async function authGoogle() {
-  const result = await api.loginGoogle();
-  if (result.error) return { ok: false, message: result.error };
-  return { ok: true, message: 'Continuing in your browser. Come back to Nūs after approving.' };
-}
-$('#auth-login').addEventListener('click', async () => {
-  const result = await authEmailLogin($('#auth-email').value.trim(), $('#auth-password').value);
-  showToast(result.message);
-});
-$('#auth-signup').addEventListener('click', async () => {
-  const result = await authEmailSignup($('#auth-email').value.trim(), $('#auth-password').value);
-  showToast(result.message);
-});
-$('#auth-google').addEventListener('click', async () => {
-  const result = await authGoogle();
-  showToast(result.message);
-});
-api.onAuthChanged?.(async () => {
-  showToast('Signed in with Google.');
-  await renderAuthState();
-  await renderLicenseState(await api.licenseRefresh());
-  await renderSyncState();
-  if (onboardStep === 'auth' && !$('#onboard-scrim').classList.contains('hidden')) advanceFromAuthStep();
-});
-$('#auth-logout').addEventListener('click', async () => {
-  const result=await api.logout();
-  if(result?.error)return showToast(result.error);
-  showToast('Signed out.');
-  renderAuthState();
-  renderLicenseState(await api.licenseRefresh());
-  renderSyncState();
-});
+// Personal build: there is no billing to return from and no plan to activate,
+// so these listeners are gone. renderLicenseState() still runs at start so the
+// Settings card can say what it really is.
 
 async function renderSyncState() {
   // Cloud content sync is not shipped. The card stays in the DOM as a visible
@@ -1345,7 +1169,6 @@ $('#outlook-connect').addEventListener('click', async () => {
   if (result.error) {
     $('#outlook-status').textContent = aiError(result.error, result.detail);
     if (result.needsAdminConsent) $('#outlook-note').textContent = 'Many universities block third-party mail access until IT approves the app. You can request approval from that screen, or connect a personal Microsoft account. Either way, the drafter below works right now and the Copy button puts the email on your clipboard.';
-    if (handleLimit(result)) return;
     return showToast(result.needsAdminConsent ? 'Your school needs to approve mail access.' : aiError(result.error, result.detail));
   }
   showToast(result.connected ? 'Outlook connected (read-only).' : 'Outlook disconnected.');
@@ -1480,7 +1303,6 @@ async function submitGlobalAsk(){
   state.busy=true;renderHero();
   try{
     const result=await api.assistantParse(text);
-    if(handleLimit(result)){globalAnswer.classList.add('hidden');return;}
     if(result.error||!result.proposal||!result.proposal.needs_confirm){await answerWithAi(result?.proposal?.command?.question||text,globalAnswer,Boolean(result.error));return;}
     state.proposal=result.proposal;setView('today');renderProposal();
   }finally{state.busy=false;renderHero();}
@@ -1547,7 +1369,6 @@ async function answerWithAi(query,target,skipAi){
   setKnotSpeaking(true);
   const result=await api.chatSend([{role:'user',text:query}],{qaOnly:true}).catch(()=>null);
   setTimeout(()=>setKnotSpeaking(false),1400);
-  if(handleLimit(result)){target.classList.add('hidden');return;}
   if(!result||result.error||!result.text){answerLocally(query,target);return;}
   target.textContent=result.text;
 }
@@ -1831,7 +1652,7 @@ $('#chat-thread')?.addEventListener('click',async(e)=>{
   if(b.id!=='chat-confirm'||!chatProposal)return;
   const proposal=chatProposal;chatProposal=null;renderChat();
   const result=await api.assistantExecute(proposal);
-  if(result?.error){if(handleLimit(result))state.chat.push({role:'nus',text:'That needs Pro. The upgrade sheet is open.'});else state.chat.push({role:'nus',text:aiError(result.error,result.detail)});}
+  if(result?.error){state.chat.push({role:'nus',text:aiError(result.error,result.detail)});}
   else{
     state.chat.push({role:'nus',text:result.message||'Done.'});
     if(result.navigate==='email'){
@@ -2010,7 +1831,6 @@ async function askVoice(){
   if(!result){voicePendingAsk=false;voiceNote('Nūs could not answer that one.');setVoiceState('listening');return;}
   if(result.streaming)return; // ai:event events finish this turn
   voicePendingAsk=false;
-  if(handleLimit(result)){stopVoice();return;}
   if(result.error){voiceNote(aiError(result.error,result.detail));setVoiceState('listening');return;}
   voiceTurns.push({role:'nus',text:result.text||'Done.'});
   voiceProposal=result.proposal||null;
@@ -2121,7 +1941,7 @@ $('#voice-thread')?.addEventListener('click',async(e)=>{
   const proposal=voiceProposal;voiceProposal=null;renderVoiceThread();
   const result=await api.assistantExecute(proposal);
   let reply;
-  if(result?.error){reply=handleLimit(result)?'That needs Pro. The upgrade sheet is open.':aiError(result.error,result.detail);}
+  if(result?.error){reply=aiError(result.error,result.detail);}
   else{
     reply=result.message||'Done.';
     if(result.navigate==='email'){
@@ -2334,38 +2154,25 @@ let tourIndex=0;
 let welcomeTimer=null;
 
 let onboardStep = 'focus';
-// The plain first-run notice with the switch right there (TELEMETRY-CONTRACT.md).
-// Rendered on whichever onboarding screen comes first, once per fresh install.
+// Personal build: nothing is transmitted, so there is no telemetry switch to
+// put in front of the operator. The first-run screen says what stays local
+// instead of asking a question with one answer.
 function statsNoticeHtml(){
-  if(!api.statsStatus)return '';
-  const on=statsState?Boolean(statsState.enabled):true;
-  return `<label class="onboard-stats"><span class="switch"><input id="ob-stats-toggle" type="checkbox"${on?' checked':''} /><span class="slider"></span></span><span>Nūs sends anonymous usage stats (which features get used, never your coursework or what you type). Turn off in Settings.</span></label>`;
+  return `<p class="onboard-stats">Nothing leaves this machine. Your semester, your notes and your transcripts stay in a local database; the only network calls are the ones your own model provider sees.</p>`;
 }
-function bindStatsNotice(){
-  $('#ob-stats-toggle')?.addEventListener('change',(e)=>{setStatsEnabled(e.target.checked);});
-}
+function bindStatsNotice(){}
+// Personal build: this was the sign-in step. There is no account to create, so
+// it is now the one thing a first run should say before anything else: where the
+// data lives, and what the app will reach for over the network.
 function renderAuthStep(){
   onboardStep='auth';
   $('.onboard-card').dataset.step='auth';
-  $('#onboard-content').innerHTML=`<div class="section-kicker">Welcome</div><h2>Hey. I am Nūs.</h2><p>Sign in and Pro, whenever you want it, follows you to any PC. Your syllabi, notes, and transcripts stay on this machine either way; your account is only an email and a plan.</p>
-    <div class="onboard-auth">
-      <button id="ob-google" class="primary-button" type="button">Continue with Google</button>
-      <div class="auth-divider"><span>or use email</span></div>
-      <div class="onboard-auth-grid"><input id="ob-email" type="email" placeholder="School or personal email" autocomplete="email" /><input id="ob-password" type="password" placeholder="Password, 8+ characters" autocomplete="current-password" /></div>
-      <div class="onboard-auth-row"><button id="ob-login" class="quiet-button" type="button">Sign in</button><button id="ob-signup" class="quiet-button" type="button">Create account</button><span id="ob-status" class="onboard-auth-status"></span></div>
-    </div>${statsNoticeHtml()}`;
-  bindStatsNotice();
+  $('#onboard-content').innerHTML=`<div class="section-kicker">First run</div><h2>Everything stays on this machine.</h2><p>Your syllabus, notes, tasks and transcripts live in a local database next to the app. There is no account and no plan to sign up for; the app talks to the model provider you chose and nothing else.</p>${statsNoticeHtml()}`;
   $('#onboard-dots').innerHTML='';
   $('#onboard-back').style.visibility='hidden';
-  $('#onboard-next').textContent='Continue without an account';
+  $('#onboard-next').textContent='Continue';
   $('#onboard-skip').textContent='Skip setup';
-  const status=(text,bad)=>{const el=$('#ob-status');if(!el)return;el.textContent=text;el.classList.toggle('bad',Boolean(bad));};
-  const busy=(on)=>$$('#ob-google,#ob-login,#ob-signup').forEach((b)=>{b.disabled=on;});
-  $('#ob-google').addEventListener('click',async()=>{busy(true);const r=await authGoogle();status(r.message,!r.ok);busy(false);});
-  $('#ob-login').addEventListener('click',async()=>{busy(true);const r=await authEmailLogin($('#ob-email').value.trim(),$('#ob-password').value);status(r.message,!r.ok);busy(false);if(r.ok)setTimeout(advanceFromAuthStep,500);});
-  $('#ob-signup').addEventListener('click',async()=>{busy(true);const r=await authEmailSignup($('#ob-email').value.trim(),$('#ob-password').value);status(r.message,!r.ok);busy(false);if(r.ok&&!r.pending)setTimeout(advanceFromAuthStep,500);});
-  $('#ob-password').addEventListener('keydown',(e)=>{if(e.key==='Enter')$('#ob-login').click();});
-  setTimeout(()=>$('#ob-email')?.focus(),350);
+  setTimeout(()=>$('#onboard-next')?.focus(),350);
 }
 async function advanceFromAuthStep(){
   await api.setPreference('auth_prompted',true);
@@ -2538,10 +2345,9 @@ $('#coach-close').addEventListener('click',finishOnboard);
 $('#replay-tour').addEventListener('click',()=>{focusPicked=state.data.preferences.focus_areas||[];onboardStep='focus';mountOnboardKnot();knotMood('ready');renderFocusPicker();$('#onboard-scrim').classList.remove('hidden');});
 window.addEventListener('resize',()=>{if(!$('#coach-card').classList.contains('hidden'))positionCoach(tourSteps[tourIndex]);});
 
+// Personal build: always the local-first notice, once per install.
 async function needsAuthStep(){
-  if(state.data.preferences.auth_prompted)return false;
-  const [cfg,sess]=await Promise.all([api.authConfig().catch(()=>({})),api.authSession().catch(()=>null)]);
-  return Boolean(cfg?.supabase)&&!sess?.user;
+  return !state.data.preferences.auth_prompted;
 }
 let onboardKnot=null;
 function mountOnboardKnot(){

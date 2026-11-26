@@ -217,10 +217,14 @@ function createStats(o) {
 
   function switchedOn() { const s = o.settings.get() || {}; return s.sendStats !== false; }
   // Everything that has to be true for one byte to leave the machine.
+  //
+  // Personal build: always false. Upstream sent from a packaged install unless
+  // the person switched it off or set NUS_STATS=0, which meant a fresh install
+  // reported to someone else's project by default. Nothing leaves this machine.
+  // The switch in Settings is still honoured (switchedOn) so the UI is honest,
+  // but it cannot turn sending on.
   function enabled() {
-    if (String(env.NUS_STATS || '') === '0') return false;
-    if (!o.packaged && String(env.NUS_STATS || '') !== '1') return false;
-    return switchedOn() && typeof fetchFn === 'function';
+    return false;
   }
 
   async function post(body) {

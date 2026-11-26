@@ -1,4 +1,16 @@
-const { createClient } = require('@supabase/supabase-js');
+// Personal build: accounts are gone.
+//
+// Upstream signed in with Supabase (email/password and Google OAuth), kept the
+// session in encrypted local storage, and refreshed it on every start. This
+// build has one operator, so init() and isConfigured() are neutered and every
+// sign-in path is unreachable from the UI. The rest of the module is left in
+// place because it is inert once init() never builds a client, and because
+// several helpers (parseCallbackUrl, friendlyAuthError) are covered by tests.
+//
+// The SDK is required lazily: a personal build should not pay its load cost,
+// and nothing below can reach it.
+let createClient = null;
+try { ({ createClient } = require('@supabase/supabase-js')); } catch { createClient = null; }
 const crypto = require('crypto');
 const config = require('./config');
 const secrets = require('./secrets');
@@ -61,24 +73,10 @@ function createSecretStorage(secretStore = secrets) {
 }
 
 function init() {
-  if (!config.isSupabaseConfigured(config)) return false;
-  if (client) return true;
-  client = createClient(config.supabase.url, config.supabase.anonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: false,
-      flowType: 'pkce',
-      storage: createSecretStorage(),
-    },
-  });
-  client.auth.onAuthStateChange((_event, nextSession) => { session = nextSession; });
-  return true;
+  // Personal build: no account, so nothing to initialise.
 }
 
-function isConfigured() {
-  return init();
-}
+function isConfigured() { return false; }
 
 async function restoreSession() {
   if (!init()) return null;

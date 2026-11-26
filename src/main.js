@@ -91,21 +91,11 @@ async function processProtocolUrl(url) {
   pendingProtocolUrl = null;
   const route = routeProtocolUrl(url);
   if (route === 'ignore') { showDesktopWindow(); return { error: 'ignored' }; }
-  if (route === 'acquire') {
+  // Personal build: referral and billing links are gone. A link that used to
+  // redeem a setup code or return from Stripe now only opens the dashboard.
+  if (route === 'acquire' || route === 'billing') {
     showDesktopWindow();
-    let token = '';
-    try { token = new URL(url).searchParams.get('tok') || ''; } catch {}
-    const userData = app.getPath('userData');
-    const result = acquisition.redeem(userData, acquisition.getSecret(userData), token);
-    sendToDesktop('acquisition:result', result);
-    return result;
-  }
-  if (route === 'billing') {
-    showDesktopWindow();
-    const state = await refreshLicense();
-    sendToDesktop('license:return', { isPro: Boolean(state.isPro) });
-    if (!state.isPro) watchForPro();
-    return { ok: true };
+    return { ok: false, reason: 'no_acquisition_in_personal_build' };
   }
   let result;
   try { result = await auth.handleOAuthCallback(url); }
@@ -186,7 +176,7 @@ function sendToDesktop(channel, data) {
 }
 
 async function refreshLicense() {
-  if (!licenseManager || !usageLimits) return { plan: 'free', isPro: false, source: 'not_ready' };
+  if (!licenseManager || !usageLimits) return { plan: 'personal', isPro: true, source: 'not_ready' };
   const state = await licenseManager.refresh();
   api.setStorageCapBytes(usageLimits.storageCapBytes());
   sendToDesktop('license:changed', { ...state, usage: usageLimits.summary() });
@@ -194,7 +184,7 @@ async function refreshLicense() {
 }
 
 function licenseSnapshot() {
-  const state = licenseManager ? licenseManager.status() : { plan: 'free', isPro: false, source: 'not_ready' };
+  const state = licenseManager ? licenseManager.status() : { plan: 'personal', isPro: true, source: 'not_ready' };
   return { ...state, usage: usageLimits ? usageLimits.summary() : null };
 }
 
@@ -236,7 +226,7 @@ function watchForPro() {
 function withAcquisitionDims(name, props) {
   const merged = props && typeof props === 'object' ? props : {};
   if (name === 'app_open' || name === 'signin' || name === 'first_import') {
-    return { ...acquisition.getDims(app.getPath('userData')), ...merged };
+    return merged;
   }
   return merged;
 }
@@ -551,8 +541,7 @@ function confirmSyllabus(payload) {
   // after the server answered, so an offline first import tries again on the
   // next confirm instead of vanishing. Every later confirm is an `import`.
   const userData = app.getPath('userData');
-  if (acquisition.hasFirstImport(userData)) trackEvent('import', {});
-  else acquisition.markFirstImportOnce(userData, () => trackEvent('first_import', {}).then((result) => result.sent)).catch(() => {});
+  trackEvent('import', {});
   writeBridge();
   return { ok: true, courseId, assignments: saved, weights: Object.keys(weightIds).length };
 }
@@ -724,25 +713,13 @@ app.whenReady().then(async () => {
   style.init(path.join(app.getPath('userData')));
   sttLocal.init({ userData: app.getPath('userData') });
   bridgeFile = path.join(app.getPath('userData'), 'context.json');
-  if (auth.isConfigured()) {
-    try { await auth.restoreSession(); } catch (e) { console.error('[nus] session restore failed', e); }
-  }
-  licenseManager = createLicense({
-    auth,
-    config,
-    // Offline Pro grace is encrypted with the OS account. It is deliberately
-    // unavailable when secure storage is unavailable instead of trusting an
-    // editable SQLite preference that could grant a fake subscription.
-    cacheStore: {
-      get: () => (secrets.isAvailable() ? secrets.getSecret('license-cache') : null),
-      set: (value) => { if (secrets.isAvailable()) secrets.setSecret('license-cache', value); },
-    },
-  });
-  usageLimits = createLimits({ db: api, license: licenseManager });
-  // Anonymous usage stats: on by default, off switch in Settings, nothing in
-  // unpackaged dev runs unless NUS_STATS=1, never in smoke runs. The enabled
-  // flag and the once-only bookkeeping live in the preferences table; the
-  // install id is <userData>/install_id.txt.
+  // Personal build: no account session to restore, and no subscription to
+  // check. createLicense() answers with a plan that is always on.
+  licenseManager = createLicense();
+  usageLimits = createLimits();
+  // Anonymous usage stats, kept wired but permanently disabled in this build
+  // (src/stats.js forces envDisabled). The settings switch and the once-only
+  // bookkeeping still exist so the dashboard's Privacy card reads honestly.
   stats = createStats({
     userData: app.getPath('userData'),
     config,
@@ -788,18 +765,10 @@ app.whenReady().then(async () => {
   if (!SMOKE) initAutoUpdate();
 
   companion = companionApp.initCompanion({
-    captureAllowanceMs: () => usageLimits.companionAllowanceMs(),
-    // The overlay shows its one-line status; the dashboard gets the real
-    // upgrade sheet, because that is where the Plan lives.
-    onCaptureLimit: () => {
-      trackEvent('limit_hit', { unit: 'companion_minutes' });
-      showDesktopWindow();
-      sendToDesktop('license:limit', { error: 'limit_companion_minutes', upgrade: true });
-    },
-    onCaptureEnd: (meta) => {
-      usageLimits.recordCompanionMs(meta.duration_ms);
-      // One row per ended Companion session: how long, nothing about what was said.
-      trackEvent('companion_session', { minutes: Math.max(0, Math.round((Number(meta.duration_ms) || 0) / 60000)) });
+    // No captureAllowanceMs and no onCaptureLimit: personal builds listen for as
+    // long as the operator leaves it on. companion/index.js setCapturing() only
+    // arms its stop timer when captureAllowanceMs exists and is finite.
+    onCaptureEnd: () => {
       sendToDesktop('license:changed', licenseSnapshot());
     },
     // A question or voice command the Knot answered: first_ask once, then
@@ -962,8 +931,8 @@ async function prepareChatTurn(messages, opts) {
     text: String((m && m.text) || '').slice(0, 2000).trim(),
   })).filter((m) => m.text);
   if (!turns.length) return { response: { error: 'empty_text' } };
-  const questionTicket = usageLimits.reserveQuestion();
-  if (!questionTicket.ok) return { response: denied(questionTicket) };
+  // Personal build: no question quota, so no ticket to reserve or roll back.
+  const questionTicket = { ok: true, rollback() {} };
   const latest = turns[turns.length - 1];
   const transcript = turns.map((m) => (m.role === 'nus' ? 'Nūs: ' : 'Student: ') + m.text).join('\n');
 
@@ -1038,8 +1007,6 @@ const handlers = {
   'integrations:list': () => api.listIntegrations(),
   'automations:list': () => api.listAutomations(),
   'automations:add': (_event, automation) => {
-    const allowed = usageLimits.automationAllowed(api.listAutomations().length);
-    if (!allowed.ok) return denied(allowed);
     return mutate(api.addAutomation)(automation);
   },
   'automations:update': (_event, id, fields) => mutate(api.updateAutomation)(id, fields),
@@ -1055,51 +1022,20 @@ const handlers = {
     return mutate(api.setPreference)(key, value);
   },
   'bridge:status': () => ({ connected: fs.existsSync(bridgeFile), path: bridgeFile, updated_at: fs.existsSync(bridgeFile) ? fs.statSync(bridgeFile).mtime.toISOString() : null }),
-  'auth:config': () => ({ supabase: auth.isConfigured(), googleCalendar: config.isGoogleCalendarConfigured(config), outlook: config.isOutlookConfigured(config) }),
-  'auth:session': () => ({ user: auth.getUser(), configured: auth.isConfigured() }),
-  'auth:login-email': async (_event, email, password) => {
-    const result = await auth.loginWithEmail(email, password);
-    if (result.session) { await refreshLicense(); trackEvent('signin', { method: 'email' }); writeBridge(); }
-    return result;
-  },
-  'auth:signup-email': async (_event, email, password) => {
-    const result = await auth.signUpWithEmail(email, password);
-    if (result.session) await refreshLicense();
-    return result;
-  },
-  'auth:login-google': async () => {
-    const result = await auth.loginWithGoogle();
-    if (result.url && isTrustedSupabaseAuthUrl(result.url)) shell.openExternal(result.url);
-    else if (result.url) return { error: 'Rejected an unexpected sign-in URL.' };
-    return result;
-  },
-  'auth:logout': async () => {
-    const cloudResult = await sync.deleteCloudData().catch((error) => ({ error: error.message }));
-    if (cloudResult.error && cloudResult.error !== 'sync_not_available') return cloudResult;
-    const logoutResult = await auth.logout();
-    if (logoutResult.error) return logoutResult;
-    stopProWatch();
-    await refreshLicense();
-    writeBridge();
-    return { ok: true };
-  },
+  // Personal build: no accounts. These channels stay registered so an older
+  // preload or dashboard cannot throw on invoke, but they do nothing.
+  'auth:config': () => ({ supabase: false, googleCalendar: config.isGoogleCalendarConfigured(config), outlook: config.isOutlookConfigured(config) }),
+  'auth:session': () => ({ user: null, configured: false }),
+  'auth:login-email': async () => ({ error: 'no_accounts_in_personal_build' }),
+  'auth:signup-email': async () => ({ error: 'no_accounts_in_personal_build' }),
+  'auth:login-google': async () => ({ error: 'no_accounts_in_personal_build' }),
+  'auth:logout': async () => ({ ok: true }),
   'license:status': () => licenseSnapshot(),
   'license:refresh': async () => { await refreshLicense(); return licenseSnapshot(); },
-  'license:checkout': async (_event, meta) => {
-    trackEvent('upgrade_click', { reason: typeof meta?.reason === 'string' ? meta.reason.slice(0, 40) : 'settings' });
-    const result = await licenseManager.createCheckout();
-    if (result.url) {
-      trackEvent('checkout_started', {});
-      await shell.openExternal(result.url);
-      watchForPro();
-    }
-    return result.url ? { ok: true } : result;
-  },
-  'license:portal': async () => {
-    const result = await licenseManager.createPortal();
-    if (result.url) await shell.openExternal(result.url);
-    return result.url ? { ok: true } : result;
-  },
+  // No billing, so these never open a browser. The dashboard's upgrade sheet
+  // is gone, so nothing calls them either.
+  'license:checkout': async () => ({ error: 'no_billing_in_personal_build' }),
+  'license:portal': async () => ({ error: 'no_billing_in_personal_build' }),
   'license:track': (_event, name, props) => { trackEvent(String(name), props && typeof props === 'object' ? props : {}); return true; },
   // Anonymous usage stats: the Settings switch, the onboarding notice and the
   // one-click "Where did you hear about Nūs?" row all go through these.
@@ -1108,9 +1044,9 @@ const handlers = {
   'stats:source-answer': async (_event, source) => (stats ? stats.answerSource(String(source || 'skipped')) : { ok: false }),
   'acquisition:redeem': (_event, token) => {
     const userData = app.getPath('userData');
-    return acquisition.redeem(userData, acquisition.getSecret(userData), String(token || '').trim());
+    return { ok: false, reason: 'no_acquisition_in_personal_build' };
   },
-  'acquisition:status': () => acquisition.getDims(app.getPath('userData')),
+  'acquisition:status': () => ({}),
   'sync:status': async () => sync.status(),
   'sync:set-enabled': async (_event, enabled) => {
     const r = await sync.setSyncEnabled(enabled);
@@ -1124,8 +1060,6 @@ const handlers = {
     return { connected: s.connected, configured: s.configured, email: s.email };
   },
   'outlook:connect': async (_event, withSend) => {
-    const allowed = usageLimits.connectedAccountAllowed('outlook', await connectedAccountStatuses());
-    if (!allowed.ok) return denied(allowed);
     return outlook.connect(Boolean(withSend));
   },
   'outlook:disconnect': async () => outlook.disconnect(),
@@ -1161,8 +1095,6 @@ const handlers = {
   },
   'gcal:status': async () => gcal.status(),
   'gcal:connect': async () => {
-    const allowed = usageLimits.connectedAccountAllowed('google_calendar', await connectedAccountStatuses());
-    if (!allowed.ok) return denied(allowed);
     const result = await gcal.connect();
     if (result.connected) await refreshGcalCache();
     writeBridge();
@@ -1190,27 +1122,20 @@ const handlers = {
   'ai:clear-key': () => ai.clearApiKey(),
   'ai:test': async () => ai.testConnection(),
   'syllabus:import': async (_event, filePath) => {
-    const allowed = usageLimits.syllabusAllowed(null);
-    if (!allowed.ok) return denied(allowed);
     const result = await importSyllabus(typeof filePath === 'string' ? filePath : null);
-    if (result?.data && result.sourceId) usageLimits.recordSyllabus(result.sourceId);
     return result;
   },
   'syllabus:extract': async (_event, sourceId) => {
-    const allowed = usageLimits.syllabusAllowed(sourceId);
-    if (!allowed.ok) return denied(allowed);
     const source = api.listSources().find((row) => row.id === sourceId);
     const sourceText = api.getSourceText(sourceId);
     if (!source || !sourceText) return { error: 'source_missing' };
     const extraction = await ai.extractSyllabus(sourceText);
     if (extraction.error) return { ...extraction, sourceId, fileName: source.title };
-    usageLimits.recordSyllabus(sourceId);
     return { sourceId, fileName: source.title, data: extraction };
   },
   'syllabus:confirm': (_event, payload) => confirmSyllabus(payload),
   'assistant:parse': async (_event, text) => {
-    const ticket = usageLimits.reserveQuestion();
-    if (!ticket.ok) return denied(ticket);
+    const ticket = { ok: true, rollback() {} };
     const result = await assistantParse(text);
     if (['no_ai', 'cli_timeout', 'cli_failed', 'cli_not_logged_in', 'cli_spawn_failed', 'api_failed', 'api_refused', 'api_timeout', 'api_network'].includes(result?.error)) ticket.rollback();
     // A plain question continues into chat:send, which counts it; only a
