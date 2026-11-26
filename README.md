@@ -76,11 +76,27 @@ npm start
 
 | Command | What it does |
 |---|---|
-| `npm test` | Full assertion suite (1026 tests) |
+| `npm test` | Full assertion suite |
 | `npm run smoke` | Boots and exits |
 | `npm run tour` | Replays the walkthrough |
 | `npm run dist` | Builds the Windows installer into `dist/` |
 | `npm run setup:voice` | Downloads whisper.cpp + the base English model (~65 MB) into `vendor/` |
+
+### Building it
+
+Windows builds run in CI, manually, and the run launches the app it just packed
+before it uploads anything:
+
+```
+gh workflow run build-windows
+gh run download -n jarvis-windows -D dist
+```
+
+The artifacts are `JARVIS-Setup.exe`, `JARVIS-Portable.exe` and `latest.yml`
+(what installed copies poll to update themselves). macOS has its own manual
+workflow, `build-mac`. Neither one publishes a release: that stays a command
+you run after you have launched the build yourself. The full sequence is in
+`docs/release.md`.
 
 ## Zen
 

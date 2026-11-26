@@ -1,0 +1,148 @@
+# Builds the Windows app: an NSIS installer and a portable exe.
+#
+# The Mac workflow exists because a .dmg cannot be cross-built. This one exists
+# for the opposite reason: Windows *can* be cross-built from Linux, but doing it
+# on windows-latest is the only way to run the thing we ship. A build that is
+# never launched is a build that is only probably an app.
+#
+# Manual trigger only, and it never touches a release. The files land as run
+# artifacts, get launched on a real PC, and are attached to a release by hand.
+# A release is public the moment it exists, so that step stays a human command
+# (docs/release.md).
+#
+# Repository secrets, set once. None are required for the build to succeed: the
+# app is usable with only an AI key pasted in Settings, and an empty value is
+# written as an empty string, which src/config.js reports as "not configured".
+#   NUS_GCAL_CLIENT_ID, NUS_GCAL_CLIENT_SECRET
+#   NUS_OUTLOOK_CLIENT_ID
+#
+# Deliberately absent: NUS_SUPABASE_URL / NUS_SUPABASE_ANON_KEY. This build has
+# no accounts, and the workflow does not ask for the credentials of a server
+# that is no longer part of the product.
+name: build-windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      smoke_only:
+        description: 'Build and smoke-test, skip the installers'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # src/config.js is gitignored and required at startup, so a clean checkout
+      # has nothing for src/main.js to require. write-config refuses to run on a
+      # missing value, so every optional integration is passed as an empty
+      # string on purpose: absent means absent, not "the secret did not resolve".
+      - name: Write src/config.js
+        shell: pwsh
+        env:
+          NUS_GCAL_CLIENT_ID: ${{ secrets.NUS_GCAL_CLIENT_ID }}
+          NUS_GCAL_CLIENT_SECRET: ${{ secrets.NUS_GCAL_CLIENT_SECRET }}
+          NUS_OUTLOOK_CLIENT_ID: ${{ secrets.NUS_OUTLOOK_CLIENT_ID }}
+        run: |
+          $env:NUS_SUPABASE_URL = ''
+          $env:NUS_SUPABASE_ANON_KEY = ''
+          foreach ($n in 'NUS_GCAL_CLIENT_ID','NUS_GCAL_CLIENT_SECRET','NUS_OUTLOOK_CLIENT_ID') {
+            if (-not (Test-Path env:$n)) { Set-Item "env:$n" '' }
+          }
+          node scripts/write-config.js
+
+      - name: Test
+        run: npm test
+
+      - name: Fetch the whisper binary the Windows build bundles
+        run: npm run setup:voice
+
+      # `npm run dist` begins with make-voice-lines.js, which needs the Fable
+      # model in vendor/voice. vendor/ is gitignored (the model is ~300 MB), and
+      # nothing in the repo downloads it into the tree, so this step is not
+      # boilerplate: without it the build stops at line one of the script.
+      #
+      # It is also the one step expected to need attention, and the honest
+      # reason is that this workflow has never been run. The model is fetched
+      # with the same pinned SHA-256 that the app checks at install time, so a
+      # wrong URL fails loudly here instead of shipping a broken build.
+      - name: Fetch the Fable voice model for the pre-built lines
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2'
+          $root = Join-Path $env:GITHUB_WORKSPACE 'vendor\voice'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          $archive = Join-Path $root 'kokoro-multi-lang-v1_0.tar.bz2'
+          Invoke-WebRequest -Uri $url -OutFile $archive -MaximumRetryCount 3
+          # The whole pin from companion/src/voice/index.js, not a prefix: the
+          # app refuses a model that does not match this hash, so the build must
+          # refuse the same one rather than shipping it and failing at run time.
+          $want = '60703707bc05ccd48d60e1eb723f38b07d6e474795a0b6a588d7220400e0f7a4'
+          $got = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLower()
+          if ($got -ne $want) { throw "voice archive hash $got is not $want" }
+          & "$env:SystemRoot\System32\tar.exe" -xjf $archive -C $root
+          Remove-Item $archive
+          if (-not (Test-Path (Join-Path $root 'voices.bin'))) { Get-ChildItem -Recurse $root | Out-String | Write-Host; throw 'the voice files did not land in vendor/voice' }
+
+      - name: Check the voice lines are all present
+        run: node scripts/make-voice-lines.js --check
+
+      - name: Build installer and portable exe
+        if: ${{ !inputs.smoke_only }}
+        run: npm run dist -- --publish never
+
+      # The asar scan is the same one the Mac build runs: it fails the build if
+      # anything that must not ship is packed.
+      - name: Scan the packed asar
+        if: ${{ !inputs.smoke_only }}
+        run: node scripts/package-security-check.js dist/win-unpacked/resources/app.asar
+
+      # Launch the app we are about to publish. --smoke creates a window, opens
+      # the database and starts the Companion, then quits itself; a package that
+      # cannot do that is not a package. An isolated profile keeps the runner's
+      # real %APPDATA% out of it.
+      - name: Smoke the unpacked app
+        if: ${{ !inputs.smoke_only }}
+        shell: pwsh
+        env:
+          NUS_SMOKE_DATA_DIR: ${{ runner.temp }}\jarvis-smoke
+        run: |
+          $exe = 'dist\win-unpacked\JARVIS.exe'
+          if (-not (Test-Path $exe)) { throw "no $exe; the builder named the app something else" }
+          $out = & $exe --smoke 2>&1 | Out-String
+          Write-Host $out
+          if ($out -notmatch 'smoke ok') { throw 'the packaged app did not report smoke ok' }
+          # Quit itself is part of the deal: a hung smoke run would hang the job.
+          if (-not $out.Trim()) { throw 'the packaged app produced no output' }
+
+      - name: List what was built
+        if: ${{ !inputs.smoke_only }}
+        shell: pwsh
+        run: Get-ChildItem dist -Include *.exe,*.blockmap,*.yml -Recurse | Select-Object FullName,Length | Format-Table -AutoSize | Out-String | Write-Host
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.smoke_only }}
+        with:
+          name: jarvis-windows
+          path: |
+            dist/JARVIS-Setup.exe
+            dist/JARVIS-Portable.exe
+            dist/JARVIS-Setup.exe.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+          retention-days: 14

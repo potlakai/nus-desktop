@@ -86,6 +86,16 @@ const config = {
       // The Windows probe is a PowerShell script run with -File, which cannot
       // read from inside the asar; it ships beside the whisper binary.
       { from: 'companion/src/win', to: 'win', filter: ['*.ps1'] },
+      // The voice, and the lines already said in it. Both are read from
+      // process.resourcesPath (companion/src/voice/index.js bundledRoots,
+      // voice/lines.js shippedLinesDir) and neither can be read from inside the
+      // asar: the model is loaded by a native addon and the wavs are served to
+      // the page. Without these two entries the app runs and speaks in the
+      // Windows voice, which is the bug Pranav reported as "the hello line was
+      // not heard". Missing folders are skipped, so a build made without
+      // vendor/voice still packs; setup-voice and make-voice-lines fill them.
+      { from: 'vendor/voice', to: 'voice', filter: ['**/*'] },
+      { from: 'vendor/voice-lines', to: 'voice-lines', filter: ['**/*'] },
     ],
     ...(azure ? {
       azureSignOptions: {
