@@ -65,20 +65,20 @@ function guideChip(front) {
 }
 const HANDS_CARD = { title: 'Open Notepad and type a list?', hint: 'It runs on this PC with no AI model. Nothing is sent anywhere.' };
 // The hello card (Pranav, 2026-11-11). typed: the Notepad note landed, at least in part.
-const HELLO_LINE = "Hey, I'm Nūs. That was me. Wanna see what else I can do?";
-const HELLO_UNTYPED_LINE = "Hey, I'm Nūs. I live on your screen. Wanna see what I can do?";
+const HELLO_LINE = "Hey, I'm J.A.R.V.I.S. That was me. Wanna see what else I can do?";
+const HELLO_UNTYPED_LINE = "Hey, I'm J.A.R.V.I.S. I live on your screen. Wanna see what I can do?";
 const HELLO_ACTIONS = [{ id: 'tour-next', label: 'Show me', primary: true }, { id: 'tour-later', label: 'Not now' }];
 const HANDS_DONE_LINE = 'That was me on your mouse. Ask me to do something in any app and I will.';
 // The action could not see the words land: the card says so, never "that was me".
 const HANDS_UNSURE_LINE = 'I typed that, but I could not see it land. Have a look at Notepad.';
-const NOT_ENGLISH_LINE = 'Nūs speaks English for now.';
+const NOT_ENGLISH_LINE = 'J.A.R.V.I.S speaks English for now.';
 // The voice download: the model is about 350 MB (companion/src/voice/index.js).
 const VOICE_MB = 350;
 const VOICE_LANDED_LINE = 'That is me now.';
 const VOICE_FAILED_LINE = 'My voice did not download. The Windows voice stays for now. You can try again on the dashboard, under Settings, Voice.';
 // Card 10: the Knot's loose end walks the dashboard's rail, one line a stop.
 const DASHBOARD_STOPS = [
-  { view: 'mynus', line: 'My Nūs: your week, what I did for you, and everything I know about you.' },
+  { view: 'mynus', line: 'Your week: what I did for you, and everything I know about you.' },
   { view: 'saved', line: 'Saved: what I keep for you, and what I did today.' },
   { view: 'map', line: 'Map: your notes and chats, laid out as a map.' },
   // Folders reads files so answers can use them; it never moves or tidies them.
@@ -189,14 +189,14 @@ function card(step, info = {}) {
     // "That was me" only once something was really typed: the card can be drawn while the hello is still
     // running (a second start of the tour), and a hello that typed nothing must not claim it (a tester, 2026-11-15).
     const typed = caps.helloTyped === true;
-    return Object.assign(base, { kind: 'hello', skip: false, title: "Hey, I'm Nūs.", body: typed ? 'That was me. Wanna see what else I can do?' : 'I live on your screen. Wanna see what I can do?',
+    return Object.assign(base, { kind: 'hello', skip: false, title: "Hey, I'm J.A.R.V.I.S.", body: typed ? 'That was me. Wanna see what else I can do?' : 'I live on your screen. Wanna see what I can do?',
       spoken: typed ? HELLO_LINE : HELLO_UNTYPED_LINE, status: '', actions: HELLO_ACTIONS.slice() });
   }
   if (step === STEP.mic) return Object.assign(base, { kind: 'mic', title: 'Now, can I hear you?', body: 'Say anything out loud. If the bars move, your mic works.', spoken: 'Now, can I hear you? Say anything.', note: caps.english === false ? NOT_ENGLISH_LINE : '', device: caps.device || '', status: '', actions: continueActions(true) });
   if (step === STEP.key) {
     const typed = caps.whisper === false;
     return Object.assign(base, { kind: 'key', title: 'This is how you talk to me', keys: keycaps(caps.ptt, caps.mac),
-      body: typed ? 'I cannot hear words on this computer yet, so type your name instead.' : caps.mac ? 'Hold the keys, say your name, let go. The first time, your Mac asks to let Nus Companion use the microphone.' : 'Hold the keys, say your name, let go. I listen the whole time you hold them.',
+      body: typed ? 'I cannot hear words on this computer yet, so type your name instead.' : caps.mac ? 'Hold the keys, say your name, let go. The first time, your Mac asks to let the Companion use the microphone.' : 'Hold the keys, say your name, let go. I listen the whole time you hold them.',
       spoken: typed ? 'Type your name and I will remember it.' : caps.mac ? 'Hold the keys, say your name, and let go.' : 'Hold the keys, say your name, and let go.',
       chip: typed ? '' : 'My name is ...', status: typed ? '' : 'Waiting for you',
       // Typing is always offered (Pranav, 2026-11-11: "even if someone's mic works, give them the
@@ -244,8 +244,8 @@ function card(step, info = {}) {
 // The dictation card (0.1.37 test, half of installs): right after the talk key's
 // card, kept on its step number so the dots and "of 10" do not move. The
 // practice line goes into the person's own app (the Notepad the hello typed
-// into, or any text box), never into a Nūs window.
-const DICTATE_PRACTICE = 'This is my first note with Nūs.';
+// into, or any text box), never into a J.A.R.V.I.S window.
+const DICTATE_PRACTICE = 'This is my first note with J.A.R.V.I.S.';
 const DICTATE_DONE_LINE = 'That is dictation. Ctrl and Win type for you in any app, any time.';
 const DICTATE_MISSED_LINE = 'Click into a text box first, like Notepad, then hold Ctrl and Win again.';
 function dictateCard(info = {}) {

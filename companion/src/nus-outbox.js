@@ -1,4 +1,4 @@
-// One-way outbox: copilot -> Nūs desktop brain. Opt-in (reportToNus setting).
+// One-way outbox: copilot -> J.A.R.V.I.S desktop brain. Opt-in (reportToNus setting).
 // Appends bounded event records to <userData>/companion-events.json so the
 // desktop app can ingest what the overlay saw and answered. Mirror of
 // nus-context.js, pointed the other direction.
@@ -33,7 +33,7 @@ function appendEvent(baseDir, event) {
   if (events.length > MAX_EVENTS) events = events.slice(-MAX_EVENTS);
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ schema_version: 1, product: 'Nūs', source: 'companion', events }, null, 2));
+    fs.writeFileSync(file, JSON.stringify({ schema_version: 1, product: 'J.A.R.V.I.S', source: 'companion', events }, null, 2));
     return true;
   } catch {
     return false;

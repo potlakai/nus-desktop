@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('nus', {
   platform: process.platform,
   settingsGet: () => ipcRenderer.invoke('companion:settings:get'),
   settingsSet: (patch) => ipcRenderer.invoke('companion:settings:set', patch),
-  // Standalone: the one settings surface is the Nūs Companion window.
+  // Standalone: the one settings surface is the the Companion window.
   openSettings: (section) => ipcRenderer.invoke('companion:settings:open', section == null ? '' : String(section)),
   shortcutAssistSet: (accelerator) => ipcRenderer.invoke('companion:shortcut:assist:set', accelerator),
   ask: (payload) => ipcRenderer.send('companion:ask', payload),

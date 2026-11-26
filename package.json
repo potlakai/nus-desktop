@@ -1,7 +1,7 @@
 {
-  "name": "nus-desktop",
-  "version": "0.2.7",
-  "description": "Nūs: the semester organizer that runs on your own AI, on your own machine.",
+  "name": "jarvis-desktop",
+  "version": "0.3.0",
+  "description": "J.A.R.V.I.S: a personal desktop AI that reads the screen, drives the desktop, and answers to sir.",
   "main": "src/main.js",
   "private": true,
   "scripts": {
@@ -9,7 +9,7 @@
     "smoke": "electron . --smoke",
     "tour": "electron . --tour",
     "test:db": "node --test src/db.test.js",
-    "dist": "electron-builder --win --config electron-builder.config.js",
+    "dist": "node scripts/make-voice-lines.js && electron-builder --win --config electron-builder.config.js",
     "dist:mac": "electron-builder --mac --config electron-builder.config.js",
     "test": "node --test src/*.test.js companion/test/*.test.js",
     "dist:check": "node scripts/package-security-check.js",
@@ -18,11 +18,11 @@
   "engines": {
     "node": ">=18"
   },
-  "author": "Pranav Desu",
+  "author": "Om Senjalia",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/potlakai/nus-desktop.git"
+    "url": "https://github.com/omsenjalia/nus-desktop.git"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

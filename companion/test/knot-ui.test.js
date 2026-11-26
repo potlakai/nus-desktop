@@ -9,7 +9,7 @@ const html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
 const js = fs.readFileSync(path.join(root, 'renderer', 'renderer.js'), 'utf8');
 
-test('the persistent companion mark is the animated Nūs Knot', () => {
+test('the persistent companion mark is the animated J.A.R.V.I.S Knot', () => {
   assert.match(html, /class="nus-knot"/);
   assert.match(html, /id="knot-bloom"/);
   assert.doesNotMatch(html, /nus-statue-mark\.png/);

@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const invoke = (name, ...args) => ipcRenderer.invoke('home:' + name, ...args);
 contextBridge.exposeInMainWorld('home', {
   status: () => invoke('status'), settingsGet: () => invoke('settings:get'), settingsSet: p => invoke('settings:set',p), publikChoice: c => invoke('publik:choice',c), publikWho: () => invoke('publik:who'), publikSignOut: () => invoke('publik:signout'),
-  keysTest: which => invoke('keys:test', which), statsSource: source => invoke('stats:source', source), myNus: () => invoke('my-nus'), shareCard: dataUrl => invoke('share-card', dataUrl),
+  keysTest: which => invoke('keys:test', which), statsSource: source => invoke('stats:source', source), myJarvis: () => invoke('my-nus'), shareCard: dataUrl => invoke('share-card', dataUrl),
   sessions: () => invoke('sessions'), messages: id => invoke('messages',id), search: q => invoke('search',q), exportSession: id => invoke('session:export',id),
   keeps: () => invoke('keeps:list'), forgetKeep: key => invoke('keeps:forget',key), routines: () => invoke('routines:list'), deleteRoutine: at => invoke('routines:delete',at), notes: () => invoke('notes:list'),
   folders: () => invoke('folders:list'), addFolder: () => invoke('folders:add'), removeFolder: id => invoke('folders:remove',id), toggleFolder: (id,v) => invoke('folders:toggle',id,v), reindexFolder: id => invoke('folders:reindex',id),

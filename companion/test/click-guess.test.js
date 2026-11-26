@@ -50,7 +50,7 @@ test('the guide uses the guess only where the host says so, and the Mac capture 
   assert.match(src, /if \(!probe\) \{ this\.watchWithoutProbe\(\); return; \}/);
   assert.match(src, /if \(!this\.d\.guessClicks/);
   assert.match(src, /Screen & System Audio Recording/);
-  assert.match(src, /'I could not read the screen\. On Windows, allow screen capture for Nūs and try again\.'/, 'the Windows line is unchanged');
+  assert.match(src, /'I could not read the screen\. On Windows, allow screen capture for J.A.R.V.I.S and try again\.'/, 'the Windows line is unchanged');
   const main = fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8');
   assert.match(main, /guessClicks: IS_MAC,/);
 });

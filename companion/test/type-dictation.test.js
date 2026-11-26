@@ -288,7 +288,7 @@ test('the whole press goes to the resident whisper once, as a careful decode wit
   const l = createListener({ transcribe: async () => 'fast', server, vocabulary: () => ['Professor Lee'] });
   assert.equal(await l.whole(pcm(3000)), 'Type, I just built an app.');
   const ask = server.asked.find((a) => a.careful);
-  assert.equal(ask.prompt, 'Nūs Companion, Professor Lee.');
+  assert.equal(ask.prompt, 'Jarvis, Professor Lee.');
   assert.equal(ask.audioCtx, undefined, 'the encoder keeps its whole context');
   assert.equal(ask.timeoutMs, l.CFG.wholeBudgetMs);
   assert.ok(ask.bytes > 3000 * 32, 'the press as one WAV');
@@ -303,8 +303,8 @@ test('no answer worth having is an empty string: the caller keeps the fast words
   assert.equal(await createListener({ transcribe: async () => 'fast', server: residentWhisper(() => { throw new Error('reset'); }) }).whole(pcm(2000)), '');
   assert.equal(await createListener({ transcribe: async () => 'fast', server: residentWhisper('words') }).whole(Buffer.alloc(0)), '');
   // The hint list said back, a decoder loop, more words than the audio could hold.
-  assert.equal(await createListener({ transcribe: async () => 'fast', server: residentWhisper('Nūs Companion.') }).whole(pcm(2000)), '');
-  assert.equal(await createListener({ transcribe: async () => 'fast', server: residentWhisper('Nūs Companion, Professor Lee.'), vocabulary: () => ['Professor Lee'] }).whole(pcm(2000)), '');
+  assert.equal(await createListener({ transcribe: async () => 'fast', server: residentWhisper('Jarvis.') }).whole(pcm(2000)), '');
+  assert.equal(await createListener({ transcribe: async () => 'fast', server: residentWhisper('Jarvis, Professor Lee.'), vocabulary: () => ['Professor Lee'] }).whole(pcm(2000)), '');
   assert.equal(await createListener({ transcribe: async () => 'fast', server: residentWhisper('one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty') }).whole(pcm(1500)), '');
   // A new press began while it was decoding: its answer belongs to nobody.
   let l; const late = residentWhisper(() => { l.reset(); return 'Type hello.'; });

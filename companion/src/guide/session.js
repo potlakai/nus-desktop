@@ -36,8 +36,8 @@ const { guessClick } = require('./click-guess');
 // When the screen cannot be read. A Mac names its own place for the permission (a tester's Mac, 2026-11-15:
 // the Windows line showed there); Windows keeps its line exactly.
 const CAPTURE_FAILED_LINE = process.platform === 'darwin'
-  ? 'I could not read the screen. Allow Nus Companion in System Settings, Privacy & Security, Screen & System Audio Recording, then quit me and open me again.'
-  : 'I could not read the screen. On Windows, allow screen capture for Nūs and try again.';
+  ? 'I could not read the screen. Allow the Companion in System Settings, Privacy & Security, Screen & System Audio Recording, then quit me and open me again.'
+  : 'I could not read the screen. On Windows, allow screen capture for J.A.R.V.I.S and try again.';
 // A capture can fail with something that is not an Error ("capture failed: undefined" on that Mac).
 function whyFailed(e) { if (e == null) return 'no reason given'; if (e instanceof Error) return e.message || e.name; try { return typeof e === 'string' ? e : JSON.stringify(e); } catch (_) { return String(e); } }
 const { normRectFromPhys, physRectFromNorm, physRectToWindow, reconcile, screenChanged, clickHits, iou, tokenOverlap } = require('./verify');

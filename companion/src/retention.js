@@ -223,7 +223,7 @@ function createRetention(o) {
     if (blocked) parts.push(blocked + ' feed' + (blocked === 1 ? '' : 's') + ' kept away');
     if (minutes >= 5) parts.push('about ' + minutes + ' minutes given back');
     const text = 'Last week: ' + parts.join(', ') + '.' + (best && done > 2 ? ' Best day: ' + WEEKDAY_NAMES[new Date(dayKeyTime(best[0])).getDay()] + '.' : '');
-    return { hook: 'knot_report', week, text, actions: [{ id: 'rt-mynus', label: 'See My Nūs', primary: true }, { id: 'rt-ok', label: 'OK' }] };
+    return { hook: 'knot_report', week, text, actions: [{ id: 'rt-mynus', label: 'See your week', primary: true }, { id: 'rt-ok', label: 'OK' }] };
   }
   function knotReportShown(week) { save({ reportWeek: week }); }
   // Win-back: the person is at the computer, Nus is running, but they have not

@@ -124,6 +124,12 @@
          .replace(/(\*\*|__)(.+?)\1/g, '$2')
          .replace(/(^|[\s(])[*_]([^*_\n]+)[*_](?=[\s).,!?:;]|$)/g, '$1$2')
          .replace(/\|/g, ', ');
+    // The name, for the voice. A voice handed "J.A.R.V.I.S" reads six letters
+    // ("jay ay arr vee eye ess"); handed "Jarvis" it says the name. The dots
+    // are optional because a reply may write it either way, and the period
+    // that ends a sentence is not part of it.
+    s = s.replace(/\bJ\.?\s?A\.?\s?R\.?\s?V\.?\s?I\.?\s?S(\.?)(?=[\s,;:!?)]|$)/gi,
+      (m, dot) => 'Jarvis' + (dot ? '.' : ''));
     // Symbols a voice spells out.
     for (const [re, w] of SYMBOLS) s = s.replace(re, w);
     s = s.replace(/\b([CF])#(?![\w#])/g, '$1 sharp').replace(/\bC\+\+(?!\w)/g, 'C plus plus');

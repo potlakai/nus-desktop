@@ -1,4 +1,4 @@
-/* Nūs Companion renderer: UI state, mic capture, IPC, streaming render. */
+/* the Companion renderer: UI state, mic capture, IPC, streaming render. */
 (function () {
   const { icon } = window.ICONS;
   const nus = window.nus || createPreviewBridge(); // preload in Electron, local visual fixture in a browser
@@ -114,8 +114,8 @@
     const shortcutBtn = $('#shortcut-assist');
     if (shortcutBtn && !recordingShortcut) shortcutBtn.textContent = shortcutParts(assistShortcut).join(' + ');
     const placeholder = $('#placeholder');
-    if (standalone && placeholder) { placeholder.textContent = 'Ask Nūs anything, or hold the talk key'; return; }
-    if (placeholder) placeholder.innerHTML = 'Ask Nūs anything, or ' + shortcutKeycapsHtml(assistShortcut) + ' for What should I do?';
+    if (standalone && placeholder) { placeholder.textContent = 'Ask J.A.R.V.I.S anything, or hold the talk key'; return; }
+    if (placeholder) placeholder.innerHTML = 'Ask J.A.R.V.I.S anything, or ' + shortcutKeycapsHtml(assistShortcut) + ' for What should I do?';
   }
 
   // minimal, safe markdown: fenced code, bullets, inline code, bold, paragraphs
@@ -255,20 +255,20 @@
     const acking = Date.now() < ackUntil;
     const state = guideState ? (guideState === 'winding' && tourCard ? 'ready' : GUIDE_KNOT[guideState] || 'ready') : (busy || acking) ? 'thinking' : listening ? 'listening' : (panelOpen || quickOpen || tourCard) ? 'ready' : 'idle';
     const copy = (guideState && {
-      listening: ['Nūs listening', 'Release to send'],
-      transcribing: ['Nūs working', 'Got it, one moment'],
-      reading: ['Nūs reading your screen', 'Blue means looking'],
-      unwinding: ['Nūs unwinding', 'Following the thread'],
-      pointing: ['Nūs pointing', 'Esc or click me to wind back'],
-      nudging: ['Nūs has a note', 'Not now snoozes it for today'],
-      explaining: ['Nūs answering', 'Esc or click me to close'],
-      keeping: ['Nūs keeping that', 'Stored for later'],
-      done: ['Nūs done', 'Winding back'],
+      listening: ['J.A.R.V.I.S listening', 'Release to send'],
+      transcribing: ['J.A.R.V.I.S working', 'Got it, one moment'],
+      reading: ['J.A.R.V.I.S reading your screen', 'Blue means looking'],
+      unwinding: ['J.A.R.V.I.S unwinding', 'Following the thread'],
+      pointing: ['J.A.R.V.I.S pointing', 'Esc or click me to wind back'],
+      nudging: ['J.A.R.V.I.S has a note', 'Not now snoozes it for today'],
+      explaining: ['J.A.R.V.I.S answering', 'Esc or click me to close'],
+      keeping: ['J.A.R.V.I.S keeping that', 'Stored for later'],
+      done: ['J.A.R.V.I.S done', 'Winding back'],
     }[guideState]) || {
-      idle: ['Nūs idle', 'Quietly available'],
-      listening: ['Nūs listening', 'Screen + voice active'],
-      thinking: ['Nūs thinking', 'Working through context'],
-      ready: ['Nūs ready', 'Command layer open']
+      idle: ['J.A.R.V.I.S idle', 'Quietly available'],
+      listening: ['J.A.R.V.I.S listening', 'Screen + voice active'],
+      thinking: ['J.A.R.V.I.S thinking', 'Working through context'],
+      ready: ['J.A.R.V.I.S ready', 'Command layer open']
     }[state];
 
     toolbar.dataset.knotState = state;
@@ -357,7 +357,7 @@
   panel.addEventListener('keydown', () => { if (sheetCloseTimer) scheduleSheetClose(); });
 
   // ---- speech out --------------------------------------------------------
-  // Lifted from the Nūs dashboard: Edge's neural voices are free and good
+  // Lifted from the J.A.R.V.I.S dashboard: Edge's neural voices are free and good
   // enough, so there is no paid TTS in the loop. Used for rehearsal, where the
   // point is to practise replying out loud rather than reading.
   let voice = null;
@@ -1071,7 +1071,7 @@
   // is what made the panel look open but dead to clicks.
   function openSettings() { fillSettings(); showSurface(scrim); setIgnoreSafe(false); }
   function closeSettings() { cancelShortcutRecording(); saveSettings(); hideSurface(scrim); setIgnoreSafe(true); }
-  // Standalone has one settings surface, the Nūs Companion window; the overlay
+  // Standalone has one settings surface, the the Companion window; the overlay
   // sheet stays for the desktop build. Same gear, same shortcut, one place.
   function openAnySettings(section) { if (standalone && nus.openSettings) nus.openSettings(section || ''); else openSettings(); }
   $('#more-btn').addEventListener('click', () => openAnySettings());
@@ -1110,10 +1110,10 @@
     syncAssistShortcutLabels();
     $('#s-status').textContent = statusText();
     refreshPackStatus();
-    refreshNusContext();
+    refreshJarvisContext();
   }
 
-  async function refreshNusContext() {
+  async function refreshJarvisContext() {
     if (standalone) return;
     const el = $('#nus-link-status');
     if (!el || !nus.nusContextStatus) return;
@@ -1121,10 +1121,10 @@
       const status = await nus.nusContextStatus();
       el.classList.toggle('linked', !!status.ok);
       el.textContent = status.ok
-        ? 'Nūs desktop linked · context refreshed ' + new Date(status.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-        : 'Nūs desktop offline · open the desktop app once to create shared context';
+        ? 'J.A.R.V.I.S desktop linked · context refreshed ' + new Date(status.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+        : 'J.A.R.V.I.S desktop offline · open the desktop app once to create shared context';
     } catch (_) {
-      el.textContent = 'Nūs desktop link unavailable';
+      el.textContent = 'J.A.R.V.I.S desktop link unavailable';
     }
   }
 

@@ -66,7 +66,7 @@ function findWhisper(userData) {
 const VOCAB_MAX = 14;
 function vocabularyPrompt(words) {
   const seen = new Set();
-  const out = ['Nūs Companion'];
+  const out = ['Jarvis'];
   for (const w of out) seen.add(w.toLowerCase());
   for (const raw of Array.isArray(words) ? words : []) {
     const w = String(raw || '').replace(/\s+/g, ' ').trim();

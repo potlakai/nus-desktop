@@ -5,7 +5,7 @@
   const $$ = s => [...document.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let view = 'start', saved = 'history', selectedSession = null, currentStatus = null, searchSeq = 0;
-  const titles = { start: 'Dashboard', mynus: 'My Nūs', map: 'Map', saved: 'Saved', folders: 'Folders', settings: 'Settings', feedback: 'Feedback' };
+  const titles = { start: 'Dashboard', mynus: 'Your week', map: 'Map', saved: 'Saved', folders: 'Folders', settings: 'Settings', feedback: 'Feedback' };
   // Apple review fix 7: a plain "Saved" is a toast that fades after 3 s; an
   // error stays, next to the control that caused it when there is one.
   let toastTimer = null;
@@ -97,13 +97,13 @@
     if (!show) return;
     updateUrl = u.available.url || null;
     updateOneClick = !!u.oneClick;
-    $('#update-title').textContent = 'Nūs Companion ' + u.available.version + ' is out (this is ' + u.current + ').';
+    $('#update-title').textContent = 'the Companion ' + u.available.version + ' is out (this is ' + u.current + ').';
     $('#update-download').textContent = updateOneClick ? 'Update' : 'Download';
     const busy = u.progress && (u.progress.phase === 'downloading' || u.progress.phase === 'installing');
     $('#update-download').disabled = !!busy;
     $('#update-copy').textContent = busy ? (u.progress.phase === 'installing' ? 'Checked. Restarting to update.' : 'Downloading: ' + u.progress.pct + '%.')
       : u.progress && u.progress.phase === 'failed' ? 'That did not finish, and nothing changed. The release page has it.'
-      : updateOneClick ? 'Nūs restarts in about a minute. Your settings and memory stay.' : 'Download it, quit this one, and run the installer. Your settings and memory stay.';
+      : updateOneClick ? 'J.A.R.V.I.S restarts in about a minute. Your settings and memory stay.' : 'Download it, quit this one, and run the installer. Your settings and memory stay.';
   }
   $('#update-download').onclick = e => run(async () => { if (updateOneClick) paintUpdate(await api.updateRun()); else if (updateUrl) await api.openExternal(updateUrl); }, e.currentTarget);
   $('#update-later').onclick = e => run(async () => { paintUpdate(await api.updateDismiss()); }, e.currentTarget);
@@ -123,12 +123,12 @@
     $('#account-pending').hidden = !a.signingIn;
     $('#account-in').hidden = !a.signedIn || a.signingIn;
     $('#account-email').textContent = a.email || 'your Google account';
-    $('#account-detail').textContent = a.offline ? 'Offline. Nūs keeps you signed in and catches up when it can reach the server.' : a.secure === false ? 'This computer has no system encryption, so you stay signed in until Nūs quits.' : '';
-    $('#account-link').textContent = ({ linked: 'This computer is linked to your account.', stats_off: 'Not linked: anonymous usage stats are off on this computer.', unlinked: 'This computer is not linked.', pending: 'Linking this computer when Nūs can reach the server.' })[a.link] || '';
+    $('#account-detail').textContent = a.offline ? 'Offline. J.A.R.V.I.S keeps you signed in and catches up when it can reach the server.' : a.secure === false ? 'This computer has no system encryption, so you stay signed in until J.A.R.V.I.S quits.' : '';
+    $('#account-link').textContent = ({ linked: 'This computer is linked to your account.', stats_off: 'Not linked: anonymous usage stats are off on this computer.', unlinked: 'This computer is not linked.', pending: 'Linking this computer when J.A.R.V.I.S can reach the server.' })[a.link] || '';
     $('#account-unlink').hidden = a.link !== 'linked';
-    $('#account-plan').textContent = a.signedIn ? (a.isPro ? 'Plan: Pro' + (a.planUntil ? ' until ' + new Date(a.planUntil).toLocaleDateString() : '') : 'Plan: Free. Everything in Nūs works on it.') : '';
+    $('#account-plan').textContent = a.signedIn ? (a.isPro ? 'Plan: Pro' + (a.planUntil ? ' until ' + new Date(a.planUntil).toLocaleDateString() : '') : 'Plan: Free. Everything in J.A.R.V.I.S works on it.') : '';
     $('#account-sync').checked = !!a.syncOn;
-    $('#account-sync-state').textContent = !a.syncOn ? 'Off. Nothing about your settings leaves this computer.' : a.syncOffline ? 'Offline. Changes go up when Nūs can reach the server.' : a.syncLastAt ? 'Last synced ' + new Date(a.syncLastAt).toLocaleString() + '.' : 'Syncing...';
+    $('#account-sync-state').textContent = !a.syncOn ? 'Off. Nothing about your settings leaves this computer.' : a.syncOffline ? 'Offline. Changes go up when J.A.R.V.I.S can reach the server.' : a.syncLastAt ? 'Last synced ' + new Date(a.syncLastAt).toLocaleString() + '.' : 'Syncing...';
     $('#account-relink').hidden = a.link !== 'unlinked';
     const err = a.error || a.linkError || a.syncError || '';
     $('#account-note').textContent = err;
@@ -144,8 +144,8 @@
   $('#account-unlink').onclick = e => run(async () => { paintAccount(await api.accountUnlink()); }, e.currentTarget);
   $('#account-relink').onclick = e => run(async () => { paintAccount(await api.accountLink()); }, e.currentTarget);
   $('#account-delete').onclick = e => run(async () => {
-    if (!confirm('Delete your Nūs account? Your synced settings and links are removed from the server. Nūs keeps working on this computer without an account.')) return;
-    const a = await api.accountDelete(); paintAccount(a); if (a.deleted) notice('Account deleted. Nūs keeps working here as before.');
+    if (!confirm('Delete your J.A.R.V.I.S account? Your synced settings and links are removed from the server. J.A.R.V.I.S keeps working on this computer without an account.')) return;
+    const a = await api.accountDelete(); paintAccount(a); if (a.deleted) notice('Account deleted. J.A.R.V.I.S keeps working here as before.');
   }, e.currentTarget);
   $('#account-sync').onchange = e => run(async () => { paintAccount(await api.accountSync(e.target.checked)); notice(e.target.checked ? 'Settings sync on.' : 'Settings sync off. Nothing more about your settings is sent.'); }, e.target);
   api.on('home:account', a => paintAccount(a));
@@ -191,13 +191,13 @@
     else if(next==='saved')await renderSaved();
     else if(next==='folders')await renderFolders();
     else if(next==='feedback')await renderFeedback();
-    else if(next==='mynus')await renderMyNus();
+    else if(next==='mynus')await renderMyJarvis();
     else await renderMap();
   }
-  // My Nus (plan 2026-11-06): numbers about the person, worked out on this
+  // My Jarvis (plan 2026-11-06): numbers about the person, worked out on this
   // computer (companion/src/my-nus.js).
-  async function renderMyNus(){
-    const s=await api.myNus(); if(!s)return;
+  async function renderMyJarvis(){
+    const s=await api.myJarvis(); if(!s)return;
     const st=await api.status().catch(()=>({}));
     const name=String((st&&st.name)||'').trim().split(/\s+/)[0];
     $('#n-title').innerHTML=name?'Your week, <em>'+esc(name)+'.</em>':'Your <em>week.</em>';
@@ -219,7 +219,7 @@
       const c=window.NusShare.draw(s,name);
       const r=await api.shareCard(c.toDataURL('image/png'));
       $('#n-share-note').hidden=false;
-      notice(r&&r.ok?'Copied. Paste it anywhere. A copy is in Pictures, Nūs.':'Could not copy the picture.');
+      notice(r&&r.ok?'Copied. Paste it anywhere. A copy is in Pictures, J.A.R.V.I.S.':'Could not copy the picture.');
     });
   }
   async function setSaved(next) {
@@ -269,7 +269,7 @@
     $('#intent-list').innerHTML=Object.entries(intents).filter(([key])=>key!=='none').map(([key,label])=>'<dt>'+esc(key.replaceAll('_',' '))+'</dt><dd>'+esc(label)+'</dd>').join('');
     await renderMemory();
   }
-  // What Nūs knows: one row per fact, sources in small print, private ones masked.
+  // What J.A.R.V.I.S knows: one row per fact, sources in small print, private ones masked.
   async function renderMemory(panel) {
     const p=panel||await api.memoryPanel();
     const rows=p.facts||[];
@@ -316,7 +316,7 @@
     const [messages,sessions]=await Promise.all([api.messages(selectedSession),api.sessions()]);
     const session=sessions.find(s=>s.id===selectedSession);
     if(!session)return;
-    const names={you:'Me',them:'Them',nus:'Nūs'};
+    const names={you:'Me',them:'Them',nus:'J.A.R.V.I.S'};
     $('#history-detail').innerHTML='<div class="hist-head"><div><h3>'+esc(session.title||'Session')+'</h3><small>'+esc(new Date(session.started_at).toLocaleString())+(session.audio_path?' · Audio retained':'')+'</small></div><button id="export-session">Export</button></div>'+messages.map(m=>'<div class="hist-line"><span class="hist-who">'+esc(names[m.channel]||m.channel)+'</span><span class="hist-time">'+esc(new Date(m.ts).toLocaleTimeString())+'</span><p>'+esc(m.text)+'</p></div>').join('');
   }
   // Reminders and timers the Knot is holding: what, when, and a remove button.
@@ -343,7 +343,7 @@
   }
   async function renderFolders() {
     const rows=await api.folders();
-    $('#folder-list').innerHTML=rows.length?rows.map(f=>'<article class="card glass folder-card" data-folder="'+esc(f.id)+'"><div class="item-head"><h3>'+esc(f.label)+'</h3><span class="badge '+(f.enabled?'set':'')+'">'+(f.enabled?'Enabled':'Off')+'</span></div><p class="folder-path">'+esc(f.path)+'</p><p class="folder-meta">'+f.files+' files · '+(f.bytes/1024).toLocaleString(undefined,{maximumFractionDigits:0})+' KB · '+(f.indexedAt?'Indexed '+esc(new Date(f.indexedAt).toLocaleString()):'Not indexed')+'</p><div class="folder-actions"><label class="check"><input type="checkbox" data-folder-toggle="'+esc(f.id)+'" '+(f.enabled?'checked':'')+'>Use as context</label><button data-reindex="'+esc(f.id)+'">Reindex</button><button data-remove="'+esc(f.id)+'">Remove</button></div></article>').join(''):'<div class="card glass empty">Your memory starts here.<br>Add a folder of things you want Nūs to know.</div>';
+    $('#folder-list').innerHTML=rows.length?rows.map(f=>'<article class="card glass folder-card" data-folder="'+esc(f.id)+'"><div class="item-head"><h3>'+esc(f.label)+'</h3><span class="badge '+(f.enabled?'set':'')+'">'+(f.enabled?'Enabled':'Off')+'</span></div><p class="folder-path">'+esc(f.path)+'</p><p class="folder-meta">'+f.files+' files · '+(f.bytes/1024).toLocaleString(undefined,{maximumFractionDigits:0})+' KB · '+(f.indexedAt?'Indexed '+esc(new Date(f.indexedAt).toLocaleString()):'Not indexed')+'</p><div class="folder-actions"><label class="check"><input type="checkbox" data-folder-toggle="'+esc(f.id)+'" '+(f.enabled?'checked':'')+'>Use as context</label><button data-reindex="'+esc(f.id)+'">Reindex</button><button data-remove="'+esc(f.id)+'">Remove</button></div></article>').join(''):'<div class="card glass empty">Your memory starts here.<br>Add a folder of things you want J.A.R.V.I.S to know.</div>';
   }
   async function renderMap() {
     const [folders,routines,keeps,sessions,prefs]=await Promise.all([api.folders(),api.routines(),api.keeps(),api.sessions(),api.mapGet()]);
@@ -402,15 +402,15 @@
   api.on('home:tour',st=>{paintTour(st);});
   api.on('home:view',p=>run(async()=>{await setView(p&&(p.view==='settings'||p.view==='feedback'||p.view==='mynus')?p.view:view);if(p&&p.view==='feedback')$('#feedback-message').focus();const target=p&&p.section==='keys'?$('#keys-card'):null;if(target)target.scrollIntoView({block:'start',behavior:'smooth'});}));
   // Feedback page: a kind, the person's words, an optional reply address.
-  // Sent now, or kept on this computer and sent when Nūs can reach the server.
+  // Sent now, or kept on this computer and sent when J.A.R.V.I.S can reach the server.
   let feedbackKind='other';
   function feedbackNote(text,cls){const n=$('#feedback-note');n.textContent=text||'';n.className='muted'+(cls?' '+cls:'');}
-  async function renderFeedback(){const st=await api.feedbackStatus();feedbackNote(st&&st.waiting?(st.waiting===1?'1 note is':st.waiting+' notes are')+' waiting to send. They go as soon as Nūs can reach the server.':'');}
+  async function renderFeedback(){const st=await api.feedbackStatus();feedbackNote(st&&st.waiting?(st.waiting===1?'1 note is':st.waiting+' notes are')+' waiting to send. They go as soon as J.A.R.V.I.S can reach the server.':'');}
   $('#feedback-form .source-row').onclick=e=>{const b=e.target.closest('[data-kind]');if(!b)return;feedbackKind=b.dataset.kind;$$('#feedback-form [data-kind]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-checked',String(on));});};
   $('#feedback-form').onsubmit=e=>{e.preventDefault();const message=$('#feedback-message').value.trim();if(!message){feedbackNote('Write a line first.','error');$('#feedback-message').focus();return;}
     run(async()=>{feedbackNote('Sending...');const r=await api.feedbackSend({kind:feedbackKind,message,email:$('#feedback-email').value.trim()});
       $('#feedback-message').value='';
-      feedbackNote(r&&r.delivered?'Sent. Thank you. Pranav reads every note.':'Saved on this computer. It goes to Pranav as soon as Nūs can reach him.','ok');},e.submitter);};
+      feedbackNote(r&&r.delivered?'Sent. Thank you. Pranav reads every note.':'Saved on this computer. It goes to Pranav as soon as J.A.R.V.I.S can reach him.','ok');},e.submitter);};
   $('#ptt-form').onsubmit=e=>{e.preventDefault();run(async()=>{const r=await api.setPtt($('#ptt-input').value);if(!r.ok)throw new Error(r.error||'No talk key could be registered.');await settings();notice(r.fallback?'Requested key was unavailable. Live key: '+chord(r.accelerator):'Talk key updated.');},e.submitter);};
   // Settings, Voice, Microphone (companion/renderer/mic-devices.js, the same list the Knot reads).
   // Picking one saves it; the Knot's open mic moves to it. Test opens it for a few seconds and
@@ -453,11 +453,11 @@
     publikWhoAt=Date.now();
     api.publikWho().then(w=>{$('#publik-who').textContent=w&&w.handle?'Signed in with publik as '+w.handle+'.':w&&w.claimed===false?'Not signed in to publik yet.':'Signed in with publik.';}).catch(()=>{});
   }
-  function publikSignOutArmed(v){$('#publik-signout-hint').hidden=!v;$('#publik-signout-cancel').hidden=!v;$('#publik-signout').textContent=v?'Sign out and restart Nūs':'Sign out of publik';$('#publik-signout').dataset.armed=v?'1':'';}
+  function publikSignOutArmed(v){$('#publik-signout-hint').hidden=!v;$('#publik-signout-cancel').hidden=!v;$('#publik-signout').textContent=v?'Sign out and restart J.A.R.V.I.S':'Sign out of publik';$('#publik-signout').dataset.armed=v?'1':'';}
   $('#publik-signout-cancel').onclick=()=>publikSignOutArmed(false);
   $('#publik-signout').onclick=e=>{
     if(e.currentTarget.dataset.armed!=='1'){publikSignOutArmed(true);return;}
-    run(async()=>{const r=await api.publikSignOut();if(r&&r.ok)notice('Signed out of publik. Nūs is restarting.');else{publikSignOutArmed(false);notice('Could not sign out of publik on this computer.',true);}},e.currentTarget);
+    run(async()=>{const r=await api.publikSignOut();if(r&&r.ok)notice('Signed out of publik. J.A.R.V.I.S is restarting.');else{publikSignOutArmed(false);notice('Could not sign out of publik on this computer.',true);}},e.currentTarget);
   };
   $('#use-own-key').onchange=e=>run(async()=>{await api.publikChoice(e.target.checked?'own_key':'publik');await settings();notice(e.target.checked?'Saved. Your own key or Claude Code answers now.':'Saved. publik answers now.');},e.target);
   const fields={'open-mic':['openMic',e=>e.checked],'speak-replies-home':['speakReplies',e=>e.checked],'sounds':['sounds',e=>e.checked],'draw-on-screen':['drawOnScreen',e=>e.checked],'channel-messages':['channelMessages',e=>e.checked],'start-with-windows':['startWithWindows',e=>e.checked],'focus-guard':['focusGuard',e=>e.checked],'hands':['hands',e=>e.checked],'dictation':['dictation',e=>e.checked],'tasks':['tasks',e=>e.checked],'knot-island':['knotIsland',e=>e.checked],'focus-feeds':['focusGuardFeeds',e=>e.value.split(',').map(x=>x.trim()).filter(Boolean)],'hide-from-capture':['hideFromCapture',e=>e.checked],'persist-transcripts-home':['persistTranscripts',e=>e.checked],'save-audio-home':['saveAudio',e=>e.checked],'retention-days':['audioRetentionDays',e=>Number(e.value)],'knot-display':['knotDisplayId',e=>e.value?Number(e.value):null]};
@@ -473,7 +473,7 @@
   $('#reminder-list').onclick=e=>{const b=e.target.closest('[data-reminder-remove]');if(b)run(async()=>{paintReminders(await api.removeReminder(b.dataset.reminderRemove));notice('Reminder removed.');},b);};
   api.on('home:reminders',rows=>paintReminders(rows));
   $('#saved-routines').onclick=e=>{const b=e.target.closest('[data-delete-routine]');if(b)run(async()=>{await api.deleteRoutine(b.dataset.deleteRoutine);await renderSaved();},b);};
-  // What Nūs knows: add, forget one, copy the import prompt, import a paste, drop an import.
+  // What J.A.R.V.I.S knows: add, forget one, copy the import prompt, import a paste, drop an import.
   $('#memory-add').onsubmit=e=>{e.preventDefault();run(async()=>{const v=$('#memory-value').value.trim();if(!v)return;await renderMemory(await api.memoryAdd($('#memory-key').value,v));$('#memory-value').value='';$('#memory-note').textContent='Saved.';},e.submitter);};
   $('#memory-list').onclick=e=>{const b=e.target.closest('[data-memory-remove]');if(b)run(async()=>{await renderMemory(await api.memoryRemove(b.dataset.memoryRemove));$('#memory-note').textContent='Forgotten.';},b);};
   $('#memory-prompt').onclick=e=>run(async()=>{await api.memoryPrompt();$('#memory-note').textContent='Prompt copied. Paste it into your assistant, then paste its answer above.';},e.currentTarget);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
-  <title>Nūs Companion</title>
+  <title>J.A.R.V.I.S</title>
   <link rel="stylesheet" href="styles.css?v=knot-day1" />
   <link rel="stylesheet" href="knot-look.css?v=knot-day1" />
   <link rel="stylesheet" href="pill.css?v=knot-day1" />
@@ -26,7 +26,7 @@
   </div>
   <!-- The quick ask: one quiet line by the Knot. Click the Knot, type, Enter.
        Voice is optional; this is the everyday path. -->
-  <div id="quick-ask" class="glass no-drag hidden" role="dialog" aria-label="Ask Nūs">
+  <div id="quick-ask" class="glass no-drag hidden" role="dialog" aria-label="Ask J.A.R.V.I.S">
     <input id="quick-input" type="text" placeholder="What do you need help with?" spellcheck="false" autocomplete="off" />
     <button id="quick-more" type="button" title="Open the full sheet" aria-label="Open the full sheet">&#8943;</button>
   </div>
@@ -84,7 +84,7 @@
 
         <div id="composer">
           <div id="input-area">
-            <div id="placeholder">Ask Nūs anything<span data-desktop-only>, or <span class="keycap">⌘</span><span class="keycap">⏎</span> for What should I do?</span></div>
+            <div id="placeholder">Ask J.A.R.V.I.S anything<span data-desktop-only>, or <span class="keycap">⌘</span><span class="keycap">⏎</span> for What should I do?</span></div>
             <textarea id="input" rows="1" spellcheck="false"></textarea>
           </div>
           <div id="composer-bottom">
@@ -101,16 +101,16 @@
          locally with no key. Click it to open the full answer. -->
     <button id="daily-line" class="glass no-drag hidden" type="button" data-desktop-only></button>
 
-    <!-- The Nūs Knot: alive at rest, state controls on hover, command sheet on click. -->
+    <!-- The J.A.R.V.I.S Knot: alive at rest, state controls on hover, command sheet on click. -->
     <div id="toolbar">
       <div id="knot-shell">
-        <div id="knot-bloom" class="no-drag" aria-label="Nūs controls">
+        <div id="knot-bloom" class="no-drag" aria-label="J.A.R.V.I.S controls">
           <div class="knot-bloom-head">
             <div class="knot-copy">
-              <strong id="knot-status-title">Nūs idle</strong>
+              <strong id="knot-status-title">J.A.R.V.I.S idle</strong>
               <span id="knot-status-subtitle">Quietly available</span>
             </div>
-            <span data-desktop-only id="desktop-link" class="off" title="Connected to your Nūs desktop">◈ desktop</span>
+            <span data-desktop-only id="desktop-link" class="off" title="Connected to your J.A.R.V.I.S desktop">◈ desktop</span>
             <span id="share-state" class="hidden" title="Whether the Companion is excluded from screen shares and recordings (best effort)"></span>
             <div id="capture-chip" class="off" aria-live="polite">
               <span class="capture-dot"></span>
@@ -128,7 +128,7 @@
           </div>
         </div>
 
-        <button id="orb" class="no-drag" type="button" title="Open Nūs (drag to move)" aria-label="Open Nūs command sheet" aria-expanded="false">
+        <button id="orb" class="no-drag" type="button" title="Open J.A.R.V.I.S (drag to move)" aria-label="Open J.A.R.V.I.S command sheet" aria-expanded="false">
           <span class="knot-halo" aria-hidden="true"></span>
           <canvas id="knot-canvas" aria-hidden="true"></canvas>
           <svg class="nus-knot" viewBox="0 0 88 88" aria-hidden="true">
@@ -158,7 +158,7 @@
         <button id="s-close" class="s-close">Done</button>
       </div>
       <div class="s-body">
-        <div data-desktop-only id="nus-link-status" class="nus-link-status">Checking Nūs desktop context…</div>
+        <div data-desktop-only id="nus-link-status" class="nus-link-status">Checking J.A.R.V.I.S desktop context…</div>
 
         <label class="s-label" data-standalone-only>TypeSafe key <span class="s-hint">for Jev, the voice-to-action layer · typesafe.ai</span></label>
         <div class="s-field" data-standalone-only><span>TypeSafe</span><input id="key-typesafe" type="password" autocomplete="off" /></div>
@@ -206,8 +206,8 @@
         <details class="s-more">
           <summary>Privacy and sessions</summary>
           <div data-desktop-only class="s-field nus-share-field"><span>Let the Knot read your semester when answering with AI <small>Off by default. On: your courses, tasks, and deadlines ride along to your chosen AI provider so answers can reference them. Off: the "What should I do?" tile still works fully on this machine.</small></span><input id="share-nus-context" type="checkbox" /></div>
-          <div data-desktop-only class="s-field nus-share-field"><span>Report answers back to the Nūs desktop brain <small>Off by default. Saves finished answers to a local file the Nūs desktop app reads. Stays on this machine.</small></span><input id="report-to-nus" type="checkbox" /></div>
-          <div data-desktop-only class="s-field nus-share-field"><span>Save transcripts to history <small>On by default. Every capture session lands in the desktop app, searchable and uploadable to your Nūs vault from the Knot section.</small></span><input id="persist-transcripts" type="checkbox" /></div>
+          <div data-desktop-only class="s-field nus-share-field"><span>Report answers back to the J.A.R.V.I.S desktop brain <small>Off by default. Saves finished answers to a local file the J.A.R.V.I.S desktop app reads. Stays on this machine.</small></span><input id="report-to-nus" type="checkbox" /></div>
+          <div data-desktop-only class="s-field nus-share-field"><span>Save transcripts to history <small>On by default. Every capture session lands in the desktop app, searchable and uploadable to your J.A.R.V.I.S vault from the Knot section.</small></span><input id="persist-transcripts" type="checkbox" /></div>
           <div class="s-field nus-share-field"><span>Keep session audio <small>Off by default. Retains voice-activated WAV audio per session for 30 days. Audio is the storage-heavy part.</small></span><input id="save-audio" type="checkbox" /></div>
           <div class="s-field nus-share-field" data-founder><span>Full stealth when hidden <small>Off by default. Hiding the overlay (Ctrl+Shift+Space) also hides the tray icon: no on-screen sign of the Companion, and capture keeps running. Bring it back from the Companion pane in the desktop app. You are responsible for recording consent where you meet.</small></span><input id="stealth-mode" type="checkbox" /></div>
         </details>
@@ -223,7 +223,7 @@
         <details class="s-more" data-founder data-general-tools>
           <summary>Résumé</summary>
           <label class="s-label" for="resume-context">Résumé / professional background <span class="s-hint">stored locally; sent to your selected provider with each request</span></label>
-          <textarea id="resume-context" class="s-textarea" maxlength="12000" placeholder="Paste your résumé or professional background here. Nūs will use it as the factual source for career-related answers."></textarea>
+          <textarea id="resume-context" class="s-textarea" maxlength="12000" placeholder="Paste your résumé or professional background here. J.A.R.V.I.S will use it as the factual source for career-related answers."></textarea>
           <div class="s-resume-actions"><span class="s-hint">Maximum 12,000 characters</span><button id="clear-resume" type="button">Clear résumé</button></div>
         </details>
 

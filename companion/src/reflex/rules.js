@@ -1,4 +1,5 @@
 'use strict';
+const { NAME_ALIASES, NAME_LEADS } = require('../persona');
 // Rule-based routing for when the classifier service is not configured.
 //
 // Without a TypeSafe key the whole reflex layer used to be dark: no "open
@@ -136,7 +137,7 @@ const DUE_ON_SCREEN = /\b(?:on (?:this|the) (?:page|screen|site|tab)|here|on scr
 const DUE_HOWTO = /\b(?:how (?:do|can|would|should) i|how to|where (?:is|are|do i|can i)|show me|walk me|click|open|submit|turn in)\b/i;
 function asksDue(text) { const t = String(text || ''); return DUE_ASK.test(t) && !DUE_ON_SCREEN.test(t) && !DUE_HOWTO.test(t); }
 // "Where do I live", "what class do I take with Lee", "who is my advisor": a
-// question about the person is answered from what Nūs knows about them, not
+// question about the person is answered from what J.A.R.V.I.S knows about them, not
 // from the screen (live 2026-11-03: both went to the guide). Unless it names
 // something on the screen.
 const SELF_ASK = /\b(?:do i|am i|did i|have i|is my|are my|was my|were my|what'?s my|who'?s my|where'?s my|my name)\b/i;
@@ -160,9 +161,10 @@ function needsScreen(text) {
 // task: that is the guide. Conservative on purpose; the reflex layer still
 // takes the one-word ones (open, type, search) before this is consulted.
 const TASK_VERB = '(?:open|go to|navigate to|click|tap|press|select|choose|pick|type|write|enter|fill(?: in| out)?|scroll|find|search|look up|look for|play|pause|send|email|e-mail|mail|text|message|dm|reply|post|submit|turn in|hand in|book|order|add|remove|delete|close|save|download|upload|attach|drag|move|rename|sort|filter|apply|sign in|log in|check|compare|read|summari[sz]e|grab|copy|paste|share|watch|list|tidy|clean up|organi[sz]e|set|turn on|turn off|switch|mute|unmute)';
-// Polite openers before the verb: "Hello Nūs, can you email ..." (live
+// Polite openers before the verb: "Hello J.A.R.V.I.S, can you email ..." (live
 // 2026-10-13 that form missed the task rules and went to the reflex layer).
-const TASK_LEAD = '(?:(?:hey|hi|hello|yo|ok|okay|so|um|uh|please|nus|nūs|news|can you|could you|would you|will you|can u|lets|let\'s|now|just|go ahead and|i want you to|i need you to|i\'d like you to)[\\s,]+)*';
+const TASK_LEAD = '(?:(?:hey|hi|hello|yo|ok|okay|so|um|uh|please|' + NAME_LEADS + '|can you|could you|would you|will you|can u|lets|let\'s|now|just|go ahead and|i want you to|i need you to|i\'d like you to)[\\s,]+)*';
+  "|can you|could you|would you|will you|can u|lets|let\\'s|now|just|go ahead and|i want you to|i need you to|i\\'d like you to)[\\\\s,]+)*";
 const TASK_RE = new RegExp('^\\s*' + TASK_LEAD + TASK_VERB + '\\b', 'i');
 // Sending something to someone is always Hands' job: the reflex layer has no
 // such action, so a "can you email ..." must never be left to it.
@@ -303,10 +305,11 @@ function launchClause(text) {
   return app ? { app } : null;
 }
 
-// "Hello Nūs" (whisper writes it NuS, Nus, Nu's, News, new s): a greeting on
+// "Hello J.A.R.V.I.S" (whisper writes it Jarvis, J.A.R.V.I.S, Jervis, Javis — and
+// sometimes the old name, NuS or Nu's, which people still say): a greeting on
 // its own gets a hello back; a greeting in front of an ask is stripped so the
 // ask routes as usual. -> { rest } (rest '' for a bare greeting) or null.
-const NUS_NAME = "(?:n[uū]s|nu's|news|new s|noose|nous)";
+const NUS_NAME = "(?:" + NAME_ALIASES + ")";
 const GREETING_RE = new RegExp("^\\s*(?:(?:hey|hi|hello|yo|hiya|good (?:morning|afternoon|evening))[\\s,]+(?:there[\\s,]+)?" + NUS_NAME + "|" + NUS_NAME + "[\\s,]+(?:hey|hi|hello))\\b[\\s,.!?]*(.*)$", 'i');
 function greeting(text) {
   const m = GREETING_RE.exec(String(text || ''));

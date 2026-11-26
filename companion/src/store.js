@@ -21,16 +21,16 @@ const DEFAULTS = {
   // packPath feeds the live meeting modes, sparPath feeds rehearsal.
   packPath: '',
   sparPath: '',
-  // Full-vault fallback through the Nūs server (claude -p). 13 to 30 seconds,
+  // Full-vault fallback through the J.A.R.V.I.S server (claude -p). 13 to 30 seconds,
   // so it is a between-calls tool and never a live one.
   deepQueryUrl: 'http://127.0.0.1:8765/api/ask',
   // Read replies aloud. On for rehearsal, off during a real call.
   speakReplies: false,
-  // Explicit opt-in. When false, the Companion can show that Nūs is linked but
+  // Explicit opt-in. When false, the Companion can show that J.A.R.V.I.S is linked but
   // never sends the shared semester snapshot to an external model provider.
   shareNusContextWithProvider: false,
   // Explicit opt-in. When true, finished answers (and whether a screenshot was
-  // used) are appended to the local companion-events outbox for the Nūs desktop
+  // used) are appended to the local companion-events outbox for the J.A.R.V.I.S desktop
   // app to ingest. Never leaves the machine.
   reportToNus: false,
   // assist = "What should I do?"; ptt = hold to talk to the Knot.
@@ -45,7 +45,7 @@ const DEFAULTS = {
   audioRetentionDays: 30,
   // Full stealth: hiding the overlay also hides the tray icon, leaving no
   // on-screen sign of the Companion. Capture keeps running. The Companion pane
-  // in the Nus desktop app is always the way back.
+  // in the Jarvis desktop app is always the way back.
   stealth: false,
   // The desktop Knot pane can hide just the Knot mark; persisted so it survives
   // restarts and the pane can always show the true state and restore it.
@@ -64,7 +64,7 @@ const DEFAULTS = {
   // the dashboard always shows. Off by default since 2026-11-03: a first recording
   // of the Knot showed nothing. The tour's screen sharing card offers the switch.
   hideFromCapture: false,
-  // Messages from Nūs (companion/src/channel.js): the Knot saying a new version is
+  // Messages from J.A.R.V.I.S (companion/src/channel.js): the Knot saying a new version is
   // ready, and short notes from the signed channel file, at most one a day. Off
   // keeps the bubble quiet; the dashboard card still shows a new version.
   channelMessages: true,
@@ -80,7 +80,7 @@ const DEFAULTS = {
   sendStats: true,
   // Start with Windows (plan 2026-11-06): null = never asked. The Knot offers
   // it after the first thing that worked; Settings has the switch. On, Windows
-  // starts Nus at sign-in with --autostart, quietly, without the dashboard.
+  // starts Jarvis at sign-in with --autostart, quietly, without the dashboard.
   startWithWindows: null,
   // Focus guard ("keep me off Reels for 20 minutes"): closes feed tabs in the
   // browser while the person asked it to. null = never used (the first ask
@@ -221,7 +221,7 @@ function reason(e) { return e instanceof SyntaxError ? 'not valid JSON' : String
 
 // Where the vault lives. Auto-discovery of briefing packs is a dev-machine
 // convenience and ONLY runs when a vault is set explicitly: a user who
-// downloads Nūs must never inherit someone else's personal briefing.
+// downloads J.A.R.V.I.S must never inherit someone else's personal briefing.
 const VAULT = process.env[['JAR', 'VIS_VAULT'].join('')] || process.env.NUS_JARVIS_VAULT || null;
 
 /** Newest briefings/<slug>/ that has both a pack.md and a spar.md. */

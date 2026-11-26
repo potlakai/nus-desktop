@@ -1,7 +1,7 @@
 'use strict';
 // "This week: 3 deadlines, next is Lab 3 (Physics) Thursday Oct 15": one line
-// from the Nūs desktop app's bridge file (context.json, written by the desktop
-// app on every change), carried in every prompt with what Nūs knows about the
+// from the J.A.R.V.I.S desktop app's bridge file (context.json, written by the desktop
+// app on every change), carried in every prompt with what J.A.R.V.I.S knows about the
 // person, so "what's due" works from the Knot.
 //
 // Only dates the desktop app wrote are used, never a guess. No file, an old
@@ -17,11 +17,11 @@ const STALE_MS = 7 * 86400000;
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Where the desktop app keeps it: installed ("Nus"), or a dev run ("nus-desktop").
+// Where the desktop app keeps it: installed ("Jarvis"), or a dev run ("nus-desktop").
 function bridgeCandidates({ appData = process.env.APPDATA || '', env = process.env } = {}) {
   const out = [];
   if (env && env.NUS_DESKTOP_BRIDGE) out.push(env.NUS_DESKTOP_BRIDGE);
-  if (appData) out.push(path.join(appData, 'Nus', 'context.json'), path.join(appData, 'nus-desktop', 'context.json'));
+  if (appData) out.push(path.join(appData, 'Jarvis', 'context.json'), path.join(appData, 'nus-desktop', 'context.json'));
   return out;
 }
 
@@ -87,13 +87,13 @@ function weekLine(context, { now = Date.now(), generatedAt } = {}) {
   const today = startOfDay(now);
   const asOf = Number.isFinite(made) && startOfDay(made) < today ? ' as of ' + MONTHS[new Date(made).getMonth()] + ' ' + new Date(made).getDate() : '';
   const label = (it) => it.title + (it.course ? ' (' + it.course + ')' : '') + ' ' + dayName(it.due, today);
-  if (!items.length) return complete ? 'This week, from the Nūs desktop app' + asOf + ': nothing due in the next 7 days.' : '';
+  if (!items.length) return complete ? 'This week, from the J.A.R.V.I.S desktop app' + asOf + ': nothing due in the next 7 days.' : '';
   if (complete) {
     const n = items.length;
     const rest = items.slice(1, 5).map(label);
-    return 'This week, from the Nūs desktop app' + asOf + ': ' + n + ' deadline' + (n === 1 ? '' : 's') + ', next is ' + label(items[0]) + (rest.length ? '; then ' + rest.join('; ') : '') + (n > 5 ? '; and ' + (n - 5) + ' more' : '') + '.';
+    return 'This week, from the J.A.R.V.I.S desktop app' + asOf + ': ' + n + ' deadline' + (n === 1 ? '' : 's') + ', next is ' + label(items[0]) + (rest.length ? '; then ' + rest.join('; ') : '') + (n > 5 ? '; and ' + (n - 5) + ' more' : '') + '.';
   }
-  return 'This week, from the Nūs desktop app' + asOf + ', top deadlines only, there may be more: ' + items.slice(0, 5).map(label).join('; ') + '.';
+  return 'This week, from the J.A.R.V.I.S desktop app' + asOf + ', top deadlines only, there may be more: ' + items.slice(0, 5).map(label).join('; ') + '.';
 }
 
 // Reads the bridge at most once per change (file time) and per day.

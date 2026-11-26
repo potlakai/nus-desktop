@@ -1,5 +1,5 @@
 'use strict';
-// What Nūs knows about the person, kept on their machine.
+// What J.A.R.V.I.S knows about the person, kept on their machine.
 //
 // Facts come from what they tell the Knot to remember ("remember I'm in
 // CS 2110 with Professor Lee"), from a memory they paste out of ChatGPT or
@@ -23,7 +23,7 @@ const KEYS = {
 };
 const MULTI = new Set(['email', 'phone', 'note', 'website']);
 const SOURCE_RANK = { you: 0, desktop: 1, chatgpt: 5, claude: 5, gemini: 5, ai: 5 };
-const SOURCE_LABELS = { you: 'You told Nūs', desktop: 'Nūs desktop', chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini', ai: 'AI memory' };
+const SOURCE_LABELS = { you: 'You told J.A.R.V.I.S', desktop: 'J.A.R.V.I.S desktop', chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini', ai: 'AI memory' };
 const SENSITIVE_RE = /passport|social security|\bssn\b|card number|credit card|debit card|\bcvv\b|\bcvc\b|routing|account number|iban|password|passcode|\bpin\b|driver'?s? licen[cs]e|tax id/i;
 const REMEMBER_RE = /\b(remember|don'?t forget|keep in mind|note (that|this|down)|make a note|save (that|this)|from now on|always|my name is|i (am|live|work|study|prefer|like|take|have))\b/i;
 const FORGET_RE = /\b(forget|delete|remove|erase|clear|wipe|don'?t remember|stop remembering)\b/i;
@@ -113,7 +113,7 @@ function parseAiMemory(text) {
   return facts;
 }
 
-const MEMORY_PROMPT = 'I am setting up Nūs, my study assistant on my computer, and want it to know what you know about me. '
+const MEMORY_PROMPT = 'I am setting up J.A.R.V.I.S, my study assistant on my computer, and want it to know what you know about me. '
   + 'List everything you have saved in memory or learned about me, one fact per line, as `key: value`. '
   + 'Include my name, email, school, major, year, the courses I am taking, important people (as `person: name, relationship`), '
   + 'how I like to study and be helped, tools I use, ongoing projects, and anything else useful. Plain text only: no intro, no commentary, no markdown.';

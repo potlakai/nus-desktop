@@ -48,7 +48,7 @@ test('fix 10: switch captions are one line, the rest behind More', () => {
 });
 
 test('fixes 11 and 12: titles name the place; no eyebrows or numbers on things that are not a sequence', () => {
-  assert.match(js, /const titles = \{ start: 'Dashboard', mynus: 'My Nūs', map: 'Map', saved: 'Saved', folders: 'Folders', settings: 'Settings', feedback: 'Feedback' \};/);
+  assert.match(js, /const titles = \{ start: 'Dashboard', mynus: 'Your week', map: 'Map', saved: 'Saved', folders: 'Folders', settings: 'Settings', feedback: 'Feedback' \};/);
   assert.doesNotMatch(html, /class="eyebrow"/);
   assert.doesNotMatch(html, /<nav[\s\S]*?<span>0\d<\/span>[\s\S]*?<\/nav>/);
   assert.doesNotMatch(html, /\d\d \/ [A-Z]/);

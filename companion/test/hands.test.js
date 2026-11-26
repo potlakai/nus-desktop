@@ -268,7 +268,7 @@ test('routing: tasks go to Hands, how-to asks and questions do not', () => {
   assert.equal(multistep('open notepad'), false);
 });
 
-test('keys carry the window Hands read and our pid; the result says where they landed; keys bound for Nus itself fail', async () => {
+test('keys carry the window Hands read and our pid; the result says where they landed; keys bound for Jarvis itself fail', async () => {
   const calls = [];
   let answer = { ok: true, chars: 5, window: 'Untitled - Notepad', focus: 'Text editor', focusType: 'document' };
   const hands = { async request(op, params) { calls.push({ op, params }); return op === 'keys.text' ? answer : { ok: true, window: 'Untitled - Notepad' }; } };
@@ -280,9 +280,9 @@ test('keys carry the window Hands read and our pid; the result says where they l
   assert.match(r.report, /into "Text editor" in "Untitled - Notepad"/);
   const p = await actions.run('press', { keys: 'ctrl+n' }, ctx);
   assert.equal(calls[1].params.hwnd, 777); assert.match(p.report, /in "Untitled - Notepad"/);
-  answer = { ok: false, error: 'the keys would have gone to Nus itself' };
+  answer = { ok: false, error: 'the keys would have gone to Jarvis itself' };
   const bad = await actions.run('type', { text: 'hello' }, ctx);
-  assert.equal(bad.ok, false); assert.match(bad.report, /Nus itself/);
+  assert.equal(bad.ok, false); assert.match(bad.report, /Jarvis itself/);
 });
 
 test('the prompt asks for keyboard shortcuts, chained replies and a plain done line', () => {
@@ -317,11 +317,11 @@ test('bug 1: a task that carries text later in the sentence is held open across 
 test('bug 2: the prompt forbids invented content and empty typing, and treats odd phrases as mis-hearings', () => {
   const { SYSTEM } = require('../src/hands/prompt');
   assert.match(SYSTEM, /Never invent content/);
-  assert.match(SYSTEM, /ARE the content, even when the transcript puts a full stop between them/, 'live: "write my to-do list. Email Professor Lee and install Nūs Companion" was asked back instead of typed');
+  assert.match(SYSTEM, /ARE the content, even when the transcript puts a full stop between them/, 'live: "write my to-do list. Email Professor Lee and install the Companion" was asked back instead of typed');
   assert.match(SYSTEM, /Only when the user gave no content at all do you ask/);
   assert.match(SYSTEM, /Never send \[DO:type\] with empty text/);
   assert.match(SYSTEM, /mis-heard/);
-  assert.match(SYSTEM, /"To-do:\\n- Email Professor Lee\\n- Install Nūs Companion"/, 'his exact ask is the example');
+  assert.match(SYSTEM, /"To-do:\\n- Email Professor Lee\\n- Install the Companion"/, 'his exact ask is the example');
   assert.match(SYSTEM, /names a browser \(Chrome, Firefox, Edge\), every address in that task goes to it/);
   assert.match(SYSTEM, /The done line is for the user and is short/);
   const t = parseTags('New tab. [DO:press {"keys": "ctrl+n"}] [DO:type {"text": ""}] What should I type?');
@@ -369,7 +369,7 @@ test('bug 3: an ask that names its app goes to Hands whole when Hands is on; pla
   assert.equal(handsTakes('how do I open a new tab in chrome', { hands: true }), false, 'a how-to is the guide');
   assert.equal(handsTakes('open word and teach me how to create a table', { hands: true }), false, 'a how-to after a launch is the guide');
   // Live 2026-10-13: polite forms of the reel line missed Hands.
-  for (const s of ["Can you email Professor Lee that I'm finishing lab 3 tonight?", 'Hello Nūs, can you email my Professor Lee?', 'hey nus please message Jev that I am late', "Email Professor Lee that I'm finishing lab 3 tonight", 'send an email to my professor saying I am sick']) assert.equal(handsTakes(s, { hands: true }), true, s);
+  for (const s of ["Can you email Professor Lee that I'm finishing lab 3 tonight?", 'Hello J.A.R.V.I.S, can you email my Professor Lee?', 'hey nus please message Jev that I am late', "Email Professor Lee that I'm finishing lab 3 tonight", 'send an email to my professor saying I am sick']) assert.equal(handsTakes(s, { hands: true }), true, s);
   assert.equal(handsTakes('how do I email a professor', { hands: true }), false);
   assert.equal(handsTakes('what is email', { hands: true }), false);
 });
@@ -523,7 +523,7 @@ test('reel-take bugs: bubbles carry the run id so an old OK cannot stop a new ta
   assert.equal(ok.ok, true); assert.ok(ok.lookAfter >= 300 && ok.settle >= 1000, 'a moment to repaint before the next look');
   const { SYSTEM } = require('../src/hands/prompt');
   assert.match(SYSTEM, /do not retype it/);
-  assert.match(SYSTEM, /Nūs's own bubbles/);
+  assert.match(SYSTEM, /J\.A\.R\.V\.I\.S's own bubbles/);
   const fs = require('fs'), path = require('path');
   const renderer = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'renderer.js'), 'utf8');
   assert.match(renderer, /nus\.guideDismiss\(reason, bubble\.dataset\.sessionId \|\| ''\)/);
@@ -586,13 +586,13 @@ test('a browser is started directly with the whole address (no shell, so "&" sur
   assert.equal(findElement({ text: 'cc' }, els), null);
 });
 
-test('"hello Nūs" is a greeting on its own; in front of an ask it is dropped and the ask routes as usual', () => {
+test('"hello J.A.R.V.I.S" is a greeting on its own; in front of an ask it is dropped and the ask routes as usual', () => {
   const { greeting, handsTakes } = require('../src/reflex/rules');
-  for (const s of ['Hello Nūs', 'hey nus', 'Hi, NuS!', "hello nu's", 'Hello News.', 'Nūs, hi', 'good morning nus']) assert.deepEqual(greeting(s), { rest: '' }, s);
-  assert.deepEqual(greeting("Hello Nūs, can you email Professor Lee that I'm finishing lab 3 tonight?"), { rest: "can you email Professor Lee that I'm finishing lab 3 tonight?" });
-  assert.equal(handsTakes(greeting('Hey Nus, email Professor Lee that I am late').rest, { hands: true }), true);
+  for (const s of ['Hello J.A.R.V.I.S', 'hey nus', 'Hi, NuS!', "hello nu's", 'Hello News.', 'J.A.R.V.I.S, hi', 'good morning nus']) assert.deepEqual(greeting(s), { rest: '' }, s);
+  assert.deepEqual(greeting("Hello J.A.R.V.I.S, can you email Professor Lee that I'm finishing lab 3 tonight?"), { rest: "can you email Professor Lee that I'm finishing lab 3 tonight?" });
+  assert.equal(handsTakes(greeting('Hey Jarvis, email Professor Lee that I am late').rest, { hands: true }), true);
   assert.equal(greeting('open notepad'), null);
-  assert.equal(greeting('hello world'), null, 'not a greeting to Nūs');
+  assert.equal(greeting('hello world'), null, 'not a greeting to J.A.R.V.I.S');
   assert.equal(greeting('news about the election'), null);
 });
 
@@ -658,11 +658,11 @@ test('the Knot flies to every target: the focused field before typing or a key p
 test('whisper gets a short vocabulary prompt: the product first, then names from memory, no repeats, capped', () => {
   const { vocabularyPrompt } = require('../src/reflex/listen');
   const p = vocabularyPrompt(['Professor Lee', 'CS 2110', 'professor lee', '', 'x'.repeat(60)]);
-  assert.match(p, /^Nūs Companion, Professor Lee, CS 2110\.$/);
+  assert.match(p, /^Jarvis, Professor Lee, CS 2110\.$/);
   const many = vocabularyPrompt(Array.from({ length: 40 }, (_, i) => 'Name' + i));
   assert.ok(many.split(', ').length <= 14);
-  assert.equal(vocabularyPrompt(null), 'Nūs Companion.');
-  assert.doesNotMatch(vocabularyPrompt(null), /^Nūs,|the Knot/, 'these turned "Open Notepad" into "Open Nupad"');
+  assert.equal(vocabularyPrompt(null), 'Jarvis.');
+  assert.doesNotMatch(vocabularyPrompt(null), /^J.A.R.V.I.S,|the Knot/, 'these turned "Open Notepad" into "Open Nupad"');
 });
 
 test('a window Hands did not open coming to the front stops the task; one it opened does not', async () => {
