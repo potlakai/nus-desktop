@@ -30,6 +30,10 @@ const { createLimits } = require('./limits');
 const { createStats } = require('./stats');
 const companionApp = require('../companion');
 
+// Every provider the Companion can be pointed at. Kept in one place so the IPC
+// validation and the dashboard's picker cannot drift.
+const COMPANION_PROVIDERS = ['gemini', 'openai', 'anthropic', 'nvidia', 'ollama', 'groq', 'openrouter', 'opencode', 'custom'];
+
 const RENDERER_PREFERENCE_KEYS = new Set(['gpa_scale', 'brain_viewport', 'brain_layout', 'email_accounts', 'email_default', 'onboarded', 'focus_areas', 'auth_prompted']);
 const crashHandlers = installCrashHandlers(app, dialog);
 
@@ -1206,22 +1210,40 @@ const handlers = {
   'companion:status:desktop': () => (companion ? companion.status() : { running: false }),
   // The Companion's own provider key, settable from the desktop app so nobody
   // has to find the overlay's gear icon to get the overlay working.
+  // The Companion's own provider. Personal build adds groq, openrouter,
+  // opencode go and a custom endpoint (which may be keyless and local).
   'companion:ai:status': () => {
-    const s = require('../companion/src/store').getSettings();
-    return { provider: s.provider, keys: Object.fromEntries(['gemini', 'openai', 'anthropic', 'nvidia'].map((p) => [p, Boolean(s.apiKeys && s.apiKeys[p])])) };
+    const store = require('../companion/src/store');
+    const s = store.getSettings();
+    const names = ['gemini', 'openai', 'anthropic', 'nvidia', 'ollama', 'groq', 'openrouter', 'opencode', 'custom'];
+    const provider = s.provider;
+    return {
+      provider,
+      keys: Object.fromEntries(names.map((p) => [p, Boolean(s.apiKeys && s.apiKeys[p])])),
+      // The overlay's picker needs to warn before it sends a screenshot to a
+      // model that cannot read one.
+      vision: store.hasVision(provider),
+      customBaseUrl: s.customBaseUrl || '',
+      model: ((s.models || {})[provider] || {})[s.smart ? 'smart' : 'fast'] || '',
+    };
   },
   'companion:ai:set-key': (_event, payload) => {
     const companionStore = require('../companion/src/store');
-    const provider = ['gemini', 'openai', 'anthropic', 'nvidia'].includes(payload?.provider) ? payload.provider : 'gemini';
+    const provider = COMPANION_PROVIDERS.includes(payload?.provider) ? payload.provider : 'gemini';
     const key = String(payload?.key || '').trim();
-    if (!key) return { error: 'empty_key' };
-    companionStore.setSettings({ apiKeys: { [provider]: key }, provider });
+    // Ollama and a custom endpoint can answer without a key; every other
+    // provider cannot, so an empty key there is still a mistake.
+    if (!key && !['ollama', 'custom'].includes(provider)) return { error: 'empty_key' };
+    const patch = { apiKeys: { [provider]: key }, provider };
+    const base = String(payload?.baseUrl || '').trim();
+    if (base) patch.customBaseUrl = base;
+    companionStore.setSettings(patch);
     trackEvent('key_connected', { provider });
     return { ok: true, provider };
   },
   'companion:ai:clear-key': (_event, provider) => {
     const companionStore = require('../companion/src/store');
-    const name = ['gemini', 'openai', 'anthropic', 'nvidia'].includes(provider) ? provider : 'gemini';
+    const name = COMPANION_PROVIDERS.includes(provider) ? provider : 'gemini';
     companionStore.setSettings({ apiKeys: { [name]: '' } });
     return { ok: true };
   },

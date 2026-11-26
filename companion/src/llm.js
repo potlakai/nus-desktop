@@ -270,6 +270,56 @@ function publikLLM() {
   };
 }
 
+// The extra providers, all served by streamOpenAI because they speak the same
+// chat-completions shape. Only the base URL differs, so one table is enough.
+//
+// opencode go is the operator's own plan endpoint. Its model IDs were not
+// published when this was written, so store.js leaves both tiers blank: an
+// unset model keeps ready() false rather than 404ing on every ask.
+const EXTRA_BASE_URLS = {
+  groq: 'https://api.groq.com/openai/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
+  opencode: 'https://opencode.ai/zen/go/v1',
+};
+// Headers OpenRouter wants so requests can be attributed. Optional to it, and
+// harmless to the others, but only sent where they make sense.
+function extraHeaders(provider, settings) {
+  if (provider !== 'openrouter') return undefined;
+  return {
+    'HTTP-Referer': 'https://github.com/omsenjalia/nus-desktop',
+    'X-Title': 'J.A.R.V.I.S',
+  };
+}
+// A custom endpoint: anything OpenAI-shaped the operator points us at, including
+// a local proxy. Trailing slashes are stripped so the SDK does not build //chat.
+function customBaseUrl(settings) {
+  return String((settings && settings.customBaseUrl) || '').trim().replace(/\/+$/, '');
+}
+// Everything except Anthropic and Gemini is served by streamOpenAI.
+const OPENAI_COMPATIBLE = new Set(['openai', 'nvidia', 'ollama', 'groq', 'openrouter', 'opencode', 'custom']);
+function isOpenAICompatible(provider) { return OPENAI_COMPATIBLE.has(provider); }
+
+// Which providers need a key, and which can run without one. Ollama is local;
+// a custom endpoint may be an unauthenticated local server.
+function needsKey(provider) { return !['ollama', 'custom'].includes(provider); }
+// One place that turns a provider name into streamOpenAI arguments, so stream()
+// and complete() cannot drift apart.
+function openAIArgsFor(provider, args, settings) {
+  if (provider === 'nvidia') return nvidiaArgs(args);
+  if (provider === 'ollama') return { ...args, baseURL: 'http://localhost:11434/v1' };
+  if (EXTRA_BASE_URLS[provider]) {
+    const headers = extraHeaders(provider, settings);
+    return { ...args, baseURL: EXTRA_BASE_URLS[provider], extra_headers: headers };
+  }
+  if (provider === 'custom') {
+    const base = customBaseUrl(settings);
+    if (!base) throw new Error('custom provider has no base URL (Settings, Keys)');
+    const headers = extraHeaders(provider, settings);
+    return { ...args, baseURL: base, extra_headers: headers };
+  }
+  return args;
+}
+
 // Nvidia's OpenAI-compatible endpoint. Nemotron models think before answering unless told not to
 // (reasoning_effort defaults to "high" there): slower asks, and the key Test's 8-token budget
 // would be spent on thinking. Other Nvidia models refuse fields they do not list, so only
@@ -299,19 +349,20 @@ function createLLM(settings, opts = {}) {
   // since some SDKs like Anthropic require a maxTokens value.
   const maxTokens = 4096;
 
-  if (DEBUG) console.log('[DEBUG LLM] createLLM initialized:', { provider, model, isKeyPresent: !!apiKey, ready: !!apiKey && !!model });
+  if (DEBUG) console.log('[DEBUG LLM] createLLM initialized:', { provider, model, isKeyPresent: !!apiKey, ready: (!!apiKey || !needsKey(provider)) && !!model });
 
   return {
     provider, model, apiKey,
-    ready: !!apiKey && !!model,
+    // Ready means "an ask would reach a model": a key where one is needed, a
+    // model ID, and for a custom endpoint a base URL to send it to. Ollama needs
+    // neither a key nor a URL.
+    ready: (!!apiKey || !needsKey(provider)) && !!model && (provider !== 'custom' || !!customBaseUrl(settings)),
     async stream(params) {
       if (DEBUG) console.log('[DEBUG LLM] stream() invoked for provider:', provider);
       const args = { apiKey, model, maxTokens, ...paramsWithComputer(params) };
-      if (provider === 'openai') return streamOpenAI(args);
-      if (provider === 'nvidia') return streamOpenAI(nvidiaArgs(args));
-      if (provider === 'ollama') return streamOpenAI({ ...args, baseURL: 'http://localhost:11434/v1' });
       if (provider === 'anthropic') return streamAnthropic(args);
       if (provider === 'gemini') return geminiStream(args);
+      if (isOpenAICompatible(provider)) return streamOpenAI(openAIArgsFor(provider, args, settings));
       throw new Error('unknown provider: ' + provider);
     },
     async complete(params = {}) {
@@ -321,13 +372,11 @@ function createLLM(settings, opts = {}) {
       const args = { apiKey, maxTokens: params.maxTokens || 512, ...paramsWithComputer(params), model: params.model || model, onToken: params.onToken || params.onDelta || (() => {}) };
       if (provider === 'gemini') return geminiComplete(args);
       // The other SDKs stream fine; collect and return.
-      if (provider === 'openai') return streamOpenAI(args);
-      if (provider === 'nvidia') return streamOpenAI(nvidiaArgs(args));
-      if (provider === 'ollama') return streamOpenAI({ ...args, baseURL: 'http://localhost:11434/v1' });
       if (provider === 'anthropic') return streamAnthropic(args);
+      if (isOpenAICompatible(provider)) return streamOpenAI(openAIArgsFor(provider, args, settings));
       throw new Error('unknown provider: ' + provider);
     }
   };
 }
 
-module.exports = { createLLM, streamOpenAI, nvidiaArgs, NVIDIA_BASE_URL, PUBLIK_IDLE_AFTER_TEXT_MS, LOOKS_FINISHED, withBusyRetry, isBusy, BUSY_RETRY_MS };
+module.exports = { createLLM, streamOpenAI, nvidiaArgs, NVIDIA_BASE_URL, EXTRA_BASE_URLS, openAIArgsFor, isOpenAICompatible, needsKey, customBaseUrl, PUBLIK_IDLE_AFTER_TEXT_MS, LOOKS_FINISHED, withBusyRetry, isBusy, BUSY_RETRY_MS };

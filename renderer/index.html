@@ -283,10 +283,23 @@
               <div>
                 <div class="section-kicker">Companion AI key</div>
                 <h3 id="companion-ai-title">Screen guidance can use desktop Claude</h3>
-                <p id="companion-ai-copy">Screen guidance can use your desktop Claude connection when no Companion key is set. A Gemini key enables the Companion provider and cloud speech fallback. Keys are encrypted on this device. For keyless voice, click Talk on the Knot and complete local voice setup.</p>
+                <p id="companion-ai-copy">Pick the provider the overlay talks to. Keys are encrypted on this device. Ollama needs no key, only a running server; a custom endpoint takes any OpenAI-compatible base URL.</p>
                 <div class="auth-form">
-                  <label class="field"><span>Gemini API key</span><input id="companion-ai-key" type="password" placeholder="AIza…" autocomplete="off" /></label>
-                  <div class="sheet-actions"><span id="companion-ai-result"></span><div><button id="companion-ai-save" class="primary-button" type="button">Save key</button><button id="companion-ai-clear" class="quiet-button hidden" type="button">Remove key</button></div></div>
+                  <label class="field"><span>Provider</span><select id="companion-ai-provider">
+                    <option value="gemini">Gemini</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="nvidia">Nvidia</option>
+                    <option value="ollama">Ollama (local, no key)</option>
+                    <option value="groq">Groq</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="opencode">opencode go</option>
+                    <option value="custom">Custom endpoint</option>
+                  </select></label>
+                  <label class="field"><span id="companion-ai-key-label">Gemini API key</span><input id="companion-ai-key" type="password" placeholder="AIza…" autocomplete="off" /></label>
+                  <label class="field hidden" id="companion-ai-base-field"><span>Base URL</span><input id="companion-ai-base" type="text" placeholder="https://host/v1" autocomplete="off" spellcheck="false" /></label>
+                  <p id="companion-ai-vision" class="field-hint hidden">This provider's model cannot read a screenshot, so the screen features will ask before sending one.</p>
+                  <div class="sheet-actions"><span id="companion-ai-result"></span><div><button id="companion-ai-save" class="primary-button" type="button">Save</button><button id="companion-ai-clear" class="quiet-button hidden" type="button">Remove key</button></div></div>
                 </div>
               </div>
               <span id="companion-ai-badge" class="status-badge">Checking</span>

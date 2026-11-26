@@ -909,27 +909,66 @@ async function renderSettings(){
   renderStorage();
 }
 
-// The Companion's provider key, managed from the desktop so the overlay is
-// usable without hunting for its gear icon.
+// The Companion's provider, managed from the desktop so the overlay is usable
+// without hunting for its gear icon. Personal build: nine providers, two of
+// which (Ollama, a custom endpoint) can answer with no key at all.
+const COMPANION_PROVIDER_LABELS = {
+  gemini: ['Gemini', 'AIza…'], openai: ['OpenAI', 'sk-…'], anthropic: ['Anthropic', 'sk-ant-…'],
+  nvidia: ['Nvidia', 'nvapi-…'], ollama: ['Ollama (no key needed)', 'not used'],
+  groq: ['Groq', 'gsk_…'], openrouter: ['OpenRouter', 'sk-or-…'],
+  opencode: ['opencode go', 'your opencode key'], custom: ['Custom key (optional)', 'optional'],
+};
+// Providers whose model may not take an image. The overlay's screen features
+// attach a screenshot, so say so before the operator relies on them.
+const NO_VISION_PROVIDERS = new Set(['opencode', 'custom']);
+function syncCompanionProviderFields(){
+  const provider=$('#companion-ai-provider')?.value||'gemini';
+  const [label,placeholder]=COMPANION_PROVIDER_LABELS[provider]||COMPANION_PROVIDER_LABELS.gemini;
+  const labelEl=$('#companion-ai-key-label'); if(labelEl)labelEl.textContent=label+' key';
+  const input=$('#companion-ai-key'); if(input)input.placeholder=placeholder;
+  // Ollama needs no key, so hide the field rather than inviting one.
+  const keyField=input?.closest('.field'); if(keyField)keyField.classList.toggle('hidden',provider==='ollama');
+  $('#companion-ai-base-field')?.classList.toggle('hidden',provider!=='custom');
+  $('#companion-ai-vision')?.classList.toggle('hidden',!NO_VISION_PROVIDERS.has(provider));
+}
 async function renderCompanionAiState(){
   const badge=$('#companion-ai-badge'); if(!badge)return;
   const status=await api.companionAiStatus?.().catch(()=>null);
-  const has=Boolean(status?.keys?.gemini||status?.keys?.openai);
-  badge.textContent=has?'Key saved':'Desktop fallback';
+  const provider=status?.provider||'gemini';
+  const select=$('#companion-ai-provider');
+  if(select&&!select.dataset.userPicked)select.value=provider;
+  const keyless=provider==='ollama'||provider==='custom';
+  const has=keyless||Boolean(status?.keys?.[provider]);
+  badge.textContent=has?'Configured':'No key yet';
   badge.classList.toggle('good',has);
-  $('#companion-ai-title').textContent=has?'Companion provider configured':'Screen guidance can use desktop Claude';
-  $('#companion-ai-clear')?.classList.toggle('hidden',!status?.keys?.gemini);
+  $('#companion-ai-title').textContent=has
+    ? `Companion answers through ${(COMPANION_PROVIDER_LABELS[provider]||['this provider'])[0]}`
+    : 'Screen guidance can use desktop Claude';
+  if(status?.model)$('#companion-ai-result').textContent=`Model: ${status.model}`;
+  const base=$('#companion-ai-base'); if(base&&status?.customBaseUrl&&!base.value)base.value=status.customBaseUrl;
+  $('#companion-ai-clear')?.classList.toggle('hidden',keyless||!status?.keys?.[provider]);
+  syncCompanionProviderFields();
 }
+$('#companion-ai-provider')?.addEventListener('change',()=>{
+  const select=$('#companion-ai-provider'); select.dataset.userPicked='1';
+  $('#companion-ai-result').textContent='';
+  syncCompanionProviderFields();
+});
 $('#companion-ai-save')?.addEventListener('click',async()=>{
-  const input=$('#companion-ai-key'); const key=(input.value||'').trim();
-  if(!key){$('#companion-ai-result').textContent='Paste a key first.';return;}
-  const result=await api.companionAiSetKey({provider:'gemini',key});
-  input.value='';
+  const provider=$('#companion-ai-provider')?.value||'gemini';
+  const key=($('#companion-ai-key')?.value||'').trim();
+  const baseUrl=($('#companion-ai-base')?.value||'').trim();
+  const keyless=provider==='ollama'||provider==='custom';
+  if(!key&&!keyless){$('#companion-ai-result').textContent='Paste a key first.';return;}
+  if(provider==='custom'&&!baseUrl){$('#companion-ai-result').textContent='A custom endpoint needs a base URL.';return;}
+  const result=await api.companionAiSetKey({provider,key,baseUrl});
+  if($('#companion-ai-key'))$('#companion-ai-key').value='';
   $('#companion-ai-result').textContent=result?.error?'That key was not accepted.':'Saved. The Knot can answer now.';
   renderCompanionAiState();
 });
 $('#companion-ai-clear')?.addEventListener('click',async()=>{
-  await api.companionAiClearKey('gemini');
+  const provider=$('#companion-ai-provider')?.value||'gemini';
+  await api.companionAiClearKey(provider);
   $('#companion-ai-result').textContent='Key removed.';
   renderCompanionAiState();
 });

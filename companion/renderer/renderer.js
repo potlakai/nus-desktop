@@ -1078,6 +1078,9 @@
   $('#s-close').addEventListener('click', closeSettings);
   scrim.addEventListener('click', (e) => { if (e.target === scrim) closeSettings(); });
 
+  // Providers added for the personal build, each with one key row.
+  const EXTRA_KEY_FIELDS = ['groq', 'openrouter', 'opencode', 'custom'];
+
   function fillSettings() {
     document.querySelectorAll('#provider-seg button').forEach((b) => b.classList.toggle('on', b.dataset.provider === settings.provider));
     $('#key-openai').value = settings.apiKeys.openai || '';
@@ -1085,6 +1088,13 @@
     $('#key-typesafe').value = settings.apiKeys.typesafe || '';
     $('#key-gemini').value = settings.apiKeys.gemini || '';
     $('#key-nvidia').value = settings.apiKeys.nvidia || '';
+    // Personal build: the extra providers share this one key row each.
+    for (const name of EXTRA_KEY_FIELDS) {
+      const input = $('#key-' + name);
+      if (input) input.value = (settings.apiKeys && settings.apiKeys[name]) || '';
+    }
+    const baseUrl = $('#custom-base-url');
+    if (baseUrl) baseUrl.value = settings.customBaseUrl || '';
     $('#resume-context').value = settings.resumeContext || '';
     $('#pack-path').value = settings.packPath || '';
     $('#spar-path').value = settings.sparPath || '';
@@ -1171,6 +1181,12 @@
     settings.apiKeys.anthropic = $('#key-anthropic').value.trim();
     settings.apiKeys.gemini = $('#key-gemini').value.trim();
     settings.apiKeys.nvidia = $('#key-nvidia').value.trim();
+    for (const name of EXTRA_KEY_FIELDS) {
+      const input = $('#key-' + name);
+      if (input) settings.apiKeys[name] = input.value.trim();
+    }
+    const baseUrl = $('#custom-base-url');
+    if (baseUrl) settings.customBaseUrl = baseUrl.value.trim();
     settings.resumeContext = $('#resume-context').value.trim();
     settings.packPath = $('#pack-path').value.trim();
     settings.sparPath = $('#spar-path').value.trim();

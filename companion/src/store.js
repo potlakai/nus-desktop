@@ -123,7 +123,15 @@ const DEFAULTS = {
   // it off from the desktop Knot pane is the only thing that removes it, and
   // that choice persists until the user turns it back on.
   companionEnabled: true,
-  apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '', typesafe: '', ollama: '' },
+  // Personal build: the four providers the operator actually uses are added
+  // alongside the originals. groq, openrouter and opencode all speak the
+  // OpenAI chat-completions shape, so llm.js serves them with streamOpenAI and
+  // only the base URL differs. custom exists for anything else, including a
+  // locally proxied endpoint, and takes its base URL from customBaseUrl.
+  apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '', typesafe: '', ollama: '', groq: '', openrouter: '', opencode: '', custom: '' },
+  // A custom endpoint needs an address before it can answer. Empty means the
+  // provider is listed but not selectable until the operator fills it in.
+  customBaseUrl: '',
   models: {
     openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' },
     anthropic: { fast: 'claude-haiku-4-5', smart: 'claude-sonnet-5' },
@@ -136,8 +144,33 @@ const DEFAULTS = {
     // by default, so llm.js sends reasoning_effort "none" with it (nvidiaArgs).
     nvidia: { fast: 'nvidia/nemotron-3.5-super-vl-120b-a12b', smart: 'nvidia/nemotron-3.5-super-vl-120b-a12b' },
     // Local models run through Ollama's OpenAI-compatible API at localhost:11434.
-    ollama: { fast: 'llama3.2', smart: 'llama3.1' }
+    ollama: { fast: 'llama3.2', smart: 'llama3.1' },
+    // Groq: fast open-weight inference. Both tiers are vision-capable, which is
+    // what the screen features need.
+    groq: { fast: 'llama-3.3-70b-versatile', smart: 'llama-3.3-70b-versatile' },
+    // OpenRouter: one key, many vendors. The free Llama is the safe default;
+    // the operator changes these to whatever they have credit for.
+    openrouter: { fast: 'meta-llama/llama-3.3-70b-instruct', smart: 'anthropic/claude-sonnet-5' },
+    // opencode go (https://opencode.ai/zen/go/v1). Model IDs here are the
+    // operator's to confirm: they were not published when this was written, so
+    // both tiers are left blank and ready() stays false until one is set,
+    // instead of guessing an ID that would 404 on every ask.
+    opencode: { fast: '', smart: '' },
+    // Whatever the operator points it at.
+    custom: { fast: '', smart: '' }
   }
+};
+
+// Which providers can see an image. The guide's screen features attach a
+// screenshot, and a text-only model fails the whole ask rather than ignoring
+// the picture, so the UI warns instead of sending.
+const VISION = {
+  openai: true, anthropic: true, gemini: true, nvidia: true,
+  groq: true, openrouter: true,
+  // Local models depend on what was pulled; llava and friends do.
+  ollama: true,
+  // Unknown endpoints and unpublished model IDs: do not promise vision.
+  opencode: false, custom: false,
 };
 
 // Model IDs age out, and a saved settings file beats DEFAULTS on merge (save()
@@ -337,4 +370,8 @@ module.exports = {
   // The last save's error, empty when it reached the disk.
   saveError() { return saveError; },
   statusLine,
+  // Does this provider's model take an image? Read by the guide's screen
+  // features before they attach a screenshot (index.js warns instead).
+  hasVision(provider) { return VISION[String(provider || '')] === true; },
+  VISION,
 };
