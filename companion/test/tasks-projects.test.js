@@ -450,7 +450,7 @@ test('switch on: exactly as it was', () => {
   }
 });
 
-test('all three doors ask before the reflex layer and the guide, and the default stays off', () => {
+test('all three doors ask before the reflex layer and the guide, and the switch ships on in this build', () => {
   const main = read('companion/index.js');
   assert.doesNotMatch(main, /tasksOn\(\) && (?:!\(agent && agent\.active\(\)\) && )?tryProjectAsk/, 'no door checks the switch first');
   assert.equal((main.match(/routeProjectAsk\(/g) || []).length, 4, 'the function and three doors');
@@ -466,7 +466,10 @@ test('all three doors ask before the reflex layer and the guide, and the default
   const slow = main.indexOf('routeProjectAsk(kind.text, source, heardAt)) return;');
   assert.ok(slow > 0 && slow < main.indexOf('function routeAnswer('), 'slow: ahead of the answer path');
   assert.ok(slow < main.indexOf("routeLog('dropped: a walkthrough is still running')"), 'slow: ahead of the guide');
-  assert.match(read('companion/src/store.js'), /tasks: false/, 'the switch still ships off');
+  // Personal build: the task system ships on (store.js) because a long Hands
+  // job needs the journal and supervisor. Turning the switch off in Settings
+  // still routes exactly as it did before.
+  assert.match(read('companion/src/store.js'), /tasks: true/, 'the switch ships on for the personal build');
 });
 
 test('the keep phrases without the "as": what he actually said, and what is left alone', () => {

@@ -89,12 +89,15 @@ const DEFAULTS = {
   // words that count as a feed; editable, whole-word, any case.
   focusGuard: null,
   // Hands (companion/src/hands): the Knot clicks, types and opens things when
-  // asked to do something. Off until the Home switch turns it on.
-  hands: false,
+  // asked to do something. Personal build: on by default, because the operator
+  // asked for a desktop agent. The switch still turns it off, and every risky
+  // action still stops at a consent card (hands/consent.js): buy, pay, send,
+  // submit, delete, sign out, and anything that runs code.
+  hands: true,
   // The task system (companion/src/tasks): a Hands ask becomes a task with a
-  // journal, a supervisor and the task list in the pill. Off until the Home
-  // switch or NUS_TASKS=1 turns it on; off, the routing is as it always was.
-  tasks: false,
+  // journal, a supervisor and the task list in the pill. On by default here for
+  // the same reason: it is what makes a long job survive a slow step.
+  tasks: true,
   // The person's notes folder (an Obsidian-style vault): searched on this
   // machine for "what's in my vault about ...", their brief, and guide asks
   // about their own things (companion/src/recall). Empty = none. Chosen in Home.

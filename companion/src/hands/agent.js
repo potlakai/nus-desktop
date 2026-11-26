@@ -22,9 +22,13 @@ const { AgentStream } = require('./reply');
 const { settleSignature } = require('../guide/settle');
 const { plainAskError } = require('../ask-error');
 
-const MAX_STEPS = 15;
+// Personal build: a long job should be able to finish in one run. Upstream's
+// 15 steps is right for a quick errand and too short for "read this invoice,
+// file it, then tell me what changed". 40 matches the handoff, with the model
+// timeout raised so a slow smart-tier model is not cut off mid-plan.
+const MAX_STEPS = 40;
 const EXTRA_STEPS = 10;            // granted a few at a time while clearly progressing
-const MODEL_TIMEOUT_MS = 75000;
+const MODEL_TIMEOUT_MS = 120000;
 const REPEAT_LIMIT = 3;
 const DONE_REJECTIONS = 2;
 const RESUME_WINDOW_MS = 5 * 60 * 1000;
