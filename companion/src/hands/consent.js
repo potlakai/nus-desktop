@@ -66,6 +66,19 @@ function preview(action, ctx = {}) {
   if (name === 'open_app' && RUNS_CODE.test(String(a.name || ''))) return { title: 'Run ' + clip(a.name, 40) + '?', detail: 'That is a program or script, not an app by name.', firm: true };
   // open_file on a program runs it the same way open_app would (L1): same firm card.
   if (name === 'open_file' && RUNS_CODE.test(String(ctx.fileName || ''))) return { title: 'Run ' + clip(ctx.fileName, 40) + '?', detail: 'That is a program or script, not a document.', firm: true };
+  // The browser's own actions name what they touch, so the card can say it. The
+  // risky-click and risky-type tests above are reused rather than re-invented:
+  // a "Place order" button is a "Place order" button whether a mouse or the
+  // browser's remote control presses it.
+  if (name === 'browser_click') {
+    const what = [a.label, ctx.targetName, a.selector].filter(Boolean).join(' / ');
+    if (riskyLabel(what)) return { title: clip('Click "' + (ctx.targetName || a.label || a.selector) + '" on the page?', 80), detail: 'This looks like it ' + verbFor(what) + '.', firm: true };
+    return null;
+  }
+  if (name === 'browser_type' && a.submit) {
+    return { title: 'Send this form?', detail: 'It fills the field and submits the page, which sends what you typed.', firm: true };
+  }
+  if (name === 'browser_press' && riskyKeys(a.key)) return { title: 'Press ' + clip(a.key, 30) + '?', detail: 'That key makes the page do something that cannot be undone.', firm: true };
   if (name === 'tidy') return { title: 'Tidy ' + clip(a.folder || 'the folder', 40) + '?', detail: String(ctx.plan || 'Files move into folders by type. "Undo" puts them back.'), firm: false };
   return null;
 }

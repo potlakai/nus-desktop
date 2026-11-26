@@ -231,7 +231,7 @@
     $('#hide-from-capture').checked=!!status.contentProtection;$('#hide-from-capture').disabled=!!status.captureForcedOff;
     $('#protection-state').textContent=status.captureForcedOff?'Forced off for this launch by the environment.':status.contentProtection?'On. The Knot says "hidden from shares".':'Off. The Knot says "visible in shares".';
     $('#speak-replies-home').checked=!!s.speakReplies;$('#sounds').checked=s.sounds!==false;if($('#draw-on-screen'))$('#draw-on-screen').checked=s.drawOnScreen!==false;$('#channel-messages').checked=s.channelMessages!==false;$('#start-with-windows').checked=s.startWithWindows===true;
-    $('#focus-guard').checked=s.focusGuard===true;$('#hands').checked=s.hands===true;if($('#dictation'))$('#dictation').checked=!!(s._dictation&&s._dictation.on);$('#tasks').checked=s.tasks===true;$('#knot-island').checked=s.knotIsland===true;if(document.activeElement!==$('#focus-feeds'))$('#focus-feeds').value=(Array.isArray(s.focusGuardFeeds)?s.focusGuardFeeds:[]).join(', ');
+    $('#focus-guard').checked=s.focusGuard===true;$('#hands').checked=s.hands===true;if($('#dictation'))$('#dictation').checked=!!(s._dictation&&s._dictation.on);$('#tasks').checked=s.tasks===true;$('#knot-island').checked=s.knotIsland===true;if(document.activeElement!==$('#focus-feeds'))$('#focus-feeds').value=(Array.isArray(s.focusGuardFeeds)?s.focusGuardFeeds:[]).join(', ');if(document.activeElement!==$('#browser-port'))$('#browser-port').value=String(s.browserPort||9222);
     const spend=status.assignmentSpend;
     // Today's requests from the usage ledger, in front of the assignment-mode cap line.
     const u=status.usage;
@@ -424,11 +424,18 @@
   for (const id of ['publik-account', 'publik-signout', 'publik-signout-cancel', 'use-own-key']) {
     const el = document.getElementById(id); if (el) { el.hidden = true; el.disabled = true; }
   }
-  const fields={'open-mic':['openMic',e=>e.checked],'speak-replies-home':['speakReplies',e=>e.checked],'sounds':['sounds',e=>e.checked],'draw-on-screen':['drawOnScreen',e=>e.checked],'channel-messages':['channelMessages',e=>e.checked],'start-with-windows':['startWithWindows',e=>e.checked],'focus-guard':['focusGuard',e=>e.checked],'hands':['hands',e=>e.checked],'dictation':['dictation',e=>e.checked],'tasks':['tasks',e=>e.checked],'knot-island':['knotIsland',e=>e.checked],'focus-feeds':['focusGuardFeeds',e=>e.value.split(',').map(x=>x.trim()).filter(Boolean)],'hide-from-capture':['hideFromCapture',e=>e.checked],'persist-transcripts-home':['persistTranscripts',e=>e.checked],'save-audio-home':['saveAudio',e=>e.checked],'retention-days':['audioRetentionDays',e=>Number(e.value)],'knot-display':['knotDisplayId',e=>e.value?Number(e.value):null]};
+  const fields={'open-mic':['openMic',e=>e.checked],'speak-replies-home':['speakReplies',e=>e.checked],'sounds':['sounds',e=>e.checked],'draw-on-screen':['drawOnScreen',e=>e.checked],'channel-messages':['channelMessages',e=>e.checked],'start-with-windows':['startWithWindows',e=>e.checked],'focus-guard':['focusGuard',e=>e.checked],'hands':['hands',e=>e.checked],'control-browser':['controlBrowser',e=>e.checked],'dictation':['dictation',e=>e.checked],'tasks':['tasks',e=>e.checked],'knot-island':['knotIsland',e=>e.checked],'focus-feeds':['focusGuardFeeds',e=>e.value.split(',').map(x=>x.trim()).filter(Boolean)],'hide-from-capture':['hideFromCapture',e=>e.checked],'persist-transcripts-home':['persistTranscripts',e=>e.checked],'save-audio-home':['saveAudio',e=>e.checked],'retention-days':['audioRetentionDays',e=>Number(e.value)],'knot-display':['knotDisplayId',e=>e.value?Number(e.value):null]};
   for(const [id,[key,value]] of Object.entries(fields))$('#'+id).onchange=e=>run(async()=>{await api.settingsSet({[key]:value(e.target)});notice('Saved.');},e.target);
   // Two switches, one setting: the first-run card and the Privacy card stay in step.
   for(const id of ['send-stats','send-stats-intro'])$('#'+id).onchange=e=>run(async()=>{await api.settingsSet({sendStats:e.target.checked});paintStatus(await api.status());notice(e.target.checked?'Anonymous usage stats on.':'Anonymous usage stats off. Nothing more is sent.');});
   $('#stats-intro').onclick=e=>{const b=e.target.closest('[data-source]');if(b)run(async()=>{paintStats(await api.statsSource(b.dataset.source));},b);};
+  // The Zen port: saved on blur, and only when it reads as a port. Nothing is
+  // guessed from a typo, and the field goes back to what is really saved.
+  $('#browser-port').onchange=e=>run(async()=>{
+    const n=Number(String(e.target.value||'').trim());
+    if(!Number.isInteger(n)||n<1024||n>65535){notice('A port is a whole number from 1024 to 65535. 9222 is the usual one.',true);const st=await api.settingsGet();e.target.value=String((st&&st.browserPort)||9222);return;}
+    await api.settingsSet({browserPort:n});notice('Saved. Quit Zen and start it again with this port.');
+  },null);
   $('#knot-move').onchange=e=>run(async()=>{const corner=e.target.value;e.target.value='';if(corner){await api.control('move-'+corner);notice('The Knot is on its way.');}});
   let searchTimer;$('#history-search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>run(history),220);};
   $('#history-sessions').onclick=e=>{if(e.target.closest('[data-show-knot]')){run(()=>api.control('show'));return;}const b=e.target.closest('[data-session]');if(b)run(()=>detail(b.dataset.session));};
@@ -480,7 +487,7 @@
     openSettings:section=>run(async()=>{await setView('settings');if(section==='voice'){await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const box=$('#own-voice');if(box){box.closest('.card').scrollIntoView({block:'start'});box.focus({preventScroll:true});notice('Fable needs one download first. Turn on the Knot voice switch here.');}}}),
     onError:e=>notice(e.message||String(e),true)});
   // A switch flipped anywhere: the home row and the Settings page both follow.
-  function mirrorSettings(s){homeView.onSettings(s);if(view!=='settings')return;for(const [id,on] of [['open-mic',!!s.openMic],['sounds',s.sounds!==false],['draw-on-screen',s.drawOnScreen!==false],['channel-messages',s.channelMessages!==false],['start-with-windows',s.startWithWindows===true],['hands',s.hands===true],['tasks',s.tasks===true],['knot-island',s.knotIsland===true],['hide-from-capture',s.hideFromCapture!==false],['speak-replies-home',!!s.speakReplies]]){const box=$('#'+id);if(box&&box!==document.activeElement)box.checked=on;}}
+  function mirrorSettings(s){homeView.onSettings(s);if(view!=='settings')return;const bp=$('#browser-port');if(bp&&bp!==document.activeElement)bp.value=String(s.browserPort||9222);for(const [id,on] of [['open-mic',!!s.openMic],['sounds',s.sounds!==false],['draw-on-screen',s.drawOnScreen!==false],['channel-messages',s.channelMessages!==false],['start-with-windows',s.startWithWindows===true],['hands',s.hands===true],['tasks',s.tasks===true],['control-browser',s.controlBrowser===true],['knot-island',s.knotIsland===true],['hide-from-capture',s.hideFromCapture!==false],['speak-replies-home',!!s.speakReplies]]){const box=$('#'+id);if(box&&box!==document.activeElement)box.checked=on;}}
   api.on('home:settings',mirrorSettings);
   api.on('home:update',paintUpdate);
   api.on('home:tasks',p=>homeView.onTask(p));

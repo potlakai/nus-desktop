@@ -1666,6 +1666,9 @@ function applySettingsPatch(patch) {
   if (Object.prototype.hasOwnProperty.call(patch, 'hideFromCapture')) applyCapturePolicy();
   // The tasks switch, at once: the list comes up, or the panel folds away.
   if (Object.prototype.hasOwnProperty.call(patch, 'tasks')) { if (tasksOn()) { try { getTasks().sync(); } catch (e) { tasksLog('sync: ' + e.message); } } else { const off = { type: 'sync', enabled: false, tasks: [], name: firstName() }; send('tasks:event', off); if (hooks.onTaskEvent) hooks.onTaskEvent(off); } }
+  // Browser control: turning it off drops the session at once, and turning it on
+  // (or changing the port) lets the next task build a fresh one.
+  if (Object.prototype.hasOwnProperty.call(patch, 'controlBrowser') || Object.prototype.hasOwnProperty.call(patch, 'browserPort')) resetBrowserControl();
   if (Object.prototype.hasOwnProperty.call(patch, 'knotIsland')) { send('knot:island', { on: islandOn() }); if (!islandOn()) send('knot:pos', knotPosPayload()); updateTrayMenu(); }
   // The one switch that turns the focus guard off also stops a running one.
   if (patch.focusGuard === false && focusGuard && focusGuard.active()) focusGuard.stop('settings');
@@ -2574,11 +2577,38 @@ function handsLog(m) {
 // Hands' mouse moves in flight: the overlay never takes the mouse from one.
 let handsMouseOps = 0, handsMouseAt = 0;
 function pillMayTakeMouse() { return handsMouseOps === 0 && Date.now() - handsMouseAt > 800; }
+// Zen, through the port it opens for remote control. Null unless the operator
+// turned it on in Settings: a task should not be able to reach the browser of a
+// person who never asked for that. Kept as one client for the process, because
+// Zen allows one session per browser and reconnecting per step would drop it.
+let zenClient = null, zenFor = '';
+function browserControl() {
+  const st = store.getSettings();
+  if (st.controlBrowser !== true) return null;
+  const port = Number(st.browserPort) || 9222;
+  const key = 'zen:' + port;
+  if (zenClient && zenFor === key) return zenClient;
+  try {
+    const { createZen } = require('./src/browser/zen');
+    zenClient = createZen({ port });
+    zenFor = key;
+    console.log('[browser] Zen control on, port ' + port);
+    return zenClient;
+  } catch (e) {
+    console.log('[browser] could not prepare Zen control: ' + e.message);
+    return null;
+  }
+}
+function resetBrowserControl() { try { if (zenClient) zenClient.close(); } catch (_) { /* already gone */ } zenClient = null; zenFor = ''; }
+
 // What Hands can do, wired to this machine: the agent's, and the tour's demo.
 function buildActions() {
   const { execFile } = require('child_process');
   const os = require('os');
   return createActions({
+    // Resolved per action, not at build time: the agent is built once and the
+    // switch can be flipped after it. browserControl() closes over the settings.
+    browser: { get current() { return browserControl(); } },
     probe: { request: (op, p, ms) => probe.request(op, p, ms) },
     hands: { request: (op, p, ms) => { if (!/^mouse[.]/.test(op)) return getHands().request(op, p, ms); overlayMouse.set(true); handsMouseOps++; handsMouseAt = Date.now(); return Promise.resolve(getHands().request(op, p, ms)).finally(() => { handsMouseOps--; handsMouseAt = Date.now(); }); } },
     shell,

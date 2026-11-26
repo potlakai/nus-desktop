@@ -71,6 +71,20 @@ npm start
 | `npm run dist` | Builds the Windows installer into `dist/` |
 | `npm run setup:voice` | Downloads whisper.cpp + the base English model (~65 MB) into `vendor/` |
 
+## Zen
+
+He can read, click and fill in the tab you are looking at in Zen, through Zen's
+own remote control. It needs Zen restarted once with a port:
+
+```
+zen --remote-debugging-port=9222
+```
+
+Then **Settings → Control Zen**. Zen is Firefox-based, so this speaks WebDriver
+BiDi, not Chrome's protocol; Chrome and Edge are still driven the way they were,
+by launching them and clicking the screen. Off until you turn it on. Details,
+limits and the error table are in [docs/browser-zen.md](docs/browser-zen.md).
+
 `npm run dist` produces `JARVIS-Setup.exe` and the portable build. They are not
 code signed, so SmartScreen will say **"Windows protected your PC", Publisher:
 Unknown publisher** the first time. Click **More info → Run anyway**. That

@@ -94,6 +94,15 @@ const DEFAULTS = {
   // action still stops at a consent card (hands/consent.js): buy, pay, send,
   // submit, delete, sign out, and anything that runs code.
   hands: true,
+  // Driving Zen: the operator's own browser, through the remote-control port it
+  // opens. Off by default and turned on only from Settings, because it needs
+  // Zen restarted with a flag and it changes what a task can touch. When it is
+  // on, hands/actions.js gets a controller and the browser_ actions; when it is
+  // off the model is never told they exist.
+  controlBrowser: false,
+  // The port Zen listens on. 9222 is both the documented default and what
+  // every other tool expects, so it is the one to remember.
+  browserPort: 9222,
   // The task system (companion/src/tasks): a Hands ask becomes a task with a
   // journal, a supervisor and the task list in the pill. On by default here for
   // the same reason: it is what makes a long job survive a slow step.

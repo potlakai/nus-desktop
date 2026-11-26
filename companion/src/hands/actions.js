@@ -85,6 +85,16 @@ const BROWSERS = [
   { key: 'brave', label: 'Brave', exe: 'brave.exe', process: 'brave', match: /\bbrave\b/i },
   { key: 'opera', label: 'Opera', exe: 'opera.exe', process: 'opera', match: /\bopera\b/i },
 ];
+// What to say when the browser cannot be driven. Both messages name the fix,
+// because "browser control failed" is useless to someone mid-task.
+function noBrowser(what) {
+  return 'cannot ' + what + ': Zen is not set up for remote control. In Settings, Browser, turn on "control Zen", then quit Zen and open it again; your tabs come back.';
+}
+function browserFailed(what, e) {
+  const { adviceFor } = require('../browser/zen');
+  return 'could not ' + what + ': ' + adviceFor(e);
+}
+
 function browserFor(name) { const s = String(name || ''); return s ? BROWSERS.find((b) => b.match.test(s)) || null : null; }
 
 // Does the front window belong to this app? The process name and the title
@@ -111,7 +121,7 @@ function frontIs(fg, app) {
 
 const APP_FRONT_MS = 8000;       // a cold start of Word, Excel or a browser
 
-function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, launchBrowser, defaultBrowser, apps, searchFiles, openPath, refuseSite, log = () => {}, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), selfPid = -1 }) {
+function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, launchBrowser, defaultBrowser, apps, searchFiles, openPath, refuseSite, browser = null, log = () => {}, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), selfPid = -1 }) {
   const say = log;
   // Keys only ever go to the app the task opened (ctx.target). Live 2026-10-12:
   // a browser stayed behind a full-screen window, the next look landed on the
@@ -295,6 +305,73 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       return { ok: true, report: how + ' ' + hit.name + ', but its window is not in front yet; take a look before typing into it', lookAfter: 400, settle: 2500, giveUp: 1500 };
     },
 
+    // -------- the browser, through its own remote control --------
+    // Open URL launches a browser and hopes; these read and act on the page that
+    // is actually there. The injected controller is Zen's WebDriver BiDi client
+    // (src/browser/zen.js); when it is absent or Zen is not listening, every one
+    // of these says so in one line rather than failing in five places.
+    async browser_read(args) {
+      const b = controller();
+      if (!b) return { ok: false, no_browser: true, report: noBrowser('read the page') };
+      try {
+        const page = await b.read({ max: Number(args && args.max) || undefined });
+        return {
+          ok: true, report: 'read "' + clip(page.title || page.url, 70) + '" (' + page.length + ' characters'
+            + (page.truncated ? ', cut to the first ' + page.text.length : '') + '): ' + clip(page.text, 12000),
+          lookAfter: 0, settle: 200,
+        };
+      } catch (e) { return { ok: false, no_browser: (e && e.kind === 'offline') || undefined, report: browserFailed('read the page', e) }; }
+    },
+
+    async browser_click(args) {
+      const b = controller();
+      if (!b) return { ok: false, no_browser: true, report: noBrowser('click on the page') };
+      const sel = String((args && args.selector) || '').trim();
+      if (!sel) return { ok: false, report: 'no selector given: name the control with a CSS selector from a browser_read' };
+      try {
+        const r = await b.click(sel);
+        return { ok: true, report: 'clicked ' + (r.label ? '"' + clip(r.label, 60) + '"' : sel), lookAfter: 200, settle: 1200 };
+      } catch (e) { return { ok: false, no_browser: (e && e.kind === 'offline') || undefined, report: browserFailed('click ' + clip(sel, 40), e) }; }
+    },
+
+    async browser_type(args) {
+      const b = controller();
+      if (!b) return { ok: false, no_browser: true, report: noBrowser('type on the page') };
+      const sel = String((args && args.selector) || '').trim();
+      const text = String((args && args.text) || '');
+      if (!sel) return { ok: false, report: 'no selector given: name the field with a CSS selector from a browser_read' };
+      if (!text) return { ok: false, report: 'nothing to type' };
+      try {
+        await b.type(sel, text, { submit: Boolean(args && args.submit) });
+        return { ok: true, report: 'typed ' + Math.min(text.length, MAX_TEXT) + ' characters into ' + clip(sel, 40)
+          + (args && args.submit ? ' and submitted the form' : ''), lookAfter: 250, settle: 1200 };
+      } catch (e) { return { ok: false, no_browser: (e && e.kind === 'offline') || undefined, report: browserFailed('type into ' + clip(sel, 40), e) }; }
+    },
+
+    async browser_press(args) {
+      const b = controller();
+      if (!b) return { ok: false, no_browser: true, report: noBrowser('press a key in the browser') };
+      const key = String((args && args.key) || '').trim();
+      if (!key) return { ok: false, report: 'no key to press' };
+      try {
+        await b.press(key);
+        return { ok: true, report: 'pressed ' + clip(key, 20), lookAfter: 200, settle: 1000 };
+      } catch (e) { return { ok: false, no_browser: (e && e.kind === 'offline') || undefined, report: browserFailed('press ' + clip(key, 20), e) }; }
+    },
+
+    async browser_open(args) {
+      const b = controller();
+      if (!b) return { ok: false, no_browser: true, report: noBrowser('open a page') };
+      let url = String((args && args.url) || '').trim();
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url.replace(/^\/+/, '');
+      try { const u = new URL(url); if (!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) throw new Error('not a web address'); url = u.toString(); } catch { return { ok: false, report: '"' + clip(args && args.url, 60) + '" is not a web address' }; }
+      { const line = refuseSite && refuseSite(url); if (line) return { ok: false, guarded: true, report: line }; }
+      try {
+        await b.navigate(url);
+        return { ok: true, report: 'opened ' + clip(url, 80) + ' in Zen', lookAfter: 300, settle: 1500 };
+      } catch (e) { return { ok: false, no_browser: (e && e.kind === 'offline') || undefined, report: browserFailed('open ' + clip(url, 50), e) }; }
+    },
+
     async open_url(args, ctx) {
       let url = String(args.url || '').trim();
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url.replace(/^\/+/, '');
@@ -354,6 +431,21 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
     async look() { return { ok: true, report: 'took a fresh look', lookAfter: 0, settle: 0 }; },
   };
 
+  // The controller may be a holder (get current) so the browser switch can be
+  // flipped after this object was built; anything else is used as given.
+  function controller() {
+    if (!browser) return null;
+    const v = browser.current !== undefined ? browser.current : browser;
+    return v || null;
+  }
+  // The browser_ actions only exist when there is a browser to drive, so the
+  // model is never told about a tool that would only apologise.
+  function offered() {
+    const has = !!controller();
+    const names = Object.keys(actions).filter((n) => !/^browser_/.test(n));
+    return has ? names.concat(Object.keys(actions).filter((n) => /^browser_/.test(n))) : names;
+  }
+
   async function run(name, args, ctx) {
     const fn = actions[name];
     if (!fn) return { ok: false, report: 'no such action "' + clip(name, 30) + '"' };
@@ -361,7 +453,12 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
     catch (e) { say('[hands] ' + name + ' failed: ' + e.message); return { ok: false, report: name + ' failed: ' + clip(e.message, 100) }; }
   }
 
-  return { run, names: Object.keys(actions), findElement, parseKeys };
+  return {
+    run, findElement, parseKeys,
+    // A getter, not a snapshot: the browser switch can be flipped after this
+    // object is built, and the agent reads names when it composes a prompt.
+    get names() { return offered(); },
+  };
 }
 
 // Windows search over the home folders, by name, newest first. PowerShell is

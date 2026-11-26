@@ -17,7 +17,7 @@
 //   retract()                  -> bring the thread home
 //   memoryBlock()              -> what Nūs knows about the person, for the prompt
 //   ledger, log, now, sleep
-const { SYSTEM, userTurn } = require('./prompt');
+const { SYSTEM, systemFor, userTurn } = require('./prompt');
 const { AgentStream } = require('./reply');
 const { settleSignature } = require('../guide/settle');
 const { plainAskError } = require('../ask-error');
@@ -184,7 +184,10 @@ class HandsAgent {
       let raw;
       const ac = typeof AbortController === 'function' ? new AbortController() : null;
       this.abort = ac;
-      try { raw = await withTimeout(llm.complete({ system: SYSTEM, turns: [{ role: 'user', text: prompt }], imageDataUrl: screen.cap ? screen.cap.dataUrl : undefined, json: false, maxTokens: 700, onDelta, signal: ac ? ac.signal : undefined }), MODEL_TIMEOUT_MS, 'model'); }
+      // The browser actions are offered only when the switch is on and a
+      // controller exists, so the prompt matches what the model can actually do.
+      const offersBrowser = (() => { try { return /^browser_/.test(String((this.d.actions.names || []).join(','))); } catch (_) { return false; } })();
+      try { raw = await withTimeout(llm.complete({ system: offersBrowser ? systemFor({ browser: true }) : SYSTEM, turns: [{ role: 'user', text: prompt }], imageDataUrl: screen.cap ? screen.cap.dataUrl : undefined, json: false, maxTokens: 700, onDelta, signal: ac ? ac.signal : undefined }), MODEL_TIMEOUT_MS, 'model'); }
       catch (e) { if (gen !== this.gen) return; this.d.log('model failed: ' + clip(e.message, 400)); this.finish('error', plainAskError(llm && llm.provider, e)); return; }
       finally { if (this.abort === ac) this.abort = null; }
       if (gen !== this.gen) return;
