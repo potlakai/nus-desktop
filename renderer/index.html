@@ -1,10 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme-pending>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
   <title>J.A.R.V.I.S</title>
+  <!-- The look, chosen before the first paint. themes.css is a whole
+       palette on its own; themes.js picks which one. -->
+  <script src="./themes.js"></script>
+  <link rel="stylesheet" href="./themes.css" />
   <link rel="stylesheet" href="styles.css?v=atlas-12" />
 </head>
 <body>
@@ -246,6 +250,18 @@
         <div class="settings-grid">
           <section class="settings-nav panel-surface"><div class="settings-statue"><img src="assets/nus-statue-mark.png" alt="" /></div><h2 id="settings-name">Local</h2><p id="settings-email">This machine only</p><button class="settings-link active" type="button" data-card="license-card">This install</button><button class="settings-link" type="button" data-card="bridge-card">Companion</button><button class="settings-link" type="button" data-card="storage-card">Data</button></section>
           <div class="settings-stack">
+            <section class="setting-card" id="theme-card">
+              <div>
+                <div class="section-kicker">Appearance</div>
+                <h3>How he looks</h3>
+                <p id="theme-copy">Gold on deep blue-black, the butler's own. Switching changes colour only: the same machine, the same hands, the same caution.</p>
+                <div class="theme-choices" role="radiogroup" aria-label="Theme">
+                  <button class="theme-choice" id="theme-jarvis" data-theme-value="jarvis" role="radio" aria-checked="true" type="button">J.A.R.V.I.S<small>Gold</small></button>
+                  <button class="theme-choice" id="theme-nus" data-theme-value="nus" role="radio" aria-checked="false" type="button">Nūs<small>Violet</small></button>
+                </div>
+              </div>
+              <span id="theme-badge" class="status-badge">J.A.R.V.I.S</span>
+            </section>
             <section class="setting-card" id="license-card">
               <div>
                 <div class="section-kicker">This install</div>

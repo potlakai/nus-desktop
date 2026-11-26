@@ -414,6 +414,9 @@ function createOverlayWindow() {
   }
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  // The theme is one decision for the whole product. The dashboard owns the
+  // setting; this window is told, and repaints rather than reading storage that
+  // a reload would have thrown away.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   if (!displayWatch) {
@@ -443,6 +446,9 @@ function createOverlayWindow() {
     tasksPanelOpen = false;
     // Off, the page still needs the name: the free Knot's hover panel greets by it.
     if (tasksOn()) { try { getTasks().sync(); } catch (e) { tasksLog('sync: ' + e.message); } } else send('tasks:event', { type: 'sync', enabled: false, tasks: [], name: firstName() });
+    // The look. A reload drops localStorage's copy, so the setting is painted
+    // here on every load rather than trusted to have survived the navigation.
+    try { win.webContents.executeJavaScript('JarvisTheme && JarvisTheme.apply(' + JSON.stringify(overlayTheme()) + ')', true).catch(() => {}); } catch (_) { /* closing */ }
     // A fresh page starts on the dark look; tell it what is really behind it.
     lastLuma = null; knotAt = null; setTimeout(sampleBackdrop, 600);
     // Give the desktop a moment to push its semester snapshot, then speak first.
@@ -1622,6 +1628,7 @@ function registerShortcuts() {
 
 const OVERLAY_BOOLEANS = new Set(['speakReplies', 'onboarded', 'introSeen', 'hideFromCapture', 'openMic', 'sounds', 'proactive', 'focusGuard', 'smart', 'tasks', 'knotHidden', 'knotIsland', 'hands']);
 const OVERLAY_STRINGS = new Set(['packPath', 'sparPath', 'resumeContext', 'micDeviceId', 'micDeviceLabel']);
+const OVERLAY_THEMES = new Set(['jarvis', 'nus']);
 function overlayPatch(patch) {
   const clean = {};
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return clean;
@@ -1629,6 +1636,9 @@ function overlayPatch(patch) {
     if (OVERLAY_BOOLEANS.has(key) && typeof value === 'boolean') clean[key] = value;
     else if (OVERLAY_STRINGS.has(key) && typeof value === 'string' && value.length <= 4096) clean[key] = value;
     else if (key === 'knotCorner' && KNOT_CORNERS.has(value)) clean[key] = value;
+    // The look. Two values, checked here so a typo cannot leave the overlay
+    // with no palette at all.
+    else if (key === 'theme' && OVERLAY_THEMES.has(value)) clean[key] = value;
     else if (key === 'apiKeys' && value && typeof value === 'object') {
       clean.apiKeys = {};
       for (const k of ['typesafe', 'gemini', 'anthropic', 'openai', 'nvidia']) if (typeof value[k] === 'string' && value[k].length <= 4096) clean.apiKeys[k] = value[k].trim();
@@ -1664,6 +1674,11 @@ function applySettingsPatch(patch) {
     if (Object.prototype.hasOwnProperty.call(patch, 'knotDisplayId')) reboundOverlay();
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'hideFromCapture')) applyCapturePolicy();
+  // The look: every window repaints, including this one, so a theme picked in
+  // Settings is not a dashboard-only theme.
+  if (patch && Object.prototype.hasOwnProperty.call(patch, 'theme')) {
+    try { if (win && !win.isDestroyed()) win.webContents.executeJavaScript('JarvisTheme && JarvisTheme.apply(' + JSON.stringify(s.theme) + ')', true).catch(() => {}); } catch { /* closing */ }
+  }
   // The tasks switch, at once: the list comes up, or the panel folds away.
   if (Object.prototype.hasOwnProperty.call(patch, 'tasks')) { if (tasksOn()) { try { getTasks().sync(); } catch (e) { tasksLog('sync: ' + e.message); } } else { const off = { type: 'sync', enabled: false, tasks: [], name: firstName() }; send('tasks:event', off); if (hooks.onTaskEvent) hooks.onTaskEvent(off); } }
   // Browser control: turning it off drops the session at once, and turning it on
@@ -5880,6 +5895,12 @@ function initCompanion(providedHooks = {}) {
     if (process.env.NUS_ASSIGNMENT === '1') setTimeout(() => { assignmentOn('typed', { solve: false }).catch((e) => console.log('[assignment] ' + e.message)); }, 5000);
   }
 
+  // The look, as a function on the Companion itself so the dashboard can move
+  // the overlay with it. The palette lives in renderer/themes.css; this only
+  // decides which one a window shows.
+  function overlayTheme() {
+    try { return String(store.getSettings().theme || 'jarvis'); } catch { return 'jarvis'; }
+  }
   return {
     // Smoke runs only: build the Hands agent and read the screen once. No clicks.
     handsCheck: async () => { const a = getAgent(); const s = await handsRead(); return { agent: Boolean(a), probe: probeReady(), fg: s.fg ? { process: s.fg.process || '', title: String(s.fg.title || '').slice(0, 40), hwnd: Boolean(s.fg.hwnd) } : null, elements: s.elements.length, boxed: s.elements.filter((e) => e.box).length, capture: Boolean(s.cap), apps: handsAppList().length }; },
@@ -5957,6 +5978,14 @@ function initCompanion(providedHooks = {}) {
       .then(() => companionStatus())
       .catch((e) => { console.log('[companion] ask failed' + (opts && opts.unattended ? ' (scheduled)' : '') + ': ' + e.message); return companionStatus(); }); },
     unregisterShortcuts: () => globalShortcut.unregisterAll(),
+    // Called by the dashboard when the theme changes, so the overlay follows
+    // without either window having to know how the other is loaded.
+    setTheme: (theme) => {
+      const t = String(theme || '') === 'nus' ? 'nus' : 'jarvis';
+      try { if (store.getSettings().theme !== t) applySettingsPatch({ theme: t }); } catch { /* settings not writable yet */ }
+      try { if (win && !win.isDestroyed()) win.webContents.executeJavaScript('JarvisTheme && JarvisTheme.apply(' + JSON.stringify(t) + ')', true).catch(() => {}); } catch { /* closing */ }
+      return t;
+    },
     channelTick,
     channelProgress,
     // The key pasted after the paywall took over (main-companion.js settingsPatch).

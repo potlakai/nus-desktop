@@ -10,6 +10,7 @@ const { open, api, setSaveStateListener } = require('./db');
 const logic = require('./logic');
 const { decomposeTask, nextScheduledAt, parseIcs } = require('./smart');
 const { createScheduler } = require('./scheduled-ai');
+const themeChoice = require('./theme');
 const { nextRunIso } = require('./cron');
 const secrets = require('./secrets');
 const config = require('./config');
@@ -36,7 +37,7 @@ const companionApp = require('../companion');
 // validation and the dashboard's picker cannot drift.
 const COMPANION_PROVIDERS = ['gemini', 'openai', 'anthropic', 'nvidia', 'ollama', 'groq', 'openrouter', 'opencode', 'custom'];
 
-const RENDERER_PREFERENCE_KEYS = new Set(['gpa_scale', 'brain_viewport', 'brain_layout', 'email_accounts', 'email_default', 'onboarded', 'focus_areas', 'auth_prompted']);
+const RENDERER_PREFERENCE_KEYS = new Set(['gpa_scale', 'brain_viewport', 'brain_layout', 'email_accounts', 'email_default', 'onboarded', 'focus_areas', 'auth_prompted', 'theme']);
 const crashHandlers = installCrashHandlers(app, dialog);
 
 let gcalCache = [];
@@ -161,6 +162,10 @@ function createWindow() {
     },
   });
   win.setMenuBarVisibility(false);
+  // themes.js sets the theme from localStorage before paint, which is right on
+  // a first load and stale after the setting changes. This is the correction:
+  // the real preference, applied the moment the page is ready.
+  win.webContents.on('did-finish-load', () => paintTheme(win));
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   // Never navigate away from the local UI, even if a link slips into content.
@@ -175,6 +180,19 @@ function createWindow() {
     win = null;
     if (!companion || !companion.isEnabled()) app.quit();
   });
+}
+
+// The look, from the one preference that decides it. Read on every window load
+// rather than cached: the setting can change while a window is open, and a
+// window that reloads must come back in the theme it was in.
+function currentTheme() {
+  try { return themeChoice.normalise(api.getPreferences().theme); }
+  catch { return themeChoice.DEFAULT; }
+}
+
+function paintTheme(target) {
+  try { if (target && !target.isDestroyed()) target.webContents.executeJavaScript('JarvisTheme && JarvisTheme.apply(' + JSON.stringify(currentTheme()) + ')', true).catch(() => {}); }
+  catch { /* a window mid-close has no webContents left; nothing to paint */ }
 }
 
 function sendToDesktop(channel, data) {
@@ -1075,6 +1093,34 @@ const handlers = {
     api.updateAutomation(id, { next_run_at: new Date(0).toISOString(), enabled: 1 });
     runDueAutomations();
     return true;
+  },
+  'theme:get': () => {
+    const theme = currentTheme();
+    return { theme, ...themeChoice.describe(theme), themes: themeChoice.THEMES };
+  },
+  'theme:set': (_event, value) => {
+    // The renderer asks; this decides. A value that is not one of the two is
+    // refused rather than quietly written as the default, so a broken caller
+    // shows up instead of resetting someone's choice.
+    if (!themeChoice.isTheme(value)) return { error: 'unknown_theme', theme: currentTheme() };
+    const theme = themeChoice.normalise(value);
+    api.setPreference('theme', theme);
+    paintTheme(win);
+    if (companion && typeof companion.setTheme === 'function') {
+      try { companion.setTheme(theme); } catch { /* the Companion paints on next open */ }
+    }
+    sendToDesktop('theme:changed', { theme });
+    return { theme, ...themeChoice.describe(theme) };
+  },
+  'theme:toggle': () => {
+    const theme = themeChoice.other(currentTheme());
+    api.setPreference('theme', theme);
+    paintTheme(win);
+    if (companion && typeof companion.setTheme === 'function') {
+      try { companion.setTheme(theme); } catch { /* ditto */ }
+    }
+    sendToDesktop('theme:changed', { theme });
+    return { theme, ...themeChoice.describe(theme) };
   },
   'preferences:set': (_event, key, value) => {
     if (!RENDERER_PREFERENCE_KEYS.has(key)) return { error: 'preference_not_allowed' };

@@ -42,6 +42,13 @@ voice rules in one place, so changing who he is means changing one file. (The
 switchable Nūs / J.A.R.V.I.S appearance is still to come; today the rebrand is
 in the copy and the prompts, not the palette.)
 
+## Two looks
+
+He wears gold on deep blue-black by default. The original Nūs violet is still
+there if you prefer it: Settings, **How he looks**, or Ctrl+Shift+L from
+anywhere in the window. The setting is one preference, applied to all three
+windows, and it changes colour only.
+
 ## You bring the AI
 
 There is no bundled model and no server in the middle. Set a provider in

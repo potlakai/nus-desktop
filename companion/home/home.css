@@ -1,5 +1,6 @@
 :root {
-  --accent:#90A5FF;--accent-hi:#C4CFFF;--accent-ink:#111425;--live:#D94B43;--marble:#F3F0E8;--stone:#AAA59C;--cobalt:#506CFF;
+  /* Palette from themes.css; the fallbacks are the original Nūs violet. */
+  --accent:var(--accent-theme,#90A5FF);--accent-hi:var(--accent-theme-hi,#C4CFFF);--accent-ink:#111425;--live:var(--live-theme,#D94B43);--marble:var(--marble-theme,#F3F0E8);--stone:var(--stone-theme,#AAA59C);--cobalt:var(--cobalt-theme,#506CFF);
   --tx-1:rgba(255,255,255,.95);--tx-2:rgba(255,255,255,.90);--tx-mut:rgba(255,255,255,.40);--ic:rgba(255,255,255,.85);
   --bd-hair:rgba(255,255,255,.12);--bd-strong:rgba(255,255,255,.20);--fill-1:rgba(255,255,255,.04);--fill-2:rgba(255,255,255,.06);
   --r-panel:16px;--r-16:12px;--r-8:7px;--r-pill:999px;--r-keycap:6px;

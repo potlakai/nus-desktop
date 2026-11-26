@@ -2,13 +2,15 @@
    bottom-left corner; state (idle/listening/thinking/ready) drives its motion. */
 
 :root {
-  --accent: #90A5FF;            /* light variant of --knot-accent, text/dots */
-  --accent-hi: #C4CFFF;
+  /* Palette comes from themes.css, so the light/dark choice is one file. The
+     fallbacks are the original Nūs violet, for a sheet loaded on its own. */
+  --accent: var(--accent-theme, #90A5FF);
+  --accent-hi: var(--accent-theme-hi, #C4CFFF);
   --accent-ink: #111425;
-  --live: #D94B43;
-  --marble: #F3F0E8;
-  --stone: #AAA59C;
-  --cobalt: #506CFF;            /* unified with --knot-accent */
+  --live: var(--live-theme, #D94B43);
+  --marble: var(--marble-theme, #F3F0E8);
+  --stone: var(--stone-theme, #AAA59C);
+  --cobalt: var(--cobalt-theme, #506CFF);
 
   --tx-1: rgba(255,255,255,0.95);
   --tx-2: rgba(255,255,255,0.90);

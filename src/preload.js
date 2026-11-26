@@ -34,6 +34,12 @@ contextBridge.exposeInMainWorld('nus', {
   updateAutomation: (id, fields) => ipcRenderer.invoke('automations:update', id, fields),
   runAutomation: (id) => ipcRenderer.invoke('automations:run', id),
   setPreference: (key, value) => ipcRenderer.invoke('preferences:set', key, value),
+  // The look: read it, set it, or flip between the two. Every one answers with
+  // the theme now in force, so the caller never has to guess.
+  themeGet: () => ipcRenderer.invoke('theme:get'),
+  themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),
+  themeToggle: () => ipcRenderer.invoke('theme:toggle'),
+  onTheme: (cb) => ipcRenderer.on('theme:changed', (_e, data) => cb(data)),
   bridgeStatus: () => ipcRenderer.invoke('bridge:status'),
   authConfig: () => ipcRenderer.invoke('auth:config'),
   authSession: () => ipcRenderer.invoke('auth:session'),

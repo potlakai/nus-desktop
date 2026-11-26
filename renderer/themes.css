@@ -1,0 +1,76 @@
+/* Two ways to look at the same machine.
+ *
+ * Both palettes set the same custom properties, so a theme changes colour and
+ * nothing else: no layout, no wording, no behaviour. That is deliberate — the
+ * operator asked to switch how it looks, not what it does.
+ *
+ *   J.A.R.V.I.S  the butler: gold on deep blue-black, warm parchment paper.
+ *   Nūs          the original: cool violet on near-black, cool paper.
+ *
+ * :root is the butler, not an override, so a window that never runs themes.js
+ * still looks right. themes.js then sets data-theme on <html> before paint.
+ *
+ * Every theme block below is complete. A theme missing one property is a window
+ * that half-changes colour, so theme.test.js diffs the two key lists.
+ */
+
+/* ---- J.A.R.V.I.S: the default ---- */
+:root,
+:root[data-theme='jarvis'] {
+  --accent: #E0A94B;
+  --accent-hi: #F5CE85;
+  --accent-ink: #16130B;
+  --live: #D9694B;
+  --marble: #EDE6D8;
+  --stone: #A79E8C;
+  --cobalt: #C8933A;
+
+  --theme-bg: #0A0D14;
+  --theme-panel: #101520;
+  --theme-glow: rgba(224, 169, 75, .16);
+  --theme-hair: rgba(237, 230, 216, .12);
+  --theme-strong: rgba(237, 230, 216, .22);
+  --theme-fill-1: rgba(237, 230, 216, .04);
+  --theme-fill-2: rgba(237, 230, 216, .07);
+
+  /* the dashboard is paper, not glass: it stays light in this theme */
+  --paper-theme: #F4EFE3;
+  --paper-theme-2: #EBE4D4;
+  --ink-theme: #12151C;
+  --line-theme: rgba(30, 33, 42, .14);
+  --muted-theme: #7A7468;
+  color-scheme: dark;
+}
+
+/* ---- Nūs: the original ---- */
+:root[data-theme='nus'] {
+  --accent: #90A5FF;
+  --accent-hi: #C4CFFF;
+  --accent-ink: #111425;
+  --live: #D94B43;
+  --marble: #F3F0E8;
+  --stone: #AAA59C;
+  --cobalt: #506CFF;
+
+  --theme-bg: #0B0D12;
+  --theme-panel: #12151C;
+  --theme-glow: rgba(144, 165, 255, .16);
+  --theme-hair: rgba(243, 240, 232, .12);
+  --theme-strong: rgba(243, 240, 232, .20);
+  --theme-fill-1: rgba(243, 240, 232, .04);
+  --theme-fill-2: rgba(243, 240, 232, .06);
+
+  --paper-theme: #F1EEE6;
+  --paper-theme-2: #E9E5DB;
+  --ink-theme: #0A0C11;
+  --line-theme: rgba(25, 29, 42, .13);
+  --muted-theme: #777A83;
+  color-scheme: dark;
+}
+
+/* The body is hidden until the theme is known, so the wrong one never flashes.
+   themes.js removes the attribute in <head>, before anything paints. If the
+   script fails to run at all, this rule would leave a blank window, so it
+   gives up after a second on its own. */
+html[data-theme-pending] body { opacity: 0; animation: theme-reveal 0s linear 1s forwards; }
+@keyframes theme-reveal { to { opacity: 1; } }

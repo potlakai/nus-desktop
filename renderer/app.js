@@ -6,6 +6,12 @@ if (previewApi) Object.assign(previewApi, {
   licenseCheckout: async () => ({ error: 'checkout_unavailable' }),
   licensePortal: async () => ({ error: 'portal_unavailable' }),
   licenseTrack: async () => true,
+  // The preview has no main process, so the theme lives in localStorage alone.
+  // It still works, which is the point: the switch is not decoration.
+  themeGet: async () => { const theme = window.JarvisTheme ? JarvisTheme.choose({}) : 'jarvis'; return { theme, name: theme === 'nus' ? 'Nūs' : 'J.A.R.V.I.S' }; },
+  themeSet: async (t) => ({ theme: window.JarvisTheme ? JarvisTheme.apply(t) : t }),
+  themeToggle: async () => ({ theme: window.JarvisTheme ? JarvisTheme.apply(JarvisTheme.other(JarvisTheme.choose({}))) : 'jarvis' }),
+  onTheme: () => {},
   statsStatus: async () => ({ enabled: true, active: true, envDisabled: false, installId: 'preview', askSource: true }),
   statsSetEnabled: async (enabled) => ({ enabled: Boolean(enabled), active: Boolean(enabled), envDisabled: false, installId: 'preview', askSource: false }),
   statsSourceAnswer: async () => ({ ok: true, sent: true }),
@@ -1075,6 +1081,46 @@ async function renderAuthState() {
 let licenseState = null;
 // Refresh re-reads the plan from main. It cannot change (there is one plan),
 // so the card is repainted and nothing is announced.
+// ---- the look -------------------------------------------------------------
+// Two themes, one switch. The buttons are a radiogroup so the arrow keys work;
+// the badge is there because a colour change alone should not be the only
+// confirmation that something happened.
+function paintThemeChoice({ theme, name } = {}) {
+  const t = theme === 'nus' ? 'nus' : 'jarvis';
+  for (const el of document.querySelectorAll('[data-theme-value]')) {
+    const on = el.dataset.themeValue === t;
+    el.classList.toggle('on', on);
+    el.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+  const badge = $('#theme-badge');
+  if (badge) badge.textContent = name || (t === 'nus' ? 'Nūs' : 'J.A.R.V.I.S');
+}
+async function chooseTheme(value) {
+  const res = await api.themeSet(value);
+  if (!res || res.error) return;
+  if (window.JarvisTheme) JarvisTheme.apply(res.theme);
+  paintThemeChoice(res);
+}
+for (const el of document.querySelectorAll('[data-theme-value]')) {
+  el.addEventListener('click', () => chooseTheme(el.dataset.themeValue));
+  el.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const other = el.dataset.themeValue === 'nus' ? 'jarvis' : 'nus';
+    $(other === 'nus' ? '#theme-nus' : '#theme-jarvis')?.focus();
+    chooseTheme(other);
+  });
+}
+// Ctrl+Shift+L flips it from anywhere in the window. Registered here rather than
+// as a global shortcut: a look is not worth a system-wide key grab.
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.key.toLowerCase() !== 'l') return;
+  e.preventDefault();
+  api.themeToggle().then((res) => { if (res && !res.error) { if (window.JarvisTheme) JarvisTheme.apply(res.theme); paintThemeChoice(res); } });
+});
+api.themeGet?.().then(paintThemeChoice).catch(() => {});
+api.onTheme?.(paintThemeChoice);
+
 $('#license-refresh')?.addEventListener('click', async () => {
   renderLicenseState(await api.licenseRefresh());
 });
