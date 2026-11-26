@@ -1,7 +1,11 @@
-# Releasing Nūs Desktop
+# Releasing J.A.R.V.I.S
 
-The whole release is four commands once the suite is green. Signing is the
-only optional step, and the build config already knows how to do it.
+The release is a workflow run, a download, a launch, and a human `gh release
+create`. Signing is the only optional step, and the build config knows how to
+do it.
+
+There is no server and no account, so nothing here asks for a Supabase or
+Stripe credential: those were removed with the commercial layer.
 
 ## 1. Verify
 
@@ -10,51 +14,72 @@ npm test
 node scripts/security-check.js
 ```
 
-Both must pass. The suite locks the billing contract (JWT-only Checkout,
-signature-only webhook, read-only subscriptions table, no service-role key in
-`src/`), the cap wiring, the upgrade sheet, and the shipped-file list.
+Both must pass before anything is built. CI runs the first one, but not on a
+schedule: a release you start is the only thing that runs the suite.
 
 ## 2. Build
 
+Two ways, and on a PC the second is the one to trust.
+
+**Locally, with the toolchain:**
+
 ```
-npm run dist
+npm run setup:voice        # whisper binaries; once per machine, Windows only
+npm run dist               # makes vendor/voice-lines, then packs
 node scripts/package-security-check.js
 ```
 
 `npm run dist` reads `electron-builder.config.js` and produces
-`dist/Nus-Setup.exe`, `dist/Nus-Portable.exe`, `dist/Nus-Setup.exe.blockmap`,
-and `dist/latest.yml`. The second command scans the packed ASAR for anything
-that must not ship. The Mac dmgs come from CI, see §5.
+`dist/JARVIS-Setup.exe`, `dist/JARVIS-Portable.exe`,
+`dist/JARVIS-Setup.exe.blockmap` and `dist/latest.yml`. The scan command reads
+the packed ASAR and fails on anything that must not ship.
 
-Smoke the packaged installer with an isolated profile so the real one is never
+It needs the Fable model in `vendor/voice` before it will start: the first thing
+`dist` does is make the fixed lines, and that script stops without the model.
+`vendor/` is gitignored, so this is true of any clean checkout.
+
+**From CI, which is the only build that is ever launched:**
+
+```
+gh workflow run build-windows
+gh run watch
+gh run download -n jarvis-windows -D dist
+```
+
+`.github/workflows/build-windows.yml` runs on `windows-latest`: it renders
+`src/config.js`, runs the suite, fetches the whisper binary and the voice model
+against its pinned hash, builds the installer and portable exe, scans the asar,
+and then **runs the packaged app with `--smoke`** before uploading the files. A
+build that cannot open a window and start the Companion is not uploaded.
+
+Smoke either build yourself with an isolated profile, so the real one is never
 touched:
 
 ```
-set NUS_SMOKE_DATA_DIR=%TEMP%\nus-smoke
-"dist\win-unpacked\Nus.exe" --smoke
+set NUS_SMOKE_DATA_DIR=%TEMP%\jarvis-smoke
+"dist\win-unpacked\JARVIS.exe" --smoke
 ```
+
+It prints `smoke ok` and quits. The command is the same one the workflow runs,
+which is deliberate: what CI proves and what you can prove are the same thing.
 
 ## 3. Publish
 
+Download the artifacts from the run, launch the installer on a real PC, and
+then, by hand:
+
 ```
-git tag v0.2.5
-gh release create v0.2.5 dist/Nus-Setup.exe dist/Nus-Portable.exe dist/Nus-Setup.exe.blockmap dist/latest.yml --title "Nūs Desktop v0.2.5" --notes "One paragraph on what changed for users."
+git tag v0.2.6
+gh release create v0.2.6 dist/JARVIS-Setup.exe dist/JARVIS-Portable.exe \
+  dist/JARVIS-Setup.exe.blockmap dist/latest.yml --title "J.A.R.V.I.S 0.2.6"
 ```
 
 `latest.yml` is what installed copies poll (`src/updater.js`); without it the
-auto-update is silent.
+auto-update is silent. The portable exe cannot self-update (no install
+directory to write into) and is skipped by design.
 
-Supabase pauses a free project after seven days without API traffic, and a
-paused project's hostname stops resolving (sign-in, checkout, and funnel
-events all fail until someone clicks Restore in the dashboard; this happened
-2026-09-06). `.github/workflows/keepalive.yml` sends one anon REST request
-every two days to keep it awake. It only runs once the workflow is on `main`,
-so push it with the next release and trigger it once by hand:
-`gh workflow run keepalive`. The site's download buttons use
-`releases/latest/download/Nus-Setup.exe`, so they follow the newest release
-automatically. Bump `version` in `package.json` before building; the version
-string is baked into the installer, the updater feed, and the `app_version`
-column on funnel events.
+Bump `version` in `package.json` before building. The version string is baked
+into the installer and the updater feed.
 
 ## 4. Code signing (when there is a certificate)
 
