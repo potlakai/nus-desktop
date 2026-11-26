@@ -45,11 +45,12 @@ test('the capsule folds while the one-line composer is open', () => {
 });
 
 test('Ctrl+Shift+T selects the control under the cursor and opens the composer about it', () => {
-  assert.match(main, /globalShortcut\.register\('CommandOrControl\+Shift\+T', FOUNDER \? harnessStep : selectAtCursor\);/);
+  assert.match(main, /chord\('CommandOrControl\+Shift\+T', FOUNDER \? harnessStep : selectAtCursor\);/);
   assert.match(main, /async function selectAtCursor\(\)/);
   assert.match(main, /send\('guide:target', \{ bbox, task: 'ask', kicker: 'selected'/, 'the thread goes to the selection first');
   assert.match(main, /send\('quick:open', \{ context: /);
   assert.match(main, /if \(!win\.isAlwaysOnTop\(\)\) \{ console\.log\('\[select\] focus\(\) stripped topmost; restoring'\); await restoreTopmost\('select'\); \}/, 'focus() may strip topmost; put it back');
+  assert.match(main, /\/password\|passcode\|card number\|cvv\|ssn\/i\.test\(name \+ ' ' \+ type\)/, 'never reads a password or card field');
   assert.match(preload, /'quick:open'\]/, 'the renderer may receive quick:open');
   assert.match(js, /nus\.on\('quick:open', \(p\) => openQuickAsk\(/);
   assert.match(js, /nus\.guideAsk\(\{ text, source: 'typed', about: !!about \}\)/);
@@ -63,15 +64,21 @@ test('a question about the selection is answered at the thread tip and can becom
   assert.match(main, /selection = null;\n  if \(wasActive\)/, 'Esc and a Knot click clear the selection');
 });
 
-test('guide steps through the desktop Claude send the screenshot inline, no tools, one turn', () => {
-  const guideInput = fs.readFileSync(path.join(root, '..', 'src', 'guide-input.js'), 'utf8');
+test('guide steps through the Claude Code fallback ask for the fast model', () => {
+  const ai = fs.readFileSync(path.join(root, '..', 'src', 'ai.js'), 'utf8');
   const desktop = fs.readFileSync(path.join(root, '..', 'src', 'main.js'), 'utf8');
-  assert.match(main, /hooks\.desktopComplete\(prompt, imageDataUrl \|\| null\)/);
-  assert.doesNotMatch(main, /Read that image file first/, 'no file-based screenshot: print mode cannot read outside its cwd');
-  assert.match(desktop, /desktopComplete: \(prompt, imageDataUrl\) => ai\.complete\(prompt, \{ guidance: true, imageDataUrl \}\)/);
-  assert.match(guideInput, /'--tools='/, 'guidance has no filesystem, shell, or browser tools');
-  assert.match(guideInput, /'--strict-mcp-config', '--no-session-persistence', '--setting-sources=', '--effort', 'low'/);
-  assert.doesNotMatch(guideInput, /'--bare'/, 'bare mode skips the keychain and lands signed out');
+  // Not Haiku: measured 2026-09-15 it pads its JSON with prose and is 4x slower.
+  assert.match(main, /const GUIDE_FAST_MODEL = process\.env\.NUS_GUIDE_MODEL \|\| 'claude-sonnet-5';/);
+  // The screenshot rides as an image block and the system prompt stays separate
+  // (warm pool, prompt cache); no capture file is written for the model.
+  assert.match(main, /hooks\.desktopComplete\(prompt, \{ model: GUIDE_FAST_MODEL, fast: true, system, image: imageDataUrl \|\| undefined, onDelta, \.\.\.\(signal \? \{ signal \} : \{\}\) \}\)/, 'the stop signal rides along (2026-10-31)');
+  assert.match(ai, /const \{ createClaudePool \} = require\('\.\/claude-pool'\)/);
+  assert.match(ai, /opts && opts\.image\) content\.push\(\{ type: 'image', dataUrl: opts\.image \}\)/);
+  assert.match(ai, /FAST_CLI_ARGS = \['--strict-mcp-config', '--no-session-persistence', '--tools', 'Read', '--effort', 'low'\]/);
+  assert.doesNotMatch(ai, /'--bare'/, 'bare mode skips the keychain and lands signed out');
+  assert.match(desktop, /desktopComplete: \(prompt, opts\) => ai\.complete\(prompt, opts\),/);
+  assert.match(ai, /async function complete\(prompt, opts = \{\}\)/);
+  assert.match(ai, /'--model', model \|\| MODEL/, 'other callers keep the pinned default');
 });
 
 test('a hedged pick is pointed at as a best guess instead of refused', () => {
@@ -90,19 +97,10 @@ test('NUS_GUIDE_PROVIDER=claude forces guide steps onto Claude Code even with a 
   assert.match(main, /if \(own\.ready && !FORCE_CLAUDE_GUIDE\) return own;/);
 });
 
-test('the guide captures at full resolution so a model box lands on the control', () => {
-  assert.match(main, /const GUIDE_CAPTURE_MAXSIDE = Number\(process\.env\.NUS_GUIDE_MAXSIDE\) \|\| 2560;/);
-  assert.match(main, /capture: \(\) => captureDisplay\(store\.getSettings\(\)\.knotDisplayId, \{ maxSide: GUIDE_CAPTURE_MAXSIDE \}\)/);
-});
-
-test('password and card fields are refused locally, by the guide and by select-and-ask', () => {
-  const { sensitiveTarget } = require('../src/guide/sensitive');
-  assert.equal(sensitiveTarget({ name: 'Password', type: 'Edit' }), true);
-  assert.equal(sensitiveTarget({ name: 'Card number', type: 'Edit' }), true);
-  assert.equal(sensitiveTarget({ name: 'Search', type: 'Edit' }), false);
-  assert.equal(sensitiveTarget({ name: 'Password', type: 'Button' }), false, 'a button labelled Password is not a field');
-  const session = fs.readFileSync(path.join(root, 'src', 'guide', 'session.js'), 'utf8');
-  assert.match(session, /require\('\.\/sensitive'\)/);
-  assert.match(session, /if \(sensitiveTarget\(/, 'the guide checks the resolved control, not just the prompt');
-  assert.match(main, /if \(sensitiveTarget\(\{ name, type \}\)\)/, 'select-and-ask uses the same guard');
+test('the CLI runs in userData so it may Read the guide screenshot written there', () => {
+  // 2026-09-15: a temp cwd made every guide step a blind guess ("Could not view the screenshot").
+  const ai = fs.readFileSync(path.join(root, '..', 'src', 'ai.js'), 'utf8');
+  assert.match(ai, /const opts = \{ cwd: app\.getPath\('userData'\), env: cliEnv\(\), windowsHide: true \};/);
+  assert.doesNotMatch(ai, /getPath\('temp'\)/);
+  assert.match(main, /path\.join\(app\.getPath\('userData'\), 'companion', 'captures'\)/, 'screenshot lives under userData');
 });

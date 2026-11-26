@@ -25,6 +25,10 @@ function appendEvent(baseDir, event) {
     used_screenshot: Boolean(event.used_screenshot),
     answer: String(event.answer || '').slice(0, MAX_TEXT),
     transcript_tail: String(event.transcript_tail || '').slice(0, MAX_TEXT),
+    // A kept walkthrough names its kind, app and task so the desktop can file it.
+    kind: String(event.kind || ''),
+    app: String(event.app || '').slice(0, 80),
+    task: String(event.task || '').slice(0, 300),
   });
   if (events.length > MAX_EVENTS) events = events.slice(-MAX_EVENTS);
   try {

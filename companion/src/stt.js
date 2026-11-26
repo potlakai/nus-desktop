@@ -12,11 +12,14 @@ async function transcribeOpenAI(apiKey, wav, model) {
   return (res.text || '').trim();
 }
 
-async function transcribeGemini(apiKey, wav) {
+// The transcription model follows the store's fast Gemini model, so it retires
+// with it: gemini-2.5-flash returns 404 for new users (2026-09-15).
+const DEFAULT_GEMINI_STT_MODEL = 'gemini-3.6-flash';
+async function transcribeGemini(apiKey, wav, model) {
   const { GoogleGenAI } = require('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
   const res = await ai.models.generateContent({
-    model: 'gemini-3.6-flash', // 2026-09-16: 2.5 retired (404 for new users)
+    model: model || DEFAULT_GEMINI_STT_MODEL,
     contents: [{ role: 'user', parts: [
       { text: 'Transcribe this audio verbatim. Return only the spoken words with no commentary. If there is no clear speech, return an empty response.' },
       { inlineData: { mimeType: 'audio/wav', data: wav.toString('base64') } }
@@ -40,7 +43,8 @@ function createSTT(settings) {
     } });
   }
   if (keys.openai) chain.push({ p: 'openai', fn: (wav) => transcribeOpenAI(keys.openai, wav, settings.sttModel) });
-  if (keys.gemini) chain.push({ p: 'gemini', fn: (wav) => transcribeGemini(keys.gemini, wav) });
+  const geminiModel = (settings.models && settings.models.gemini && settings.models.gemini.fast) || DEFAULT_GEMINI_STT_MODEL;
+  if (keys.gemini && process.env.NUS_NO_GEMINI !== '1') chain.push({ p: 'gemini', fn: (wav) => transcribeGemini(keys.gemini, wav, geminiModel) });
 
   return {
     available: chain.length > 0,

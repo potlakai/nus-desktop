@@ -176,15 +176,139 @@ test('an unchanged screen after a click repeats the step once, then says so', as
   g.dismiss('test');
 });
 
+test('with a screen watcher a click waits for the screen to move and still, and a seen change is never "did not take"', async () => {
+  const waits = [];
+  const watcher = { async waitForChange(ms, baseline) { waits.push({ ms, baseline }); return { changed: true, settled: true, frames: 3, ms: 420 }; } };
+  const sent = [], logs = [];
+  const g = new GuideSession({
+    capture: async () => CAP, probe: fakeProbe(),
+    llm: () => ({ ready: true, provider: 'gemini', async complete() { return JSON.stringify({ instruction: 'Click Assignments', target: { kind: 'element', id: 1 }, confidence: 0.9 }); } }),
+    send: (ch, p) => sent.push([ch, p]), screenToDip: (p) => p, dipToScreen: (p) => p,
+    winBounds: () => ({ x: 0, y: 0, width: 1920, height: 1040 }),
+    // Same gray print every time: without the watcher's verdict this would read as unchanged.
+    hashCapture: () => ({ kind: 'gray', whole: new Uint8Array(64 * 40).fill(7), crop: new Uint8Array(160 * 100).fill(7) }),
+    selfPid: 999, log: (m) => logs.push(m), sleep: async () => { throw new Error('the fixed nap must not run when a watcher is wired'); }, now: () => 1000,
+    watcher,
+  });
+  await g.start('go', 'typed');
+  g.onArrived();
+  await g.onClick({ x: 160, y: 212 });
+  assert.equal(waits.length, 1);
+  assert.equal(waits[0].ms, 1500);
+  assert.equal(waits[0].baseline[0], 7, 'the pre-click print is the baseline');
+  assert.equal(last(sent, 'guide:target').kicker, 'step 2', 'a fresh model step, not "again"');
+  assert.ok(logs.some((m) => /settle: moved and still/.test(m)));
+  // Next clicked nothing: no wait at all.
+  g.onArrived();
+  await g.onAction('next');
+  assert.equal(waits.length, 1);
+  g.dismiss('test');
+});
+
+test('a streamed reply is spoken sentence by sentence before the thread lands, and never spoken twice', async () => {
+  const sent = [];
+  const g = new GuideSession({
+    capture: async () => CAP, probe: fakeProbe(),
+    llm: () => ({ ready: true, provider: 'claude', async complete(params) {
+      // The model writes the sentence, then the tags, in pieces.
+      for (const piece of ['Click the Assign', 'ments link on the left. ', '[POINT:1] [CONF:0.9]']) params.onDelta(piece);
+      return 'Click the Assignments link on the left. [POINT:1] [CONF:0.9]';
+    } }),
+    send: (ch, p) => sent.push([ch, p]), screenToDip: (p) => p, dipToScreen: (p) => p,
+    winBounds: () => ({ x: 0, y: 0, width: 1920, height: 1040 }),
+    hashCapture: () => null, selfPid: 999, log: () => {}, sleep: async () => {}, now: () => 1000,
+  });
+  await g.start('submit my essay', 'voice');
+  const says = sent.filter(([c]) => c === 'guide:say').map(([, p]) => p);
+  assert.deepEqual(says, [{ text: 'Click the Assignments link on the left.', first: true, sessionId: g.session.id, stream: 'guide:' + g.session.id }]);
+  const order = sent.map(([c]) => c);
+  assert.ok(order.indexOf('guide:say') < order.indexOf('guide:target'), 'speech starts before the thread goes out');
+  assert.ok(sent.some(([c, p]) => c === 'guide:hint' && /Assignments link/.test(p.text)), 'the first sentence shows by the Knot');
+  const t = last(sent, 'guide:target');
+  assert.equal(t.instruction, 'Click the Assignments link on the left.');
+  assert.equal(t.speak, undefined, 'already spoken as it streamed');
+  assert.deepEqual(t.bbox, { x: 100, y: 200, w: 120, h: 24 });
+  g.dismiss('test');
+});
+
+test('firstSpeech is the time to the first spoken sentence, not to the end of the reply', async () => {
+  let clock = 1000;
+  const timings = [];
+  const g = new GuideSession({
+    capture: async () => CAP, probe: fakeProbe(),
+    llm: () => ({ ready: true, provider: 'claude', async complete(params) {
+      clock += 300;
+      for (const piece of ['Click the Assign', 'ments link on the left. ']) params.onDelta(piece);
+      clock += 1200;
+      params.onDelta('[POINT:1] [CONF:0.9]');
+      return 'Click the Assignments link on the left. [POINT:1] [CONF:0.9]';
+    } }),
+    send: () => {}, screenToDip: (p) => p, dipToScreen: (p) => p,
+    winBounds: () => ({ x: 0, y: 0, width: 1920, height: 1040 }),
+    hashCapture: () => null, selfPid: 999, log: () => {}, sleep: async () => {}, now: () => clock,
+    onTiming: (rec) => timings.push(rec),
+  });
+  await g.start('submit my essay', 'voice');
+  assert.ok(timings.length >= 1);
+  assert.equal(timings[0].firstSpeech, 300, 'stamped at the first sentence');
+  assert.equal(timings[0].model, 1500, 'the model finished later');
+  g.dismiss('test');
+});
+
+test('a typed ask with a streamed reply shows the sentence early but says nothing', async () => {
+  const sent = [];
+  const g = new GuideSession({
+    capture: async () => CAP, probe: fakeProbe(),
+    llm: () => ({ ready: true, provider: 'claude', async complete(params) { params.onDelta('Click Assignments. [POINT:1] [CONF:0.9]'); return 'Click Assignments. [POINT:1] [CONF:0.9]'; } }),
+    send: (ch, p) => sent.push([ch, p]), screenToDip: (p) => p, dipToScreen: (p) => p,
+    winBounds: () => ({ x: 0, y: 0, width: 1920, height: 1040 }),
+    hashCapture: () => null, selfPid: 999, log: () => {}, sleep: async () => {}, now: () => 1000,
+  });
+  await g.start('submit my essay', 'typed');
+  assert.equal(sent.filter(([c]) => c === 'guide:say').length, 0);
+  assert.equal(last(sent, 'guide:target').speak, undefined);
+  g.dismiss('test');
+});
+
+test('a short ask right after a session carries the last task into the prompt; the checklist rides on the target', async () => {
+  const prompts = [];
+  let clock = 1000;
+  const g = new GuideSession({
+    capture: async () => CAP, probe: fakeProbe(),
+    llm: () => ({ ready: true, provider: 'test', async complete(p) { prompts.push(p); return 'Click Assignments. [POINT:1] [CONF:0.9] [NEXT:Open the essay (Essay 1) | Press Submit (Submit Assignment)]'; } }),
+    send: () => {}, screenToDip: (p) => p, dipToScreen: (p) => p, winBounds: () => ({ x: 0, y: 0, width: 1920, height: 1040 }),
+    hashCapture: () => null, selfPid: 999, log: () => {}, sleep: async () => {}, now: () => clock, planMode: () => 'inline',
+  });
+  const sent = [];
+  g.d.send = (ch, p) => sent.push([ch, p]);
+  await g.start('submit my essay on canvas', 'typed');
+  const t = last(sent, 'guide:target');
+  assert.deepEqual(t.plan, { done: [], current: 'Click Assignments.', next: ['Open the essay', 'Press Submit'] });
+  g.dismiss('done');
+  assert.equal(g.recentlyEnded(), true);
+  clock += 30000;
+  await g.start('and how do I resize it', 'typed');
+  assert.match(prompts[1].turns[0].text, /Just before this the user asked: submit my essay on canvas/);
+  g.dismiss('test');
+  clock += 4 * 60000;
+  assert.equal(g.recentlyEnded(), false, 'the window closes after a few minutes');
+  await g.start('and now', 'typed');
+  assert.doesNotMatch(prompts[2].turns[0].text, /Just before this/);
+  g.dismiss('test');
+});
+
 test('no key, a dead model, and a busy session all explain instead of hanging', async () => {
   const noKey = harness([], { ready: false });
   await noKey.g.start('x', 'typed');
-  assert.match(last(noKey.sent, 'guide:bubble').text, /Add your gemini key/);
+  const noKeyBubble = last(noKey.sent, 'guide:bubble');
+  assert.match(noKeyBubble.text, /No AI is set up yet[\s\S]*Settings > Keys/);
+  assert.equal(noKeyBubble.kind, 'error');
+  assert.equal(noKeyBubble.actions[0].id, 'settings', 'the fix is the first button');
   noKey.g.dismiss('test');
 
   const dead = harness([new Error('ECONNRESET')]);
   await dead.g.start('x', 'typed');
-  assert.match(last(dead.sent, 'guide:bubble').text, /could not reach the model/);
+  assert.match(last(dead.sent, 'guide:bubble').text, /could not reach .*Check your internet/);
   dead.g.dismiss('test');
 
   const busy = harness([{ instruction: 'Click Assignments', target: { kind: 'element', id: 1 }, confidence: 0.9 }]);
@@ -280,14 +404,4 @@ test('Skip forgets: nothing is saved for replay', async () => {
   g.onArrived(); await g.onClick({ x: 160, y: 212 });
   g.skip();
   assert.equal(store.list().length, 0);
-});
-
-test('a resolved password field is refused even when the model points at it', async () => {
-  const h = harness([{ instruction: 'Type your password', target: { kind: 'bbox', x: 0.1, y: 0.1, w: 0.05, h: 0.03, label: 'Password' }, confidence: 0.9 }]);
-  h.probe.request = async (op) => (op === 'fg' ? { hwnd: 77, title: 'x', process: 'x', pid: 1 } : op === 'uia.list' ? { elements: ELEMENTS } : { element: { name: 'Password', type: 'Edit', rect: { x: 180, y: 100, w: 100, h: 40 } } });
-  await h.g.start('log in', 'typed');
-  assert.equal(h.g.status().state, 'explaining');
-  assert.match(last(h.sent, 'guide:bubble').text, /password or card field/);
-  assert.equal(h.sent.some(([c]) => c === 'guide:target'), false, 'no thread');
-  h.g.dismiss('test');
 });

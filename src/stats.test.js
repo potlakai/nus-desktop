@@ -374,5 +374,8 @@ test('the desktop wires stats through the preload and main like every other sett
   assert.match(main, /acquisition\.hasFirstImport\(userData\)\) trackEvent\('import'/);
   assert.match(main, /trackEvent\('companion_session', \{ minutes:/);
   assert.match(main, /trackEvent\('key_connected', \{ provider: 'anthropic' \}\)/);
-  assert.match(read('companion/index.js'), /hooks\.onAsk\(mode\)/);
+  // The Companion (0.1.36 lineage) reports a turn as one object; the desktop's
+  // trackAsk() accepts either that object or the older bare mode string.
+  assert.match(read('companion/index.js'), /hooks\.onAsk\(\{ mode:/);
+  assert.match(main, /typeof turn === 'object' \? turn\.mode : turn/, 'trackAsk reads both shapes');
 });

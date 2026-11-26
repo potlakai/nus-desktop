@@ -116,8 +116,11 @@ test('the marble-era surface blurs are gone; scrim blurs may stay', () => {
 
 test('the 3D knot renderer is mounted and the overlay boots clean', () => {
   assert.match(companionHtml, /id="knot-canvas"/);
-  assert.match(companionHtml, /knot3d\.js/);
-  assert.match(companionJs, /NusKnot3D\.mount/);
+  // The Knot is still the same 3D renderer, mounted through the engine: the
+  // engine owns the spring/gesture numbers (knot-spec.js) and drives the body.
+  assert.match(companionHtml, /knot3d\.js|knot-engine\.js/);
+  assert.match(companionHtml, /knot-spec\.js/);
+  assert.match(companionJs, /NusKnot3D\.mount|engine\.knot/);
   assert.ok(!companionJs.includes('showExample'), 'no fake conversation at boot');
   const knot3d = read('companion/renderer/knot3d.js');
   assert.match(knot3d, /trefoilPoint/);
@@ -150,8 +153,10 @@ test('the tutorials link to each other', () => {
 });
 
 test('all three hide levels exist, with a way back that does not need a hotkey', () => {
-  assert.match(companionIndex, /globalShortcut\.register\('CommandOrControl\+Shift\+Space', toggleOverlay\)/);
-  assert.match(companionIndex, /globalShortcut\.register\('CommandOrControl\+Shift\+X', panicHide\)/);
+  // Shortcuts go through chord(), which logs an accelerator another app owns.
+  // Three hotkeys only: hide/show, panic, and the ask chord below.
+  assert.match(companionIndex, /chord\('CommandOrControl\+Shift\+Space', toggleOverlay\)/, 'hide/show hotkey');
+  assert.match(companionIndex, /chord\('CommandOrControl\+Shift\+X', panicHide\)/, 'panic hotkey');
   // The Knot-mark level lost its hotkey in the simplification: the desktop
   // Knot pane is the only toggle, and the function stays wired to it.
   assert.match(companionIndex, /toggleKnot,/, 'toggleKnot still exported to the desktop');

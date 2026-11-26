@@ -251,7 +251,12 @@ function trackEvent(name, props) {
 
 // The first answered question is `first_ask`, later ones `ask` (mode: voice,
 // text or guide). Counts a turn, never its content.
-function trackAsk(mode) {
+//
+// The Companion (0.1.36 lineage) passes one object: { mode, feature, outcome }.
+// Older builds passed a bare mode string. Accept both so the dashboard's stats
+// keep counting if either side is ever rolled back.
+function trackAsk(turn) {
+  const mode = turn && typeof turn === 'object' ? turn.mode : turn;
   if (stats) stats.ask(mode).catch(() => {});
 }
 

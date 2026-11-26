@@ -1,0 +1,497 @@
+{
+  "label": "branch held-out, after its misses were fixed",
+  "root": "C:\\Users\\prana\\Projects\\_worktrees\\nus-desktop-day1-ask-routing\\companion",
+  "at": "2026-11-12T00:07:27.179Z",
+  "runs": {
+    "handsOff": {
+      "total": 24,
+      "ok": 24,
+      "by": {
+        "screen": {
+          "n": 12,
+          "ok": 12
+        },
+        "general": {
+          "n": 4,
+          "ok": 4
+        },
+        "guide": {
+          "n": 4,
+          "ok": 4
+        },
+        "do": {
+          "n": 2,
+          "ok": 2
+        },
+        "clarify": {
+          "n": 2,
+          "ok": 2
+        }
+      },
+      "misses": [],
+      "rows": [
+        {
+          "text": "what's this about",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "summarize",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "can you tell me what this article says",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "describe",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "whats wrong with my code",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "ask",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "translate this into english",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "explain",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what does this word mean",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "ask",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "do these numbers look right to you",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "check",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "explain the graph",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "explain",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "summarise the email I have open",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "summarize",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what is this popup asking me",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "ask",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "can you look at this and tell me what's going on",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "describe",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "read out the instructions",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "read",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "so what is happening on my screen right now",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "ask",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what's the difference between RAM and storage",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "explain how compound interest works",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what year did the berlin wall fall",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "give me a summary of hamlet",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how do I attach a file in gmail",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "where's the print button",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how do i get rid of this popup",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "show me how to share this doc",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "open chrome",
+          "want": "do",
+          "got": "do",
+          "route": "reflex",
+          "why": "open_app",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "type thank you so much",
+          "want": "do",
+          "got": "do",
+          "route": "reflex",
+          "why": "type_text",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "help me",
+          "want": "clarify",
+          "got": "clarify",
+          "route": "clarify",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "uh",
+          "want": "clarify",
+          "got": "clarify",
+          "route": "not-caught",
+          "why": "reflex dropped it",
+          "ok": true,
+          "real": ""
+        }
+      ]
+    },
+    "handsOn": {
+      "total": 24,
+      "ok": 24,
+      "by": {
+        "screen": {
+          "n": 12,
+          "ok": 12
+        },
+        "general": {
+          "n": 4,
+          "ok": 4
+        },
+        "guide": {
+          "n": 4,
+          "ok": 4
+        },
+        "do": {
+          "n": 2,
+          "ok": 2
+        },
+        "clarify": {
+          "n": 2,
+          "ok": 2
+        }
+      },
+      "misses": [],
+      "rows": [
+        {
+          "text": "what's this about",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "summarize",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "can you tell me what this article says",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "describe",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "whats wrong with my code",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "ask",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "translate this into english",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "explain",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what does this word mean",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "ask",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "do these numbers look right to you",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "check",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "explain the graph",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "explain",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "summarise the email I have open",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "summarize",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what is this popup asking me",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "ask",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "can you look at this and tell me what's going on",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "describe",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "read out the instructions",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "read",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "so what is happening on my screen right now",
+          "want": "screen",
+          "got": "screen",
+          "route": "screen-answer",
+          "why": "ask",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what's the difference between RAM and storage",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "explain how compound interest works",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what year did the berlin wall fall",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "give me a summary of hamlet",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how do I attach a file in gmail",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "where's the print button",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how do i get rid of this popup",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "show me how to share this doc",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "open chrome",
+          "want": "do",
+          "got": "do",
+          "route": "reflex",
+          "why": "open_app",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "type thank you so much",
+          "want": "do",
+          "got": "do",
+          "route": "reflex",
+          "why": "type_text",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "help me",
+          "want": "clarify",
+          "got": "clarify",
+          "route": "clarify",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "uh",
+          "want": "clarify",
+          "got": "clarify",
+          "route": "not-caught",
+          "why": "reflex dropped it",
+          "ok": true,
+          "real": ""
+        }
+      ]
+    }
+  }
+}

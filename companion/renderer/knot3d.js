@@ -73,6 +73,40 @@
     // looks outward. The host paints --knot-accent amber for it; this row just
     // makes the tint strong enough that the amber actually shows.
     reading: { speed: 1.3, band: 2.2, tint: 0.92, glow: 1.1 },
+    // 0.1.2 bodies. working: between listening and thinking (transcribing,
+    // routing), a faster and straighter Knot. error: the host paints it red
+    // for a beat. sleeping: settles, breathes slowly, then the loop stops.
+    working: { speed: 2, band: 2.2, tint: 0.4, glow: 0.7 },
+    error: { speed: 1.4, band: 1.6, tint: 0.7, glow: 0.8 },
+    sleeping: { speed: 0.25, band: 0.4, tint: 0.05, glow: 0.15 },
+  };
+
+  // ---- pose and gestures (0.1.2) -------------------------------------
+  // Continuous pose parameters, spring-eased toward targets, with one-shot
+  // gestures layered on top. Everything here is additive: with no host call
+  // the frame is the 0.1.1 frame. Each state may add a small pose of its own
+  // (working straightens, thinking tightens, sleeping shrinks and slows).
+  const POSE_KEYS = ['scale', 'squash', 'leanX', 'leanY', 'straighten', 'tempo', 'bright'];
+  const POSE_REST = { scale: 1, squash: 0, leanX: 0, leanY: 0, straighten: 0, tempo: 1, bright: 0 };
+  const SPRING_K = { scale: 140, squash: 160, leanX: 90, leanY: 90, straighten: 60, tempo: 40, bright: 80 };
+  const STATE_POSE = {
+    working: { straighten: 0.22, tempo: 0.1 },
+    thinking: { scale: -0.05 },
+    sleeping: { scale: -0.08, tempo: -0.75 },
+  };
+  // Gestures: name -> duration and the pose delta at progress p (0..1).
+  // Placeholders until the motion design lands; the shapes are the contract.
+  const GESTURES = {
+    acknowledge: { ms: 220, at: (p) => ({ squash: 0.12 * Math.sin(Math.PI * p), tempo: 1.5 * (1 - p) }) },
+    done: { ms: 520, at: (p) => ({ scale: 0.14 * Math.sin(Math.PI * p), bright: 0.6 * (1 - p) }) },
+    error: { ms: 420, at: (p) => ({ leanX: 0.5 * Math.sin(6 * Math.PI * p) * (1 - p) }) },
+    poke: { ms: 180, at: (p, o) => ({ squash: -0.16 * Math.sin(Math.PI * p), leanX: (o.dx || 0) * 0.4 * Math.sin(Math.PI * p), leanY: (o.dy || 0) * 0.4 * Math.sin(Math.PI * p) }) },
+    wake: { ms: 600, at: (p) => ({ scale: -0.1 * (1 - p) + 0.06 * Math.sin(Math.PI * p), tempo: 1 - p }) },
+    arrive: { ms: 360, at: (p) => ({ squash: 0.1 * Math.sin(Math.PI * p) * (1 - p), bright: 0.3 * (1 - p) }) },
+    nudge: { ms: 500, at: (p) => ({ leanY: -0.35 * Math.sin(2 * Math.PI * p) * (1 - p) }) },
+    gulp: { ms: 420, at: (p) => ({ squash: 0.2 * Math.sin(Math.PI * Math.min(1, p * 1.6)), scale: 0.08 * Math.sin(Math.PI * p) }) },
+    settle: { ms: 380, at: (p) => ({ squash: 0.08 * Math.sin(2 * Math.PI * p) * (1 - p) }) },
+    sleep: { ms: 400, at: (p) => ({ squash: 0.05 * Math.sin(Math.PI * p) }) },
   };
 
   // ---------------------------------------------------------------- material
@@ -91,10 +125,14 @@
   const rgb = (c) => 'rgb(' + c[0] + ', ' + c[1] + ', ' + c[2] + ')';
   const cache = new Map();
 
-  function sprites(acc, tint) {
+  function sprites(raw, tint) {
     const q = Math.round(Math.max(0, Math.min(1, tint)) * 12) / 12;
+    // The accent now fades between colours, so quantise it: one sprite set
+    // per 6 levels per channel, and a bounded cache (48 sets, oldest out).
+    const acc = [0, 1, 2].map((i) => Math.round(raw[i] / 6) * 6);
     const key = acc[0] + ',' + acc[1] + ',' + acc[2] + '|' + q;
     if (cache.has(key)) return cache.get(key);
+    if (cache.size >= 48) cache.delete(cache.keys().next().value);
     const set = new Array(LEVELS);
     for (let l = 0; l < LEVELS; l++) {
       const lit = l / (LEVELS - 1);
@@ -343,6 +381,46 @@
     let bandPos = 0;
     let pausePending = false;
 
+    // Pose: host targets (setPose) plus the state's own pose, spring-eased;
+    // gestures add on top for their duration. effv is what this frame draws.
+    const hostPose = { ...POSE_REST }, poseTarget = { ...POSE_REST }, pose = { ...POSE_REST }, poseVel = {}, effv = { ...POSE_REST };
+    for (const k of POSE_KEYS) poseVel[k] = 0;
+    const gestures = [];
+    let sleeping = false, asleep = false, lastDrawn = 0, sq = 0;
+    function retarget() { const sp = STATE_POSE[state] || {}; for (const k of POSE_KEYS) poseTarget[k] = hostPose[k] + (sp[k] || 0); }
+    function stepPose(dt) {
+      for (const k of POSE_KEYS) {
+        const kk = SPRING_K[k], c = 2 * Math.sqrt(kk); // critically damped
+        const a = kk * (poseTarget[k] - pose[k]) - c * poseVel[k];
+        poseVel[k] += a * dt;
+        pose[k] += poseVel[k] * dt;
+      }
+    }
+    function poseSettled() {
+      for (const k of POSE_KEYS) if (Math.abs(pose[k] - poseTarget[k]) > 0.002 || Math.abs(poseVel[k]) > 0.01) return false;
+      return true;
+    }
+    function evalGestures(now) {
+      for (const k of POSE_KEYS) effv[k] = pose[k];
+      for (let i = gestures.length - 1; i >= 0; i--) {
+        const g = gestures[i];
+        const p = (now - g.t0) / g.ms;
+        if (p >= 1) { gestures.splice(i, 1); continue; }
+        const d = g.at(Math.max(0, p), g.opts);
+        for (const k in d) if (k in effv) effv[k] += d[k];
+      }
+    }
+    // straighten blends the trefoil toward a gentle arc of the same extent,
+    // parameter-aligned so the tube keeps its order and simply unbends.
+    function straightPoint(t) { const s = t / TWO_PI - 0.5; return { x: s * 5.2, y: Math.sin(t) * 0.35, z: 0 }; }
+    function poseCurve(t) {
+      const a = curvePoint(t, unravel);
+      const st = effv.straighten;
+      if (st <= 0.002) return a;
+      const b = straightPoint(t), e = smooth(Math.min(1, st));
+      return { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e, z: a.z + (b.z - a.z) * e };
+    }
+
     // Projection state from the latest frame, shared with getTailAnchor().
     let cx = 0, cy = 0, R = 1, cosX = 1, sinX = 0, cosY = 1, sinY = 0, lastTube = 1, projected = false;
     const fov = 6.2;
@@ -356,8 +434,8 @@
     function syncProjection() {
       resize();
       cx = canvas.width / 2; cy = canvas.height * ANCHOR_Y;
-      R = Math.min(canvas.width, canvas.height) * RATIO;
-      const rx = tumble * 0.26, ry = tumble * 0.17;
+      R = Math.min(canvas.width, canvas.height) * RATIO * effv.scale;
+      const rx = tumble * 0.26 + effv.leanY * 0.35, ry = tumble * 0.17 + effv.leanX * 0.35;
       cosX = Math.cos(rx); sinX = Math.sin(rx);
       cosY = Math.cos(ry); sinY = Math.sin(ry);
       lastTube = tubeAt(unravel);
@@ -372,8 +450,9 @@
       const xr = x1 * ROT_C - y1 * ROT_S;
       const yr = x1 * ROT_S + y1 * ROT_C;
       const persp = fov / (fov - z2 * 1.6);
-      pt.sx = cx + xr * R * persp;
-      pt.sy = cy + yr * R * persp;
+      // squash: wider and shorter (positive) or taller and thinner (negative)
+      pt.sx = cx + xr * R * persp * (1 + sq);
+      pt.sy = cy + yr * R * persp * (1 - sq);
       pt.z = z2;
       pt.persp = persp;
       return pt;
@@ -383,7 +462,10 @@
       const raw = getComputedStyle(canvas.parentElement || canvas).getPropertyValue('--knot-accent');
       return parseColor(raw, [80, 108, 255]);
     }
-    let acc = accent();
+    // The accent eases toward the CSS colour instead of snapping to it, so
+    // silver -> amber -> violet is a fade in the halo, core and light.
+    let acc = accent().slice();
+    let accTarget = acc.slice();
     let accAt = 0;
 
     let rectW = canvas.clientWidth || 0, rectH = canvas.clientHeight || 0;
@@ -401,6 +483,10 @@
     for (let i = 0; i < MAXN; i++) pool[i] = { sx: 0, sy: 0, z: 0, persp: 1, t: 0, ang: 0, s: 0, len: 2 };
     let list = [];
     let perim = 0; // projected curve length from the previous frame
+    // The reference tube's 201 points, allocated once (they were 201 fresh
+    // objects every frame).
+    const refPool = [];
+    for (let i = 0; i <= 200; i++) refPool.push({ sx: 0, sy: 0, z: 0, persp: 1 });
 
     let idleSkip = 0;
     function draw(now) {
@@ -408,6 +494,11 @@
         if (running) frame = requestAnimationFrame(draw);
         return;
       }
+      // At rest nothing changes fast: about 30 fps is plenty and halves the
+      // idle cost. Any state, gesture, pose or unravel change lifts the cap.
+      const calm = (state === 'idle' || state === 'sleeping') && !gestures.length && Math.abs(unravelTarget - unravel) < 0.005 && poseSettled();
+      if (calm && now - lastDrawn < 28) { if (running) frame = requestAnimationFrame(draw); return; }
+      lastDrawn = now;
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const target = STATES[state] || STATES.idle;
@@ -418,26 +509,34 @@
       glow += (target.glow - glow) * k;
       band += (target.band - band) * k;
       unravel += (unravelTarget - unravel) * unwindK;
-      time += dt * speed;
+      stepPose(dt);
+      evalGestures(now);
+      sq = Math.max(-0.4, Math.min(0.4, effv.squash));
+      const tempo = Math.max(0.05, effv.tempo);
+      time += dt * speed * tempo;
       // Keep the Companion's readable S silhouette. A small, breathing orbit gives
       // it depth without rotating into the rejected three-lobed presentation.
       tumble = basePose + Math.sin(time * 0.18) * 0.16 * (1 - unravel * 0.85);
-      if (liveLevel > level) level = liveLevel;
-      else level += (liveLevel - level) * Math.min(1, dt * 5);
-      bandTime += dt * band * (1 + level * 0.5) * BAND_DIR;
-      const glowE = Math.min(1.4, glow * (1 + level * 0.6));
-      if (now - accAt > 500) { acc = accent(); accAt = now; }
+      // speaking with no microphone: a synthetic voice level so the band pulses.
+      const wantLevel = state === 'speaking' && liveLevel <= 0 ? 0.35 + 0.35 * Math.sin(time * 7) : liveLevel;
+      if (wantLevel > level) level = wantLevel;
+      else level += (wantLevel - level) * Math.min(1, dt * 5);
+      bandTime += dt * band * (1 + level * 0.5) * BAND_DIR * tempo;
+      const glowE = Math.min(1.4, glow * (1 + level * 0.6)) + Math.max(0, effv.bright);
+      if (now - accAt > 500) { accTarget = accent(); accAt = now; }
+      const ak = 1 - Math.exp(-dt * 6);
+      for (let i = 0; i < 3; i++) acc[i] += (accTarget[i] - acc[i]) * ak;
 
       const dpr = resize();
       const W = canvas.width, H = canvas.height;
       cx = W / 2; cy = H * ANCHOR_Y;
-      R = Math.min(W, H) * RATIO;
+      R = Math.min(W, H) * RATIO * Math.max(0.2, effv.scale);
       const tube = Math.max(0.9 * dpr, Math.min(W, H) * TUBE_RATIO * (1 - unravel * 0.45)); // strand radius
       lastTube = tube;
 
       ctx.clearRect(0, 0, W, H);
 
-      const rx = tumble * 0.26, ry = tumble * 0.17;
+      const rx = tumble * 0.26 + effv.leanY * 0.35, ry = tumble * 0.17 + effv.leanX * 0.35;
       cosX = Math.cos(rx); sinX = Math.sin(rx);
       cosY = Math.cos(ry); sinY = Math.sin(ry);
       projected = true;
@@ -484,7 +583,7 @@
       list.length = 0;
       for (let i = 0; i < N; i++) {
         const t = (i / N) * TWO_PI;
-        const pt = project(curvePoint(t, unravel), pool[i]);
+        const pt = project(poseCurve(t), pool[i]);
         pt.t = i / N;
         list.push(pt);
       }
@@ -494,8 +593,8 @@
       for (let i = 1; i < N; i++) plen += Math.hypot(pool[i].sx - pool[i - 1].sx, pool[i].sy - pool[i - 1].sy);
       perim = plen;
       const slen = Math.max(2 * dpr, (plen / N) * 3.2);
+      const open = unravel > 0.002 || effv.straighten > 0.002;
       for (let i = 0; i < N; i++) {
-        const open = unravel > 0.002;
         const a = pool[open ? Math.max(0, i - 1) : (i + N - 1) % N];
         const b = pool[open ? Math.min(N - 1, i + 1) : (i + 1) % N];
         const p = pool[i];
@@ -508,9 +607,8 @@
       const set = sprites(acc, tint);
       // Use the reference material on the Knot. The strand retains the shared
       // slice material and tail anchor, so unwinding remains fully compatible.
-      const referencePoints = [];
-      for (let i = 0; i <= 200; i++) referencePoints.push(project(curvePoint(i / 200 * TWO_PI, unravel), {}));
-      drawReferenceTube(ctx, referencePoints, tube, acc, tint, glowE, dpr);
+      for (let i = 0; i <= 200; i++) project(poseCurve(i / 200 * TWO_PI), refPool[i]);
+      drawReferenceTube(ctx, refPool, tube, acc, tint, glowE, dpr);
 
       // The travelling light: runs the curve, faster with voice.
       bandPos = ((bandTime * 0.11) % 1 + 1) % 1;
@@ -530,7 +628,34 @@
         stop();
         return;
       }
+      // Asleep: once the sleep pose has settled, this frame is the last one
+      // until wake(). No timer, no rAF, no CPU.
+      if (sleeping && !asleep && !gestures.length && poseSettled() && Math.abs(unravelTarget - unravel) < 0.005) {
+        asleep = true;
+        canvas.classList.add('knot-asleep');
+        stop();
+        return;
+      }
       if (running) frame = requestAnimationFrame(draw);
+    }
+
+    function gesture(name, opts) {
+      const g = GESTURES[name];
+      if (!g || reduced) return false;
+      if (sleeping) wake();
+      gestures.push({ t0: performance.now(), ms: g.ms, at: g.at, opts: opts || {} });
+      start();
+      return true;
+    }
+    function wake() {
+      const was = sleeping || asleep;
+      sleeping = false; asleep = false;
+      canvas.classList.remove('knot-asleep');
+      if (state === 'sleeping') state = 'idle';
+      retarget();
+      if (!reduced) start(); else draw(performance.now());
+      if (was) gesture('wake');
+      return was;
     }
 
     function start() {
@@ -574,7 +699,11 @@
     return {
       setState(next) {
         if (!STATES[next]) next = 'idle';
+        // Asleep stays asleep through the host's idle ticks; anything else wakes.
+        if (sleeping && next === 'idle') return;
+        if (sleeping && next !== 'sleeping') wake();
         state = next;
+        retarget();
         // The host recolours --knot-accent with the state (amber = reading);
         // pick it up this frame rather than on the next 500ms poll.
         accAt = 0;
@@ -592,9 +721,35 @@
       setLevel(value) {
         if (reduced) return;
         liveLevel = Math.max(0, Math.min(1, Number(value) || 0));
+        if (sleeping && liveLevel > 0) wake();
       },
+      // Pose targets from the host (travel, lean toward what it reads, drag).
+      // Partial: unnamed keys keep their value. Values are deltas from rest
+      // except scale and tempo, which are the values themselves.
+      setPose(partial) {
+        if (!partial) return;
+        for (const k of POSE_KEYS) if (partial[k] != null && Number.isFinite(Number(partial[k]))) hostPose[k] = Number(partial[k]);
+        if (sleeping) wake(); else { retarget(); if (!reduced) start(); }
+      },
+      getPose() { return { ...effv }; },
+      gesture,
+      // Sleep: the sleeping body, then the loop stops once it has settled.
+      sleep() {
+        if (sleeping || reduced) return;
+        sleeping = true; asleep = false;
+        state = 'sleeping'; retarget(); accAt = 0;
+        gestures.length = 0;
+        // Pushed directly: gesture() would wake a sleeping Knot.
+        const g = GESTURES.sleep;
+        gestures.push({ t0: performance.now(), ms: g.ms, at: g.at, opts: {} });
+        start();
+      },
+      wake,
+      isAsleep() { return asleep; },
+      isSleeping() { return sleeping; },
       setUnravel(value) {
         unravelTarget = Math.max(0, Math.min(1, Number(value) || 0));
+        if (sleeping && unravelTarget > 0.005) wake();
         if (reduced) { unravel = unravelTarget; draw(performance.now()); return; }
         if (opts.quietIdle && Math.abs(unravelTarget - unravel) >= 0.005) { pausePending = ['idle', 'ready'].includes(state); start(); }
       },

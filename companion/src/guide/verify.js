@@ -74,6 +74,8 @@ function reconcile({ target, elements, bboxPhys, fromPoint, found, verified = tr
   if (fromPoint && fromPoint.rect) {
     const nameOk = label && tokenOverlap(fromPoint.name, label) >= 0.5;
     const boxOk = iou(fromPoint.rect, bboxPhys) >= 0.3;
+    // ring: a control chosen by words and distance among those around the box (chooser.js).
+    if (fromPoint.ring) return { rect: fromPoint.rect, name: fromPoint.name || label, type: fromPoint.type || '', source: 'frompoint-ring', verified: true };
     if (nameOk || boxOk) return { rect: fromPoint.rect, name: fromPoint.name || label, type: fromPoint.type || '', source: nameOk ? 'frompoint-name' : 'frompoint-box', verified: true };
   }
   if (found && found.rect && iou(found.rect, bboxPhys) >= 0.3) {
@@ -112,9 +114,17 @@ function hamming(a, b) {
   return d;
 }
 
-// { whole, crop } hashes before and after a click.
+// { whole, crop } before and after a click. Gray thumbnails ({ kind: 'gray' },
+// src/guide/settle.js) are compared by how many pixels moved and by how much,
+// which catches a tick mark and ignores JPEG noise; the older 256-bit hashes
+// still compare by hamming distance.
 function screenChanged(prev, next, threshold = CHANGE_THRESHOLD) {
   if (!prev || !next) return true;
+  if (prev.kind === 'gray' || next.kind === 'gray') {
+    const S = require('./settle');
+    if (prev.crop && next.crop && S.changed(prev.crop, next.crop)) return true;
+    return S.changed(prev.whole, next.whole) || S.difference(prev.whole, next.whole) >= S.CHANGE_THRESHOLD;
+  }
   if (prev.crop && next.crop && hamming(prev.crop, next.crop) > threshold) return true;
   return hamming(prev.whole, next.whole) > threshold;
 }
@@ -127,4 +137,4 @@ function clickHits(point, rect) {
   return Math.hypot(point.x - cx, point.y - cy) <= r;
 }
 
-module.exports = { normRectFromPhys, physRectFromNorm, physRectToWindow, tokenOverlap, iou, reconcile, bitmapHash, hamming, screenChanged, clickHits, CHANGE_THRESHOLD };
+module.exports = { normRectFromPhys, physRectFromNorm, physRectToWindow, tokens, tokenOverlap, iou, reconcile, bitmapHash, hamming, screenChanged, clickHits, CHANGE_THRESHOLD };
