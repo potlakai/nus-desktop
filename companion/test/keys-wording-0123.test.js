@@ -21,11 +21,11 @@ test('nothing the person or the model reads says a TypeSafe key is needed', () =
   assert.match(home, /\$\('#step-voice'\)\.classList\.add\('set'\)/, 'voice commands are always ready');
 });
 
-test('the Knot\'s guide says no key is needed on publik, and voice commands need none either way', () => {
+test('the Knot\'s guide names the ways to answer, and says voice commands need no key', () => {
   const index = read('companion/index.js');
   assert.match(index, /function keysGuide\(\)/);
-  assert.match(index, /No key is needed: answers and pointing come through the publik account/);
-  assert.match(index, /Voice commands such as opening an app, typing and searching need no key\. A TypeSafe key in Settings, Keys is optional\./);
+  assert.match(index, /Answers and pointing use one of these, set in Settings, Keys/);
+  assert.match(index, /Voice commands such as opening an app, typing and searching need no key\. A key in Settings, Keys is optional for chat\./);
   assert.match(index, /keysGuide\(\) \+ ' ' \+/, 'appGuide uses it');
   assert.doesNotMatch(index.slice(index.indexOf('function keysGuide'), index.indexOf('function appGuide')), /—/);
 });

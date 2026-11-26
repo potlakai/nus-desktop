@@ -49,7 +49,7 @@ const PEN_RULES = [
 ];
 
 // What the answering model is told. Short and flat: the default brain is small.
-// Every tag is shown as a real example, never as a pattern: publik-fast copied
+// Every tag is shown as a real example, never as a pattern: the fast tier copied
 // "[BOX:<target>]" out letter for letter (draw-check 2026-11-23, 2 of 16 marks).
 // A box is left, top, right, bottom because that is how models write boxes when
 // left to themselves (the same run: "403,169,863,407", "(340, 110, 1230, 380)").
@@ -316,7 +316,7 @@ function placeTarget(target, shape, ctx) {
   if (target.kind === 'element') {
     // An id means something only when the model was shown the list it comes
     // from. A bare number that is no id is a number on the screen with its
-    // quotes forgotten ("[CIRCLE:149]" for a total, publik-fast 2026-11-23).
+    // quotes forgotten ("[CIRCLE:149]" for a total, fast tier 2026-11-23).
     const el = ctx.ids === false ? null : (ctx.elements || []).find((e) => Number(e.id) === Number(target.id));
     if (!el) return placeTarget({ kind: 'words', text: String(target.id) }, shape, Object.assign({}, ctx, { elements: [] }));
     if (!el.rect || private_(el)) return null;

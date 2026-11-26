@@ -103,19 +103,19 @@ One-time setup. `src/config.js` is gitignored, so the runner renders it with
 `src/config.js`):
 
 ```
-gh secret set NUS_SUPABASE_URL -R potlakai/nus-desktop
-gh secret set NUS_SUPABASE_ANON_KEY -R potlakai/nus-desktop
-gh secret set NUS_GCAL_CLIENT_ID -R potlakai/nus-desktop
-gh secret set NUS_GCAL_CLIENT_SECRET -R potlakai/nus-desktop
-gh secret set NUS_OUTLOOK_CLIENT_ID -R potlakai/nus-desktop
+gh secret set NUS_SUPABASE_URL -R omsenjalia/nus-desktop
+gh secret set NUS_SUPABASE_ANON_KEY -R omsenjalia/nus-desktop
+gh secret set NUS_GCAL_CLIENT_ID -R omsenjalia/nus-desktop
+gh secret set NUS_GCAL_CLIENT_SECRET -R omsenjalia/nus-desktop
+gh secret set NUS_OUTLOOK_CLIENT_ID -R omsenjalia/nus-desktop
 ```
 
 Each release, after the version bump is on `main`:
 
 ```
-gh workflow run build-mac -R potlakai/nus-desktop
-gh run watch -R potlakai/nus-desktop
-gh run download -R potlakai/nus-desktop -n nus-mac-dmgs -D dist/mac-dmgs
+gh workflow run build-mac -R omsenjalia/nus-desktop
+gh run watch -R omsenjalia/nus-desktop
+gh run download -R omsenjalia/nus-desktop -n nus-mac-dmgs -D dist/mac-dmgs
 ```
 
 The workflow runs the suite, builds `Nus-arm64.dmg` and `Nus-x64.dmg`, scans

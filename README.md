@@ -121,10 +121,19 @@ The upstream MIT `LICENSE` and copyright notices are kept in full — that is a
 licence condition, and removing a product's identity is not the same as
 removing its notices.
 
-**Not yet removed, and inert:** `companion/src/publik/` (a subscription gate
-module, never required on a live path) still sits in the tree and is scheduled
-for deletion; `companion/src/account.js` and `feedback.js` still contain a URL
-for the upstream server, on code paths no longer reached.
+Also gone, because they pointed at the previous owner rather than at you:
+
+| Removed | Why |
+|---|---|
+| `companion/src/publik/` and its sign-in window | the paid answering account, and everything behind it |
+| `account.js`, `entitlement.js`, `account-link.js`, `account-offer.js` | the account, its plan and its settings sync; nothing outside their own tests used them |
+| the Account card and sign-in offer in the dashboard | markup only: their IPC channels were registered by nothing |
+| `updates.js`, `channel.js`, `one-click.js` | the updater read **his** GitHub releases; adopting one would have replaced this app with his |
+| the upstream Supabase URLs | feedback and usage rows now stay on this computer; the URLs are empty strings |
+
+Nothing in the tree contacts a server that is not one you configured yourself.
+`companion/src/reflex/jev.js` is the one third-party call left, and it only runs
+if you paste a TypeSafe key; leave the field blank and it never leaves.
 
 ## Stack
 

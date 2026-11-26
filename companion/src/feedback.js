@@ -25,7 +25,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const FEEDBACK_URL = 'https://xnpkplcjurzwanotmwwt.supabase.co/functions/v1/submit-feedback';
+// No feedback endpoint in this build. The owner's server used to take these notes;
+// there is no owner here, so a note is kept on this computer and shown on the
+// dashboard, and nothing is sent anywhere.
+const FEEDBACK_URL = '';
 const TIMEOUT_MS = 6000;
 const DAY_MS = 86400000;
 const REACTION_AT = [1, 5, 25];
@@ -59,13 +62,14 @@ const TELL_RE = new RegExp(LEAD + '(?:(?:tell|message)\\s+' + NAME + '|let\\s+' 
 const SEND_RE = new RegExp(LEAD + '(?:send|give|leave)\\s+(?:some\\s+)?feedback\\s+(?:to|for)\\s+(?:' + NAME.slice(3, -1) + '|nus|nūs)' + REST, 'i');
 const COLON_RE = /^feedback\s*:\s*(.*)$/i;
 
-// Pure: the thank-you's words. The free week is publik's own offer to every new subscriber, so it
-// is said as that, with its card and its charge; it is never called a gift from Nūs.
-const THANKS_WEEK = 'If you ever want more than the free asks, publik gives new subscribers a free week. It needs a card, and it is paid after the week unless you cancel.';
+// Pure: the thank-you's words. The free-week upsell that used to sit behind
+// freeWeek belonged to the paid account this build no longer has, so the
+// parameter stays (an old caller must not break) and says nothing.
+const THANKS_WEEK = '';
 function thanksText(asks, { freeWeek = false } = {}) {
   const n = Math.max(THANKS_AT, Math.floor(Number(asks) || 0));
-  return 'You have asked Nūs ' + n + ' times on this computer. That puts you among the people who use it the most. I build Nūs by myself, and I wanted to say thank you.'
-    + (freeWeek ? '\n\n' + THANKS_WEEK : '');
+  return 'You have asked J.A.R.V.I.S ' + n + ' times on this computer. That is a lot of work together, and I wanted to say thank you.'
+    + (freeWeek ? THANKS_WEEK : '');
 }
 function tellText(text) {
   const t = String(text || '').trim().replace(/\s+/g, ' ');
@@ -108,9 +112,11 @@ function createFeedback(o) {
   function outbox() { const v = readJson(outboxFile, { items: [] }); return Array.isArray(v.items) ? v.items : []; }
   function saveOutbox(items) { writeJson(outboxFile, { items }); }
 
-  // A dev run sends nothing unless asked to; the outbox still fills, so the
-  // whole path can be watched without a single request leaving the machine.
+  // Nothing is sent unless an endpoint was explicitly handed in. This build has
+  // none, so the outbox fills and is read back locally; a future owner can pass
+  // o.url to make the same code send again without touching this file.
   function canSend() {
+    if (!url) return false;
     if (String(env.NUS_FEEDBACK || '') === '0') return false;
     if (!o.packaged && String(env.NUS_FEEDBACK || '') !== '1') return false;
     return typeof fetchFn === 'function';

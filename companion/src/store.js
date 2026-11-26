@@ -64,7 +64,7 @@ const DEFAULTS = {
   // the dashboard always shows. Off by default since 2026-11-03: a first recording
   // of the Knot showed nothing. The tour's screen sharing card offers the switch.
   hideFromCapture: false,
-  // Messages from J.A.R.V.I.S (companion/src/channel.js): the Knot saying a new version is
+  // Messages from J.A.R.V.I.S (the host's channel, removed in this build): the Knot saying a new version is
   // ready, and short notes from the signed channel file, at most one a day. Off
   // keeps the bubble quiet; the dashboard card still shows a new version.
   channelMessages: true,

@@ -42,7 +42,7 @@ function windowName(url) {
   const u = String(url || '');
   if (/renderer\/index\.html/.test(u)) return 'overlay';
   if (/home\/index\.html/.test(u)) return 'dashboard';
-  if (/publik\/gate\.html/.test(u)) return 'signin';
+  if (/gate\.html$/.test(u)) return 'signin';
   if (/touch-pad\.html/.test(u)) return 'touchpad';
   return null;
 }

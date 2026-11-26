@@ -11,7 +11,7 @@
 //
 // Where it goes: the same place the site's Mac waitlist goes (the feedback
 // notes in Supabase, through submit-feedback and its outbox), as a note with a
-// fixed first line and the address. Never to publik, and nothing from publik
+// fixed first line and the address. Never to a server, and nothing from one
 // goes with it.
 //
 // The ruling still open: LINK_INSTALL. false (built): the address travels

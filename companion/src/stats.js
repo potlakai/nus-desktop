@@ -16,13 +16,15 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const TRACK_URL = 'https://xnpkplcjurzwanotmwwt.supabase.co/functions/v1/track';
+// No tracking endpoint in this build. The owner's server used to take these rows;
+// there is no owner here. The default URL is empty so a caller that does not pass
+// one sends nothing, and enabled() is false regardless.
+const TRACK_URL = '';
 const PRODUCT = 'companion';
 const EVENTS = new Set(['install', 'app_open', 'source_answer', 'first_ask', 'ask', 'key_connected', 'companion_session', 'stats_off',
   'feature_session', 'app_session', 'onboarding_step', 'first_run_end', 'crash', 'update_installed',
   'update_offered', 'notice_shown', 'notice_clicked',
   'first_win', 'engaged', 'ai_ready', 'hook_shown', 'hook_used',
-  // Amendment (f), 2026-11-11: the sign-in door (Sign in with publik).
   'signin_shown', 'signin_clicked', 'signin', 'signin_closed', 'signin_unreachable', 'ai_source',
   // 0.1.38 (eighth edition on the server): how a run ended, see EXIT_REASONS.
   'app_exit']);
@@ -50,7 +52,7 @@ const STEPS = ['welcome_seen', 'stats_notice_seen', 'key_prompt_seen', 'key_skip
   'tour_dashboard', 'tour_done', 'tour_skipped', 'struggle_picked', 'autostart_on', 'autostart_off',
   // 0.1.37: the dictation card after the talk key's card (seventh edition on the server).
   'tour_dictate',
-  // 0.1.40 (ninth edition): the choose screen publik showed (free use or a balance, a plan, none left),
+  // 0.1.40 (ninth edition): the door's choose screen,
   // the no-key check before "Use my own key", the tour's AI card first when nothing can answer, and
   // its "Get a free key" button.
   'door_balance', 'door_plan', 'door_empty', 'door_nokey_seen', 'tour_ai_first', 'tour_get_key'];
@@ -73,16 +75,15 @@ const HOOKS = ['checkin', 'morning_line', 'continue_project', 'reminder_toast', 
 // open), other. A crash or a killed process sends none; sleep is not an exit.
 const EXIT_REASONS = ['quit', 'shutdown', 'update', 'uninstall', 'exam', 'other'];
 // path: how answers are possible on this install, sent once after the key card.
-// publik (amendment f): publik's AI answers and no key is on this computer.
-const AI_PATHS = ['key', 'claude_code', 'none', 'publik'];
-// Amendment (f), 2026-11-11: the sign-in door. Fixed lists; nothing from
-// publik's files, no account, no email, ever.
+const AI_PATHS = ['key', 'claude_code', 'none'];
+// The sign-in door's fixed lists. This build has no account to sign in to, so
+// nothing here can fire; the lists stay so an old queued row still validates.
 // cohort: was a different version here before this one (update) or not (new).
 // screen: where the door stood when it was closed. ai_source path: who answers
-// once the person is through, publik or their own key.
+// once the person is through, their own key.
 const COHORTS = ['new', 'update'];
 const GATE_SCREENS = ['sign_in', 'waiting', 'choose', 'unreachable'];
-const AI_SOURCES = ['publik', 'own_key'];
+const AI_SOURCES = ['own_key'];
 // The door's rows wait on this computer until the server takes them: the door
 // is where the app quits, and where the network is most often missing. A short
 // list in stats-state.json, oldest first, tried again at the next launch.
@@ -289,9 +290,7 @@ function createStats(o) {
   }
 
   // ---- the sign-in door (amendment f) ----
-  // The host says which of publik's screens is on the glass, which button was
-  // pressed, and when the door let the person through. Counts only: the install
-  // id and a name, never anything publik knows.
+  // The sign-in door's counters. Counts only, never an account name.
   // new or update, decided once: was a different version here before this one.
   function cohort() {
     const s = st();
@@ -316,12 +315,12 @@ function createStats(o) {
     gate.clicked = true;
     return durable('signin_clicked');
   }
-  // Signed in to publik: once per install. seconds only when the window was up.
+  // Signed in: once per install. seconds only when the window was up.
   function signedIn() {
     if (st().signinDone || !enabled()) return none();
     remember({ signinDone: true });
     const seconds = gate && gate.signShownAt ? Math.max(0, Math.round((now() - gate.signShownAt) / 1000)) : null;
-    return durable('signin', { method: 'publik', ...(seconds != null ? { seconds } : {}) });
+    return durable('signin', { method: 'account', ...(seconds != null ? { seconds } : {}) });
   }
   // Who answers: sent when it is first known, and again only when it changes.
   function aiSource(p) {
@@ -486,8 +485,6 @@ function createStats(o) {
   // How answers are possible here, once per install.
   function aiReady(p) {
     if (!AI_PATHS.includes(p) || st().aiReadySent) return Promise.resolve({ sent: false, status: 0 });
-    // publik is new to the server's list (amendment f): it waits in the queue until taken.
-    if (p === 'publik') { if (!enabled()) return none(); remember({ aiReadySent: true }); return durable('ai_ready', { path: p }); }
     return track('ai_ready', { path: p }).then(r => { if (r.sent) remember({ aiReadySent: true }); return r; });
   }
   // A retention loop put in front of the person, or taken up. Counts only.

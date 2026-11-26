@@ -69,7 +69,7 @@ const FOUND_MS = 12000;           // a thing found on the screen stays ringed th
 const FOUND_FRAME_SHARE = 0.3;    // wider than this share of the screen, it gets a frame, not a ring
 const PAGE_WAIT_MS = 1500;        // how long a drawing answer waits for the window's own words
 const PEN_WAIT_LINE = 'Checking it line by line.';
-const PEN_PUBLIK_MODEL = 'publik-smart';   // a check of someone's work, on publik: the careful tier
+const PEN_CAREFUL_MODEL = 'publik-smart';  // a check of someone's work: the careful tier
 const MARKS_LIGHT = 0.55;        // brightness (0..1) under a mark from which the page counts as light
 const MARKS_MOVED = 8;           // mean gray change (0..255) that means the screen moved (a scroll is 10 to 40)
 // A step may be kept for replay only when the model stood behind it.
@@ -88,7 +88,7 @@ function jevElements(list, fg) {
 // [DONE] ends the walk only when there is nothing left to click. The model
 // also writes [DONE] on the one click that finishes the goal ("Click the Night
 // light toggle to turn it on. [POINT:21] [DONE]"): measured 2026-11-15 on
-// publik-fast, 38 of 168 guide replies did this and 30 of them named the right
+// the fast tier, 38 of 168 guide replies did this and 30 of them named the right
 // control, which the app then dropped. Such a reply is pointed at; the next
 // step's fresh screenshot ends the walk.
 const ALREADY = /\b(?:already|is now|are now|you're all set|you are all set|all done)\b/i;
@@ -544,7 +544,7 @@ class GuideSession {
     // walk, and it is worth the careful brain: the quick one called wrong work
     // right (live 2026-11-23, and the paid check before it).
     const pen = drawing && s.answer === 'check';
-    // It takes about 8 s to its first word (measured on publik-smart; the quick
+    // It takes about 8 s to its first word (measured on the careful tier; the quick
     // tier caught 2 of 5 mistakes and the middle one wrote nothing), so the wait
     // is said and shown: asked by voice, the line is spoken after the short ack.
     if (pen) {
@@ -640,7 +640,7 @@ class GuideSession {
     let raw = null, err = null, streamed = false;
     this.modelsInFlight += 1;
     try {
-      raw = await withTimeout(llm.complete({ system: req.system, turns: [{ role: 'user', text: req.text }], imageDataUrl: cap.dataUrl, json: false, maxTokens: req.maxTokens, ...(pen && T.provider === 'publik' ? { model: PEN_PUBLIK_MODEL } : {}), onDelta: (piece) => { streamed = true; for (const ev of rs.feed(piece)) take(ev); } }), MODEL_TIMEOUT_MS, 'model');
+      raw = await withTimeout(llm.complete({ system: req.system, turns: [{ role: 'user', text: req.text }], imageDataUrl: cap.dataUrl, json: false, maxTokens: req.maxTokens, ...(pen && T.provider === 'publik' ? { model: PEN_CAREFUL_MODEL } : {}), onDelta: (piece) => { streamed = true; for (const ev of rs.feed(piece)) take(ev); } }), MODEL_TIMEOUT_MS, 'model');
     } catch (e) { err = e; } finally { this.modelsInFlight -= 1; }
     // The walk is awaited even when the answer is not shown: one still queued
     // in the probe would hold up the next thing asked of it.
@@ -1006,7 +1006,7 @@ class GuideSession {
     this.stopWatch();
     this.logTiming(opts.end || 'explain');
     this.setState('explaining');
-    // A failed answer whose cause is the person's own key: the host may add one button (Switch to publik).
+    // A failed answer whose cause is the person's own key: the host may add one button.
     let extra = [];
     if (opts.fail && opts.err && typeof this.d.failActions === 'function') { try { extra = this.d.failActions(opts.provider, opts.err) || []; } catch (_) { extra = []; } }
     const actions = opts.fail ? [{ id: 'settings', label: 'Open Settings', primary: true }, ...extra, { id: 'dismiss', label: 'OK' }] : [{ id: 'dismiss', label: 'OK' }];

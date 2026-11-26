@@ -228,18 +228,13 @@ const APP_GUIDE = 'APP GUIDE (answer questions about Jarvis from this, not from 
 // The one sentence for "there is no AI to answer", pointing at the checklist.
 const NO_KEY_COPY = 'No AI is set up yet. Add a free Gemini key or an Anthropic key on the dashboard, under Settings, Keys, or sign in to Claude Code. The checklist there tests each one.';
 
-// What the Knot tells someone who asks which keys they need. Until 0.1.22 it said to add a TypeSafe
-// key and a Gemini key, which stopped being true in 0.1.18: publik answers with no key, and voice
-// commands have run on the built-in rules with no key since 0.1.7 (src/reflex/rules.js). A tester
-// asked "do I need a Jev key?" on 2026-11-15 because of that line.
+// What the Knot tells someone who asks which keys they need. Voice commands have run on
+// the built-in rules with no key since 0.1.7 (src/reflex/rules.js); answers need a key.
 function keysGuide() {
-  let viaPublik = false, publikBuild = false;
-  try { const p = require('./src/publik'); publikBuild = p.on(); viaPublik = p.active(); } catch (_) { /* a build without publik */ }
   // On a Mac the app-opening and typing commands run through Windows-only helpers, so the Mac line claims talking only.
-  const voice = IS_MAC ? 'Talking to the Knot needs no key: the words are turned into text on this Mac. There is no Hands on a Mac yet. A TypeSafe key in Settings, Keys is optional.' : 'Voice commands such as opening an app, typing and searching need no key. A TypeSafe key in Settings, Keys is optional.';
-  if (viaPublik) return 'No key is needed: answers and pointing come through the publik account this person signed in with. In Settings, Keys they can switch to their own Gemini, Anthropic or Nvidia key, or Claude Code, if they prefer. ' + voice;
-  const own = 'Answers and pointing use one of these, set in Settings, Keys: a free Gemini key, an Anthropic or Nvidia key, or Claude Code if it is installed and signed in.';
-  return own + (publikBuild ? ' Or switch back to publik there, which needs no key.' : '') + ' ' + voice;
+  const voice = IS_MAC ? 'Talking to the Knot needs no key: the words are turned into text on this Mac. There is no Hands on a Mac yet. A key in Settings, Keys is optional for chat.' : 'Voice commands such as opening an app, typing and searching need no key. A key in Settings, Keys is optional for chat.';
+  const own = 'Answers and pointing use one of these, set in Settings, Keys: a free Gemini key, an Anthropic or Nvidia key, a local Ollama model, or Claude Code if it is installed and signed in.';
+  return own + ' ' + voice;
 }
 
 function appGuide() {
@@ -675,7 +670,11 @@ function maybeSendDailyLine() {
   } catch (_) { /* the daily line is best-effort, never a crash */ }
 }
 
-// -------- the channel: new version and notices (companion/src/channel.js, owned by the host) --------
+// -------- the channel: new version and notices (owned by the host) --------
+// The signed channel file and the updater that read it were removed from this
+// build: they pointed at the previous owner's GitHub releases, and adopting one
+// of those would have replaced this app with his. Every path here is behind
+// hooks.channel, which the host never provides, so it stays dormant.
 // Plain text in the Knot's own bubble, never spoken, at a moment when nothing is
 // going on. The buttons here are fixed: the file supplies words and at most one
 // checked link, which is held in this process, so a click can only update or
@@ -900,11 +899,11 @@ function rtTryQuietMoment() {
   }
   return false;
 }
-// -------- the contact card (companion/src/contact.js; Pranav's ruling pending, 2026-11-11) --------
+// -------- the contact card (companion/src/contact.js) --------
 // One ask for an email, a few minutes after something worked, never in the tour.
 // The Knot asks with two buttons; "Leave my email" opens its own typed line.
-// The dashboard shows the same ask as a card. The address goes to Pranav's
-// feedback notes (the same place as the site's Mac waitlist), never to publik.
+// The dashboard shows the same ask as a card. This build has no server to send
+// an address to, so the card records locally and sends nothing.
 let contact = null;
 let contactCardCounted = false;
 function getContact() {
@@ -1058,28 +1057,14 @@ function tellIntercept(text, explicit) {
     [{ id: 'fb-send', label: 'Send', primary: true }, { id: 'dismiss', label: 'Cancel' }]);
   return true;
 }
-// The thank-you for the people who use J.A.R.V.I.S most (0.1.22, feedback.js THANKS_AT): once, from the
-// count of asks kept on this computer. In a build with publik it also names publik's free week,
-// as publik's offer to new subscribers with its card and its charge, and not for someone who
-// already has a publik plan. The button opens publik's own page for it.
-let freeWeekUrl = '';
+// The thank-you for the people who use J.A.R.V.I.S most (0.1.22, feedback.js THANKS_AT):
+// once, from the count of asks kept on this computer. The free-week offer that used
+// to live here belonged to the paid account this build no longer has, so the card
+// is just the thank-you.
 async function thanksCard() {
   const fb = hooks.feedback;
   const asks = fb.status().asks;
-  let week = false;
-  try {
-    const p = require('./src/publik');
-    if (p.on()) {
-      const c = p.module.readCredential();
-      const r = c ? await p.module.readWallet(c.key).catch(() => null) : null;
-      const w = r && r.wallet;
-      week = !!w && !(w.plan && w.plan.kind === 'plan');
-      freeWeekUrl = w && /^https:\/\//.test(String(w.top_up_url || '')) ? String(w.top_up_url) : '';
-      if (!freeWeekUrl) week = false;
-    }
-  } catch (_) { week = false; }
-  feedbackBubble('a note', thanksText(asks, { freeWeek: week }),
-    week ? [{ id: 'fb-week', label: 'See the free week', primary: true }, { id: 'dismiss', label: 'OK' }] : [{ id: 'dismiss', label: 'OK', primary: true }]);
+  feedbackBubble('a note', thanksText(asks, { freeWeek: false }), [{ id: 'dismiss', label: 'OK', primary: true }]);
 }
 // Right after the person closed an answer with OK: is a prompt due?
 function maybeAskFeedback(reason) {
@@ -1102,52 +1087,20 @@ function maybeAskFeedback(reason) {
     }
   }, 900);
 }
-// publik API's empty balance (402). Two buttons: the person's own key first, then Publik's one
-// top-up link. 0.1.35: a free Gemini key keeps J.A.R.V.I.S free, and until now the only button was Top up,
-// and a screen ask had no button at all.
-let publikTopUp = null;
-function publikTopUpAction(e) {
-  let r = null;
-  try { r = require('./src/publik').readError(e); } catch (_) { r = null; }
-  if (!r || r.kind !== 'balance') return [];
-  // The host remembers the wall was met: a key pasted after it answers from then on.
-  try { if (hooks.publikPaywall) hooks.publikPaywall(); } catch (_) { /* a note, never a failure */ }
-  const own = { id: 'publik-own-key', label: 'Use my own key' };
-  if (!r.url || !/^https:\/\//.test(r.url)) return [own];
-  publikTopUp = r.url;
-  return [own, { id: 'publik-topup', label: 'Top up' }];
-}
-// "Use my own key" on the paywall. With a key already saved the answers move to it at once (the
-// switch in Settings, Keys is what was missing: a person pasted a key and publik still answered).
-// With none, Settings opens at Keys, and the key pasted there takes over by itself.
-const OWN_KEY_NOW = 'Your own key answers now. Ask again.';
+// The paywall's buttons, kept as no-ops so an error bubble minted by an older
+// build still has a handler and cannot throw. There is no balance to top up
+// and no separate answering account to switch to in this build: the operator's
+// own key is the only route to an answer, so the only useful button is the
+// one that opens Settings at Keys.
 const OWN_KEY_PASTE = 'Paste a key in Settings, Keys. A free Gemini key works. J.A.R.V.I.S switches to it by itself.';
 function publikOwnKey() {
-  let r = 'no';
-  try { if (hooks.publikOwnKey) r = String(hooks.publikOwnKey() || 'no'); } catch (e) { console.log('[publik] own key failed: ' + e.message); }
-  routeLog('publik: own key from the paywall, ' + r);
-  if (r === 'switched') { flash(OWN_KEY_NOW, 4500); return r; }
   if (typeof hooks.showSettings === 'function') hooks.showSettings('keys'); else if (hooks.showDesktop) hooks.showDesktop();
   flash(OWN_KEY_PASTE, 7000);
-  return r;
+  return 'no';
 }
-// The person's own key or Claude Code is what failed (quota, credit, refused, nothing set up) and
-// this computer is signed in with publik: one button moves the answers to publik (0.1.22).
-function publikSwitchAction(provider, e) {
-  try {
-    if (!require('./src/publik').canSwitch()) return [];
-    return require('./src/ask-error').ownKeyStuck(provider, e) ? [{ id: 'publik-switch', label: 'Switch to publik' }] : [];
-  } catch (_) { return []; }
-}
-function publikSwitch() {
-  let ok = false;
-  try {
-    if (hooks.publikSwitch) ok = hooks.publikSwitch() === true;
-    else { const p = require('./src/publik'); if (p.canSwitch()) { p.setChoice('publik'); ok = p.choice() === 'publik'; } }
-  } catch (e) { console.log('[publik] switch failed: ' + e.message); }
-  routeLog('publik: switch from an error bubble, ' + (ok ? 'done' : 'not done'));
-  flash(ok ? 'Switched to publik. Ask again.' : 'I could not switch. Open Settings, Keys to change who answers.', 4500);
-}
+const publikTopUpAction = () => [];
+const publikSwitchAction = () => [];
+function publikSwitch() { publikOwnKey(); }
 function feedbackAction(id) {
   const fb = hooks.feedback;
   if (!fb) return;
@@ -1164,7 +1117,7 @@ function feedbackAction(id) {
   else if (id === 'fb-never') { fb.never(); flash('Got it. No more questions.', 3000); }
   else if (id === 'fb-tell') openTell();
   else if (id === 'fb-good') { fb.checkinGood().catch(() => {}); thanks(); }
-  else if (id === 'fb-week') { if (freeWeekUrl) shell.openExternal(freeWeekUrl).catch(() => {}); fb.thanksOpened().catch(() => {}); }
+  else if (id === 'fb-week') fb.thanksOpened().catch(() => {});
   else if (id === 'fb-error') { const line = lastFailure; lastFailure = ''; if (line) fb.submit({ message: 'Could not answer: ' + line, collector: 'error', kind: 'bug', mode: 'text' }).then(r => flash(r && r.delivered ? 'Sent. Thank you.' : 'Saved. It will send once it can reach the owner.', 3500)).catch(() => {}); }
   else if (id === 'fb-send' && pendingTell) { const t = pendingTell; pendingTell = ''; sendTell(t, 'tell'); }
 }
@@ -1903,7 +1856,6 @@ function registerIpc() {
     if (p && p.action === 'open' && activeNudge) { if (hooks.showDesktop) hooks.showDesktop(); endNudge('open'); return; }
     if (p && p.action === 'notnow' && activeNudge) { endNudge('notnow'); return; }
     if (p && p.action === 'walk' && selection) { walkFromSelection(); return; }
-    if (p && p.action === 'publik-topup') { if (publikTopUp) shell.openExternal(publikTopUp).catch(() => {}); return; }
     if (p && p.action === 'publik-switch') { publikSwitch(); return; }
     if (p && p.action === 'publik-own-key') { publikOwnKey(); return; }
     if (p && p.action && /^fb-/.test(String(p.action))) { feedbackAction(String(p.action)); return; }
@@ -3603,7 +3555,6 @@ function getGuide() {
     hashCapture,
     selfPid: process.pid,
     log: (m) => console.log('[guide]', m),
-    // 0.1.35: a publik paywall on a screen ask had only a sentence, no button.
     failActions: (provider, err) => [...publikTopUpAction(err), ...publikSwitchAction(provider, err)],
     // Keep = explicit consent: the session summary goes to the outbox the
     // desktop already ingests, whatever the reportToNus default says.
@@ -4436,7 +4387,7 @@ function tourAskAi() {
   const T = tour;
   Promise.resolve().then(() => hooks.tourAi()).then((r) => {
     if (!r || tour !== T) return;
-    T.caps.cli = !!r.cli; T.caps.keyReady = !!r.key; T.caps.publik = !!r.publik; T.caps.source = !!(r.cli || r.key); T.caps.aiKnown = true;
+    T.caps.cli = !!r.cli; T.caps.keyReady = !!r.key; T.caps.source = !!(r.cli || r.key); T.caps.aiKnown = true;
   }).catch((e) => routeLog('tour: ai status: ' + e.message));
 }
 function tourPublicState() {
@@ -4883,11 +4834,10 @@ function tourEnd(reason) {
   if (week && week.a && tourPickedStruggle !== 'homework_start') rtOfferCheckin(week.a);
 }
 // How answers are possible on this install, said once when the tour ends:
-// publik answering, a saved key, Claude Code on this computer, or none of them.
-// (0.1.18 left publik out, so an install answered by publik said "none".)
+// a saved key, Claude Code on this computer, or none of them.
 function noteAiReady() {
   if (typeof hooks.onAiReady !== 'function' || typeof hooks.tourAi !== 'function') return;
-  Promise.resolve(hooks.tourAi()).then((a) => { hooks.onAiReady(a && a.publik ? 'publik' : a && a.key ? 'key' : a && a.cli ? 'claude_code' : 'none'); }).catch(() => {});
+  Promise.resolve(hooks.tourAi()).then((a) => { hooks.onAiReady(a && a.key ? 'key' : a && a.cli ? 'claude_code' : 'none'); }).catch(() => {});
 }
 
 async function routeUtterance(text, source, heard, uttId, assignmentAlreadyChecked) {

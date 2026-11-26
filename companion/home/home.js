@@ -117,38 +117,9 @@
   }
   // The optional account: the Settings card in one of three states, and the
   // one offer on Saved from the third day the Companion was opened.
-  function paintAccount(a) {
-    if (!a) return;
-    $('#account-out').hidden = a.signedIn || a.signingIn;
-    $('#account-pending').hidden = !a.signingIn;
-    $('#account-in').hidden = !a.signedIn || a.signingIn;
-    $('#account-email').textContent = a.email || 'your Google account';
-    $('#account-detail').textContent = a.offline ? 'Offline. J.A.R.V.I.S keeps you signed in and catches up when it can reach the server.' : a.secure === false ? 'This computer has no system encryption, so you stay signed in until J.A.R.V.I.S quits.' : '';
-    $('#account-link').textContent = ({ linked: 'This computer is linked to your account.', stats_off: 'Not linked: anonymous usage stats are off on this computer.', unlinked: 'This computer is not linked.', pending: 'Linking this computer when J.A.R.V.I.S can reach the server.' })[a.link] || '';
-    $('#account-unlink').hidden = a.link !== 'linked';
-    $('#account-plan').textContent = a.signedIn ? (a.isPro ? 'Plan: Pro' + (a.planUntil ? ' until ' + new Date(a.planUntil).toLocaleDateString() : '') : 'Plan: Free. Everything in J.A.R.V.I.S works on it.') : '';
-    $('#account-sync').checked = !!a.syncOn;
-    $('#account-sync-state').textContent = !a.syncOn ? 'Off. Nothing about your settings leaves this computer.' : a.syncOffline ? 'Offline. Changes go up when J.A.R.V.I.S can reach the server.' : a.syncLastAt ? 'Last synced ' + new Date(a.syncLastAt).toLocaleString() + '.' : 'Syncing...';
-    $('#account-relink').hidden = a.link !== 'unlinked';
-    const err = a.error || a.linkError || a.syncError || '';
-    $('#account-note').textContent = err;
-    $('#account-note').classList.toggle('error', !!err);
-    $('#account-offer').hidden = !a.offer;
-  }
-  const accountSignIn = e => run(async () => { $('#account-offer').hidden = true; paintAccount(await api.accountSignIn()); }, e.currentTarget);
-  $('#account-signin').onclick = accountSignIn;
-  $('#account-offer-signin').onclick = e => { setView('settings').then(() => $('#account-card').scrollIntoView({ block: 'center' })).catch(() => {}); accountSignIn(e); };
-  $('#account-offer-later').onclick = e => run(async () => { paintAccount(await api.accountDismiss()); }, e.currentTarget);
-  $('#account-cancel').onclick = e => run(async () => { paintAccount(await api.accountCancel()); }, e.currentTarget);
-  $('#account-signout').onclick = e => run(async () => { paintAccount(await api.accountSignOut()); notice('Signed out on this computer.'); }, e.currentTarget);
-  $('#account-unlink').onclick = e => run(async () => { paintAccount(await api.accountUnlink()); }, e.currentTarget);
-  $('#account-relink').onclick = e => run(async () => { paintAccount(await api.accountLink()); }, e.currentTarget);
-  $('#account-delete').onclick = e => run(async () => {
-    if (!confirm('Delete your J.A.R.V.I.S account? Your synced settings and links are removed from the server. J.A.R.V.I.S keeps working on this computer without an account.')) return;
-    const a = await api.accountDelete(); paintAccount(a); if (a.deleted) notice('Account deleted. J.A.R.V.I.S keeps working here as before.');
-  }, e.currentTarget);
-  $('#account-sync').onchange = e => run(async () => { paintAccount(await api.accountSync(e.target.checked)); notice(e.target.checked ? 'Settings sync on.' : 'Settings sync off. Nothing more about your settings is sent.'); }, e.target);
-  api.on('home:account', a => paintAccount(a));
+  // The account card and its offer are gone from the markup: this build has no
+  // account, no Google sign-in and no settings sync, and their IPC channels
+  // are registered by nothing. The handlers went with the markup.
   // The contact card (companion/src/contact.js): one ask for an email, a few
   // minutes after something worked. The words come from the main process.
   // contactHold: a save is under way or its thank-you is up. The main process
@@ -238,13 +209,15 @@
     }
     $('#cli-state').textContent=status.ai.cli?'Found':'Not found';$('#cli-state').classList.toggle('set',!!status.ai.cli);
     $('#claude-status').textContent=status.ai.cli?'Claude Code is installed. If it is signed in, it answers and points with no key.':'Not installed. Not needed if you have a Gemini, Nvidia or Anthropic key.';
-    const pub=status.publik||{on:false},viaPublik=!!(pub.on&&pub.choice==='publik');$('#publik-row').hidden=!pub.on;$('#use-own-key').checked=!viaPublik;paintPublikAccount(pub);
+    // There is no separate answering account in this build: the operator's own key
+    // (or Claude Code) is the only route to an answer, so that row stays hidden.
+    $('#publik-row').hidden=true;
     // Voice commands run on the built-in rules with no key (src/reflex/rules.js), so this step is
     // never "Not set". A saved TypeSafe key is named beside it; it is optional.
-    const answersOk=!!(viaPublik||s.keys.gemini||s.keys.nvidia||s.keys.anthropic||status.ai.cli);
+    const answersOk=!!(s.keys.gemini||s.keys.nvidia||s.keys.anthropic||status.ai.cli);
     $('#step-voice').textContent=status.reflex.key?'Ready · TypeSafe':'Ready';$('#step-voice').classList.add('set');
     $('#typesafe-state').textContent=status.reflex.key?'Set · '+status.reflex.keySource:'Optional';
-    $('#step-answers').textContent=answersOk?'Ready'+(viaPublik?' · publik':s.keys.gemini?' · Gemini':s.keys.anthropic?' · Anthropic':s.keys.nvidia?' · Nvidia':' · Claude Code'):'Not set';$('#step-answers').classList.toggle('set',answersOk);
+    $('#step-answers').textContent=answersOk?'Ready'+(s.keys.gemini?' · Gemini':s.keys.anthropic?' · Anthropic':s.keys.nvidia?' · Nvidia':' · Claude Code'):'Not set';$('#step-answers').classList.toggle('set',answersOk);
     $('#voice-status').textContent='Whisper engine: '+(status.voice.whisper?'found':'missing')+' · Speech model: '+(status.voice.model?'found':'missing');
     $('#ptt-live').textContent=chord(status.ptt.accelerator);
     $('#ptt-input').placeholder=chord(status.ptt.accelerator);
@@ -445,21 +418,12 @@
     }catch(err){$('#mic-note').textContent=NM.failLine(err&&err.name);}
   };
   if(navigator.mediaDevices&&navigator.mediaDevices.addEventListener)navigator.mediaDevices.addEventListener('devicechange',()=>{setTimeout(()=>fillMics(),400);});
-  // Which publik account this is, and the way out. Sign out is two taps: the first says what happens.
-  let publikWhoAt=0;
-  function paintPublikAccount(pub){
-    $('#publik-account').hidden=!pub.on;
-    if(!pub.on||!api.publikWho||Date.now()-publikWhoAt<60000)return;
-    publikWhoAt=Date.now();
-    api.publikWho().then(w=>{$('#publik-who').textContent=w&&w.handle?'Signed in with publik as '+w.handle+'.':w&&w.claimed===false?'Not signed in to publik yet.':'Signed in with publik.';}).catch(()=>{});
+  // This build has no answering account to sign out of or to choose away from. The
+  // sign-in controls stay in the markup so the layout is unchanged, but they are
+  // hidden and have no handlers: a button that cannot work is worse than none.
+  for (const id of ['publik-account', 'publik-signout', 'publik-signout-cancel', 'use-own-key']) {
+    const el = document.getElementById(id); if (el) { el.hidden = true; el.disabled = true; }
   }
-  function publikSignOutArmed(v){$('#publik-signout-hint').hidden=!v;$('#publik-signout-cancel').hidden=!v;$('#publik-signout').textContent=v?'Sign out and restart J.A.R.V.I.S':'Sign out of publik';$('#publik-signout').dataset.armed=v?'1':'';}
-  $('#publik-signout-cancel').onclick=()=>publikSignOutArmed(false);
-  $('#publik-signout').onclick=e=>{
-    if(e.currentTarget.dataset.armed!=='1'){publikSignOutArmed(true);return;}
-    run(async()=>{const r=await api.publikSignOut();if(r&&r.ok)notice('Signed out of publik. J.A.R.V.I.S is restarting.');else{publikSignOutArmed(false);notice('Could not sign out of publik on this computer.',true);}},e.currentTarget);
-  };
-  $('#use-own-key').onchange=e=>run(async()=>{await api.publikChoice(e.target.checked?'own_key':'publik');await settings();notice(e.target.checked?'Saved. Your own key or Claude Code answers now.':'Saved. publik answers now.');},e.target);
   const fields={'open-mic':['openMic',e=>e.checked],'speak-replies-home':['speakReplies',e=>e.checked],'sounds':['sounds',e=>e.checked],'draw-on-screen':['drawOnScreen',e=>e.checked],'channel-messages':['channelMessages',e=>e.checked],'start-with-windows':['startWithWindows',e=>e.checked],'focus-guard':['focusGuard',e=>e.checked],'hands':['hands',e=>e.checked],'dictation':['dictation',e=>e.checked],'tasks':['tasks',e=>e.checked],'knot-island':['knotIsland',e=>e.checked],'focus-feeds':['focusGuardFeeds',e=>e.value.split(',').map(x=>x.trim()).filter(Boolean)],'hide-from-capture':['hideFromCapture',e=>e.checked],'persist-transcripts-home':['persistTranscripts',e=>e.checked],'save-audio-home':['saveAudio',e=>e.checked],'retention-days':['audioRetentionDays',e=>Number(e.value)],'knot-display':['knotDisplayId',e=>e.value?Number(e.value):null]};
   for(const [id,[key,value]] of Object.entries(fields))$('#'+id).onchange=e=>run(async()=>{await api.settingsSet({[key]:value(e.target)});notice('Saved.');},e.target);
   // Two switches, one setting: the first-run card and the Privacy card stay in step.
@@ -522,11 +486,11 @@
   api.on('home:tasks',p=>homeView.onTask(p));
   api.on('home:knot',w=>homeView.onKnot(w));
   api.on('home:voice',v=>homeView.onVoice(v));
-  window.addEventListener('focus',()=>run(async()=>{paintStatus(await api.status());paintAccount(await api.accountStatus());paintContact(await api.contactStatus());if(view==='saved')await renderSaved();if(view==='settings')await settings();if(view==='start'){await renderStart();await homeView.refresh();}}));
+  window.addEventListener('focus',()=>run(async()=>{paintStatus(await api.status());paintContact(await api.contactStatus());if(view==='saved')await renderSaved();if(view==='settings')await settings();if(view==='start'){await renderStart();await homeView.refresh();}}));
   // The mark in the rail is the Knot itself: the overlay's engine, body only, at
   // rest. The canvas is 116 px because that is the frame the engine draws. It
   // stops drawing while this window is hidden or in the background.
   const mark=window.NusKnotEngine&&window.NusKnotEngine.mount({body:$('#brand-knot'),thread:null,light:{treatment:'none'},pauseWhenHidden:true});
   if(mark){window.addEventListener('blur',()=>mark.knot.pause());window.addEventListener('focus',()=>mark.knot.resume());}
-  run(async()=>{paintStatus(await api.status());paintAccount(await api.accountStatus());paintContact(await api.contactStatus());const st=await api.tourState();paintTour(st);await setView('start');});
+  run(async()=>{paintStatus(await api.status());paintContact(await api.contactStatus());const st=await api.tourState();paintTour(st);await setView('start');});
 })();

@@ -158,7 +158,7 @@ function validatePoint(reply, elements, opts = {}) {
       x /= img.width; w /= img.width; y /= img.height; h /= img.height; pixels = true;
     } else if (img && img.width > 0 && img.height > 0 && [x, y, w, h].every((v) => v >= 0) && (x > 1.5 || y > 1.5) && x <= img.width && y <= img.height && w <= 1 && h <= 1) {
       // Half and half: the corner in pixels, the size already in fractions
-      // ("[POINT:1117,148,0.06,0.025]" for MDN's Theme button, publik-fast
+      // ("[POINT:1117,148,0.06,0.025]" for MDN's Theme button, fast tier
       // 2026-11-15, 5 of 168 replies). Convert the corner only.
       x /= img.width; y /= img.height; pixels = true;
     }

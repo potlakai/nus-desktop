@@ -7,11 +7,14 @@ function stripDataUrl(dataUrl) {
   return m ? { mime: m[1], b64: m[2] } : null;
 }
 
-// idleAfterTextMs: publik sometimes sends the whole reply and then neither its
-// finish chunk nor [DONE], and holds the connection open until 300 s (raw SSE
-// probe 2026-11-15: 2 of 8 calls; 67 of 216 guide calls in the pointing
-// measurement, every one with its text already complete). With this set, once
-// text has arrived, that long without a new token ends the call with the text.
+// idleAfterTextMs: some servers send the whole reply and then neither a finish
+// chunk nor [DONE], and hold the connection open for minutes (raw SSE probe
+// 2026-11-15: 2 of 8 calls). With this set, once text has arrived, that long
+// without a new token ends the call with the text.
+const IDLE_AFTER_TEXT_MS = 2500;
+// The old name of the same guard, kept as an alias so an import written against
+// the previous release still resolves. New code should use IDLE_AFTER_TEXT_MS.
+const PUBLIK_IDLE_AFTER_TEXT_MS = IDLE_AFTER_TEXT_MS;
 // extra: fields one provider needs in the request body and others would refuse (Nvidia's
 // Nemotron takes reasoning_effort; see nvidiaArgs).
 async function streamOpenAI({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken = () => {}, baseURL, signal, idleAfterTextMs, extra }) {
@@ -246,29 +249,8 @@ function withBusyRetry(fn, waitMs = BUSY_RETRY_MS) {
 const geminiStream = withBusyRetry(streamGemini);
 const geminiComplete = withBusyRetry(completeGemini);
 
-// publik API (companion/src/publik): only in a build with the publik switch on, and only when the
-// person picked "Connect your plan". Same OpenAI-compatible path as above, tier names only.
-let publik = null;
-try { publik = require('./publik'); } catch (_) { publik = null; }
 // On a Mac each request's instructions also say it is a Mac (companion/src/computer-words.js).
 const { paramsWithComputer } = require('./computer-words');
-
-// Normal publik streams send their tokens within milliseconds of each other
-// (about 35 chunks in 0.5 s); 2.5 s of silence after text is a stall, not a pause.
-const PUBLIK_IDLE_AFTER_TEXT_MS = 2500;
-function publikLLM() {
-  const p = publik.provider();
-  const tierOf = (s) => (s && s.smart ? 'smart' : 'fast');
-  return (settings) => {
-    const model = publik.model(tierOf(settings));
-    const run = (args) => streamOpenAI({ ...args, apiKey: p.apiKey, baseURL: p.baseURL, idleAfterTextMs: PUBLIK_IDLE_AFTER_TEXT_MS, imageDataUrl: args.imageDataUrl ? publik.prepareImage(args.imageDataUrl) : args.imageDataUrl });
-    return {
-      provider: 'publik', model, apiKey: p.apiKey, ready: true,
-      stream: (params) => run({ maxTokens: 4096, ...paramsWithComputer(params), model }),
-      complete: (params) => run({ maxTokens: params.maxTokens || 512, ...paramsWithComputer(params), model: publik.model(tierOf(settings), params.model), onToken: params.onToken || params.onDelta || (() => {}) }),
-    };
-  };
-}
 
 // The extra providers, all served by streamOpenAI because they speak the same
 // chat-completions shape. Only the base URL differs, so one table is enough.
@@ -286,6 +268,8 @@ const EXTRA_BASE_URLS = {
 function extraHeaders(provider, settings) {
   if (provider !== 'openrouter') return undefined;
   return {
+    // Attribution only. A personal build has no site to point at, so the
+    // repository is named; OpenRouter uses it for its own dashboards.
     'HTTP-Referer': 'https://github.com/omsenjalia/nus-desktop',
     'X-Title': 'J.A.R.V.I.S',
   };
@@ -330,15 +314,13 @@ function nvidiaArgs(args) {
   return { ...args, baseURL: NVIDIA_BASE_URL, extra };
 }
 
-// opts.ownKey: the person's own key for settings.provider even when publik answers the asks. The
-// key Test in Settings uses it (0.1.36): with the choice on publik, "Test" on a Gemini or Nvidia
-// key pinged publik, and an empty publik balance read as "That key did not work".
+// opts.ownKey: test settings.provider's own key even when something else would answer the
+// asks. The Test button in Settings uses it (0.1.36).
 function createLLM(settings, opts = {}) {
   // NUS_COMPANION_CLAUDE_API=1 (launch-day1.ps1 -ClaudeApi): Claude through the
   // ANTHROPIC_API_KEY already in the environment, whatever the settings say.
   // Opt-in because it spends API credits; the key is never written to settings.
   const envClaude = process.env.NUS_COMPANION_CLAUDE_API === '1' && !!process.env.ANTHROPIC_API_KEY;
-  if (!envClaude && !opts.ownKey && publik && publik.active()) return publikLLM()(settings);
   const provider = envClaude ? 'anthropic' : settings.provider;
   const keys = settings.apiKeys || {};
   const apiKey = envClaude ? process.env.ANTHROPIC_API_KEY : keys[provider];
@@ -379,4 +361,4 @@ function createLLM(settings, opts = {}) {
   };
 }
 
-module.exports = { createLLM, streamOpenAI, nvidiaArgs, NVIDIA_BASE_URL, EXTRA_BASE_URLS, openAIArgsFor, isOpenAICompatible, needsKey, customBaseUrl, PUBLIK_IDLE_AFTER_TEXT_MS, LOOKS_FINISHED, withBusyRetry, isBusy, BUSY_RETRY_MS };
+module.exports = { createLLM, streamOpenAI, nvidiaArgs, NVIDIA_BASE_URL, EXTRA_BASE_URLS, openAIArgsFor, isOpenAICompatible, needsKey, customBaseUrl, IDLE_AFTER_TEXT_MS, PUBLIK_IDLE_AFTER_TEXT_MS, LOOKS_FINISHED, withBusyRetry, isBusy, BUSY_RETRY_MS };

@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const invoke = (name, ...args) => ipcRenderer.invoke('home:' + name, ...args);
 contextBridge.exposeInMainWorld('home', {
-  status: () => invoke('status'), settingsGet: () => invoke('settings:get'), settingsSet: p => invoke('settings:set',p), publikChoice: c => invoke('publik:choice',c), publikWho: () => invoke('publik:who'), publikSignOut: () => invoke('publik:signout'),
+  status: () => invoke('status'), settingsGet: () => invoke('settings:get'), settingsSet: p => invoke('settings:set',p), gateChoice: c => invoke('publik:choice',c), publikWho: () => invoke('publik:who'), publikSignOut: () => invoke('publik:signout'),
   keysTest: which => invoke('keys:test', which), statsSource: source => invoke('stats:source', source), myJarvis: () => invoke('my-nus'), shareCard: dataUrl => invoke('share-card', dataUrl),
   sessions: () => invoke('sessions'), messages: id => invoke('messages',id), search: q => invoke('search',q), exportSession: id => invoke('session:export',id),
   keeps: () => invoke('keeps:list'), forgetKeep: key => invoke('keeps:forget',key), routines: () => invoke('routines:list'), deleteRoutine: at => invoke('routines:delete',at), notes: () => invoke('notes:list'),
@@ -15,10 +15,6 @@ contextBridge.exposeInMainWorld('home', {
   recallTopics: () => invoke('recall:topics'), recallWatch: on => invoke('recall:watch', on), recallWatchFolder: clear => invoke('recall:watch-folder', clear),
   feedbackSend: p => invoke('feedback:send', p), feedbackStatus: () => invoke('feedback:status'),
   contactStatus: () => invoke('contact:status'), contactGive: email => invoke('contact:give', email), contactDecline: () => invoke('contact:decline'),
-  accountStatus: () => invoke('account:status'), accountSignIn: () => invoke('account:signin'), accountCancel: () => invoke('account:cancel'),
-  accountSignOut: () => invoke('account:signout'), accountDismiss: () => invoke('account:dismiss'),
-  accountUnlink: () => invoke('account:unlink'), accountLink: () => invoke('account:link'), accountDelete: () => invoke('account:delete'),
-  accountSync: on => invoke('account:sync', on), accountSyncNow: () => invoke('account:sync-now'),
   updateCheck: () => invoke('update:check'), updateDismiss: () => invoke('update:dismiss'), updateRun: () => invoke('update:run'),
   voiceStatus: () => invoke('voice:status'), voiceInstall: name => invoke('voice:install', name),
   speechStatus: () => invoke('speech:status'), speechInstall: () => invoke('speech:install'),
