@@ -123,8 +123,14 @@ function createStats({
 
   // NUS_STATS=0 always wins (tests, smoke runs, CI). Unpackaged dev runs send
   // nothing unless NUS_STATS=1, so hacking on the app never pollutes the data.
-  const envValue = env && typeof env.NUS_STATS === 'string' ? env.NUS_STATS.trim() : '';
-  const envDisabled = envValue === '0' || (!packaged && envValue !== '1');
+  //
+  // Personal build: this is unconditional. Upstream let a packaged install send
+  // unless NUS_STATS=0; here nothing is transmitted whatever the build or the
+  // environment, because the telemetry belongs to someone else's product and
+  // this machine is not a participant in it. The rest of the module is left
+  // intact so status(), ask() and track() keep their shapes and callers do not
+  // need to know telemetry is off.
+  const envDisabled = true;
 
   let installId = null;
   let lastOpenDay = null;

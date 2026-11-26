@@ -24,37 +24,6 @@ test('the desktop Content Security Policy permits no remote script execution', (
   assert.doesNotMatch(html, /script-src[^;]*(?:unsafe-inline|unsafe-eval|https?:)/i);
 });
 
-test('billing secrets remain server-side and Checkout URLs are allowlisted', () => {
-  const license = read('src/license.js');
-  const checkout = read('supabase/functions/create-checkout/index.ts');
-  assert.doesNotMatch(license, /STRIPE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|STRIPE_WEBHOOK_SECRET/);
-  assert.match(license, /url\.hostname\.endsWith\('\.stripe\.com'\)/);
-  assert.match(checkout, /supabase\.auth\.getUser\(\)/);
-});
-
-test('Google account sign-in opens only the configured Supabase auth origin', () => {
-  const main = read('src/main.js');
-  assert.match(main, /candidate\.origin === project\.origin/);
-  assert.match(main, /candidate\.pathname\.startsWith\('\/auth\/v1\/'\)/);
-  assert.match(main, /isTrustedSupabaseAuthUrl\(result\.url\)/);
-});
-
-test('the renderer cannot overwrite license or usage bookkeeping', () => {
-  const main = read('src/main.js');
-  assert.match(main, /RENDERER_PREFERENCE_KEYS = new Set/);
-  assert.match(main, /if \(!RENDERER_PREFERENCE_KEYS\.has\(key\)\)/);
-  const allowedBlock = main.slice(main.indexOf('RENDERER_PREFERENCE_KEYS'), main.indexOf('RENDERER_PREFERENCE_KEYS') + 260);
-  assert.doesNotMatch(allowedBlock, /license_|usage_/);
-});
-
-test('offline Pro grace comes only from OS-encrypted storage', () => {
-  const main = read('src/main.js');
-  const license = read('src/license.js');
-  assert.match(main, /secrets\.isAvailable\(\).*secrets\.getSecret\('license-cache'\)/s);
-  assert.match(main, /secrets\.isAvailable\(\).*secrets\.setSecret\('license-cache'/s);
-  assert.doesNotMatch(license, /getPreferences|setPreference/);
-});
-
 test('quitting closes active Companion capture before the final save', () => {
   const main = read('src/main.js');
   assert.match(main, /if \(companion\?\.isCapturing\(\)\) companion\.setCapturing\(false\)/);

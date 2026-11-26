@@ -1,35 +1,11 @@
-# Credentials needed for Nūs v0.2
+# Credentials for J.A.R.V.I.S
 
-> Create these three credentials and paste them into `src/config.js` (or the
-> in-app Settings → Connections screen when shipped). Nothing sends anywhere
-> until you run the app yourself.
+> Two optional integrations remain. Neither is needed to use him: the AI key you
+> paste in Settings is the only thing he cannot work without, and that one is
+> not in this file. **There is no account, so there is no Supabase section any
+> more**; it was removed with the commercial layer.
 
-## 1. Supabase (account creation + subscription identity)
-
-**Why:** Google OAuth + email/password login. Local SQLite stays the source of truth; Supabase holds identity and subscription status only.
-
-**Steps:**
-1. Go to https://supabase.com → sign in → New Project.
-2. Project name: `nus`. Choose a region close to you.
-3. Once created: Project Settings → API → copy:
-   - **Project URL** (e.g. `https://xyz.supabase.co`)
-   - **anon public key** (the `sb-publishable` / `eyJhbGci...` key, NOT the service_role key)
-4. Dashboard → Authentication → Providers:
-   - Enable **Email** (built in, no extra config).
-   - Enable **Google** → paste your Google Cloud OAuth client ID + secret (see step 2 below if you don't have one yet; the same GCP client can be reused if you add the Supabase callback URL to its authorized redirects). Supabase shows the redirect URL to whitelist in GCP.
-5. Paste URL + anon key into `src/config.js`:
-   ```js
-   module.exports = {
-     supabase: { url: 'PASTE_HERE', anonKey: 'PASTE_HERE' },
-     ...
-   };
-   ```
-
-**Where data goes:** only auth metadata (email and user id) plus subscription status. This build does not upload courses, tasks, imports, chats, or Companion content.
-
----
-
-## 2. Google Calendar (live read + write)
+## 1. Google Calendar (live read + write)
 
 **Why:** Pull your live GCal events into the Nūs calendar view; Smart Tasks can push events back to GCal.
 
@@ -56,7 +32,7 @@
 
 ---
 
-## 3. Microsoft Outlook (email connect + send)
+## 2. Microsoft Outlook (email connect + send)
 
 **Why:** Read your sent mail to learn your writing style; send professor emails you draft and approve in Nūs via your Outlook account.
 

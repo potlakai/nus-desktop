@@ -1,0 +1,28 @@
+/* Play (play.js, play-fx.js): the field that holds the mouse while the game is on,
+   and the score line at the top of the screen. The hoop, the net and everything
+   that flies are drawn on two canvases play-fx.js makes for the length of a game.
+   The Knot's own look: white with an ink outline, black glass for the line. */
+
+/* A breath of dim so the court reads as a mode, and every click is the game's. */
+#play-field { position: fixed; inset: 0; z-index: 1; background: rgba(10,12,20,.07); cursor: default; animation: playDim 260ms ease-out; }
+#play-field[hidden] { display: none; }
+@keyframes playDim { from { background: rgba(10,12,20,0); } }
+body.playing #orb { cursor: grab; }
+body.playing #app.dragging #orb { cursor: grabbing; }
+body.playing #knot-bloom { opacity: 0 !important; pointer-events: none !important; }
+
+#play-hud { position: fixed; z-index: 8; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 5px 5px 5px 16px; border-radius: 18px; background: #000; box-shadow: 0 12px 32px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.16); color: #eceef5; font: 13px/18px var(--font); pointer-events: auto; user-select: none; animation: playHudIn 320ms cubic-bezier(.2,1.4,.4,1); transition: box-shadow 300ms ease; }
+#play-hud[hidden] { display: none; }
+@keyframes playHudIn { from { transform: translate(-50%, -30px); opacity: 0; } }
+#play-hud .p-score { min-width: 28px; font: 800 22px/26px var(--font); font-variant-numeric: tabular-nums; text-align: center; color: #fff; }
+#play-hud .p-score.pop { animation: playPop 360ms cubic-bezier(.2,1.6,.4,1); }
+@keyframes playPop { 0% { transform: scale(1); } 30% { transform: scale(1.45); color: #72DDA8; } 100% { transform: scale(1); } }
+#play-hud .p-fire { padding: 1px 8px; border-radius: 10px; background: #FFC76A; color: #000; font: 800 12px/18px var(--font); animation: playFire 900ms ease-in-out infinite alternate; }
+#play-hud .p-fire[hidden] { display: none; }
+@keyframes playFire { from { box-shadow: 0 0 0 0 rgba(255,199,106,.0); } to { box-shadow: 0 0 14px 2px rgba(255,199,106,.65); } }
+#play-hud.fire { box-shadow: 0 12px 32px rgba(0,0,0,.5), 0 0 0 1.5px #FFC76A; }
+#play-hud .p-best { color: #9aa0b4; font: 600 12.5px/18px var(--font); white-space: nowrap; }
+#play-hud.record .p-best { color: #72DDA8; }
+#play-hud .p-close { width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(255,255,255,.1); color: #eceef5; font: 16px/28px var(--font); cursor: pointer; }
+#play-hud .p-close:hover { background: rgba(255,255,255,.2); }
+@media (prefers-reduced-motion: reduce) { #play-hud, #play-hud .p-score.pop, #play-hud .p-fire, #play-field { animation: none; } }

@@ -9,7 +9,9 @@ function cleanTranscript(text) {
   return t.length > 1 ? t : '';
 }
 
-const DISMISS = /^(?:ok(?:ay)?[,.! ]+)?(?:wind (?:it )?(?:back )?up|thanks?(?: you)?(?: n[uū]s)?|never ?mind|stop|cancel|that'?s (?:all|it|enough)|go away|leave me alone|dismiss)[.!]?$/i;
+// "I got it from here" cuts the Knot off mid-line, like "stop" (Pranav,
+// 2026-10-13, from the reference reel).
+const DISMISS = /^(?:(?:ok(?:ay)?|alright|cool|thanks|nah)[,.! ]+)?(?:wind (?:it )?(?:back )?up|thanks?(?: you)?(?: n[uū]s)?|never ?mind|stop(?: talking| it| there| please)?|cancel|that'?s (?:all|it|enough)|enough|go away|leave me alone|dismiss|(?:be )?quiet|shh+|hush|(?:i'?ve |i )?got it(?: from here)?|i(?:'ll| can| will) take it from here|i(?:'m| am) good(?: from here)?)[.!]?$/i;
 const NEXT = /^(?:ok(?:ay)?[,.! ]+)?(?:next|next step|done|go on|continue|what'?s next|and then)[.!?]?$/i;
 
 // -> { kind:'dismiss'|'next'|'ask', text }

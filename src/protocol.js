@@ -1,6 +1,9 @@
 const path = require('path');
 
-const PROTOCOL = 'nus-desktop';
+// Personal build: the scheme is jarvis://. Sign-in, billing and referral links
+// are gone, so the only routes that still resolve are kept for older links and
+// answer with "not available" in main.js.
+const PROTOCOL = 'jarvis';
 
 function findProtocolUrl(argv = []) {
   return argv.find((arg) => typeof arg === 'string' && arg.toLowerCase().startsWith(`${PROTOCOL}://`)) || null;
@@ -33,16 +36,15 @@ function registerProtocolClient(app, argv = process.argv) {
 // Supabase's own wording is written for web developers. Students get this.
 function friendlySignInError(message) {
   const text = String(message || '');
-  if (/PKCE code verifier/i.test(text)) return 'This sign-in was started by a different copy of Nūs. Close any other Nūs window, then try Sign in with Google again.';
+  if (/PKCE code verifier/i.test(text)) return 'This sign-in was started by a different copy of J.A.R.V.I.S. Close the other window and try again.';
   if (/expired|invalid.*code|code.*invalid/i.test(text)) return 'That sign-in link has expired. Try Sign in with Google again.';
-  if (/network|fetch|ENOTFOUND|ECONN/i.test(text)) return 'Nūs could not reach the sign-in service. Check your connection and try again.';
+  if (/network|fetch|ENOTFOUND|ECONN/i.test(text)) return 'J.A.R.V.I.S could not reach the sign-in service. Check your connection and try again.';
   return text || 'The sign-in did not complete.';
 }
 
-// nus-desktop:// links carry exactly three things: a sign-in callback from
-// Supabase, "billing finished" from the website after Stripe Checkout, or an
-// acquisition token from the website's download flow. The path decides;
-// anything else is ignored so a stray link never reaches the OAuth exchange.
+// jarvis:// links. In this build sign-in, billing and referral links no longer
+// do anything (main.js answers them without acting), but they still parse so an
+// old bookmark cannot crash the handler. Anything unrecognised is ignored.
 function routeProtocolUrl(url) {
   let parsed;
   try { parsed = new URL(String(url)); } catch { return 'ignore'; }

@@ -10,13 +10,15 @@
 // mid-call, and a long answer causes visible eye drift on video, which is the
 // exact failure this tool is supposed to prevent rather than cause.
 
+const { withPersona } = require('./persona');
+
 const GLANCE =
   'HARD LIMIT: at most 3 short lines. No bullets, no headings, no preamble, no sign-off. ' +
   'It is read in a single glance during a live video call.';
 
 const RECEIPTS =
   'Every number, statistic, and quoted line must be reproduced exactly as it appears in the ' +
-  'briefing pack or the Nūs semester context. Never round, never approximate, never say ' +
+  'briefing pack or the desktop context. Never round, never approximate, never say ' +
   '"about" or "roughly". If a fact is in neither source, do not state it.';
 
 function formatTranscript(turns, limit) {
@@ -35,12 +37,12 @@ const MODES = {
     small: false,
     localFallback: 'guide',
     system:
-      'You are Nūs, a semester copilot for this user, answering inside the Nūs desktop app. ' +
-      'Read the NŪS CONTEXT block: next_moves is the ranked answer to "what should I do", ' +
-      'tasks are open work, gcal_events are the commitments for today, courses are the ground truth. ' +
-      'Answer the question directly and concretely, referencing real task and course names. ' +
-      'If the question is about how to use the app itself, answer from the APP GUIDE lines. ' +
-      'Keep it under 8 short lines. No preamble.',
+      withPersona(
+        'Read the CONTEXT block: next_moves is the ranked answer to "what should I do", ' +
+        'tasks are open work, gcal_events are the commitments for today, courses are the ground truth. ' +
+        'Answer the question directly and concretely, referencing real task and course names. ' +
+        'If the question is about how to use the app itself, answer from the APP GUIDE lines. ' +
+        'Keep it under 8 short lines. No preamble.'),
     build(ctx) {
       return 'Question: ' + (ctx.userText || 'What should I do next?');
     }
@@ -53,7 +55,7 @@ const MODES = {
     small: false,
     pack: 'live',
     system:
-      'You are the user\'s meeting copilot, overlaid on his screen during a live call. ' +
+      withPersona() + ' You are overlaid on the operator\'s screen during a live call. ' +
       'Look at the screenshot and the recent conversation, decide what he needs RIGHT NOW, ' +
       'and deliver it directly. ' +
       'If it is a conversation: answer the current question, or say exactly what he should say ' +

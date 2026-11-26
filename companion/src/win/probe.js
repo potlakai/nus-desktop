@@ -44,6 +44,10 @@ function createProbe(opts = {}) {
   let buffer = '';
   const pending = new Map();      // id -> { resolve, reject, timer }
   const state = { available: false, pid: 0, restarts: 0, lastError: '', watching: null, ready: false };
+  // Keys watched for as long as the sidecar runs (the modifier talk key,
+  // 2026-11-02): joined onto every session watch, and re-armed when a session
+  // watch ends or the sidecar restarts.
+  let baseKeys = null;
 
   function failPending(reason) {
     for (const [id, p] of pending) {
@@ -60,6 +64,7 @@ function createProbe(opts = {}) {
       if (msg.ev === 'ready') {
         state.ready = true;
         state.pid = Number(msg.pid) || state.pid;
+        if (baseKeys) armBase();
       }
       emitter.emit('event', msg);
       emitter.emit(msg.ev, msg);
@@ -159,6 +164,20 @@ function createProbe(opts = {}) {
     });
   }
 
+  // The sidecar answers in order, so this can sit behind a slow request
+  // (apps.list at boot takes seconds): a long timeout and two more tries.
+  let baseTries = 0;
+  function armBase() {
+    if (!baseKeys || !child) return Promise.resolve({ ok: false });
+    state.watching = { keys: baseKeys.slice(), click: false, fg: false, base: true };
+    const keys = baseKeys.slice();
+    return request('watch.start', { keys, click: false, fg: false }, 15000).then((r) => { baseTries = 0; return r; }).catch((e) => {
+      log('base watch failed: ' + e.message);
+      if (baseKeys && child && baseTries++ < 2) { const t = setTimeout(() => { if (baseKeys && child) armBase(); }, 2000); if (t.unref) t.unref(); }
+      return { ok: false };
+    });
+  }
+
   return {
     get available() { return state.available; },
     status() { return { available: state.available, pid: state.pid, restarts: state.restarts, lastError: state.lastError, watching: state.watching, script }; },
@@ -182,14 +201,25 @@ function createProbe(opts = {}) {
     request,
     // Only while a session needs it: key/click polling costs CPU.
     async watch(options = {}) {
-      const r = await request('watch.start', { keys: options.keys || [], click: options.click !== false, fg: options.fg !== false });
-      state.watching = { keys: options.keys || [], click: options.click !== false, fg: options.fg !== false };
+      const keys = (options.keys || []).slice();
+      for (const k of baseKeys || []) if (!keys.includes(k)) keys.push(k);
+      const r = await request('watch.start', { keys, click: options.click !== false, fg: options.fg !== false });
+      state.watching = { keys, click: options.click !== false, fg: options.fg !== false };
       return r;
     },
     async unwatch() {
       state.watching = null;
       if (!child) return { ok: true };
+      if (baseKeys) return armBase();
       return request('watch.stop', {}).catch(() => ({ ok: false }));
+    },
+    // The keys to keep watching whatever else is going on (null to stop).
+    setBase(keys) {
+      baseKeys = Array.isArray(keys) && keys.length ? keys.map(Number) : null;
+      if (!child || !state.ready) return Boolean(baseKeys);
+      if (baseKeys && !(state.watching && !state.watching.base)) armBase();
+      else if (!baseKeys && state.watching && state.watching.base) { state.watching = null; request('watch.stop', {}).catch(() => {}); }
+      return Boolean(baseKeys);
     },
     on: (event, cb) => { emitter.on(event, cb); return () => emitter.off(event, cb); },
     off: (event, cb) => emitter.off(event, cb),

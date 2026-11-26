@@ -1,6 +1,14 @@
-/* Knot look only (from quiet-knot.css, 2026-09-15): silver at rest, violet-blue thinking.
-   Amber reading is re-asserted because #orb.k3d would otherwise beat styles.css. */
-#orb, #orb.k3d { --knot-accent: #d6dbea; }
-#toolbar[data-knot-state='listening'] #orb { --knot-accent: #d6dbea; }
-#toolbar[data-knot-state='thinking'] #orb { --knot-accent: #8c96ff; }
-#toolbar[data-knot-state='reading'] #orb { --knot-accent: #E0B663; }
+/* The Knot's accent by state. The engine (knot-engine.js) draws the mark from
+   the same colours in knot-spec.js; these rules give the rest of the CSS
+   (glows, the fallback mark) the matching value. A test keeps the two equal.
+   White at rest, orchid listening, amber working and thinking, blue reading
+   and speaking. The numbers are character.accent in knot-spec.js. */
+#orb, #orb.k3d { --knot-accent: #F5F5F7; }
+#toolbar[data-knot-state='listening'] #orb { --knot-accent: #C58AFF; }
+#toolbar[data-knot-state='thinking'] #orb { --knot-accent: #FFC76A; }
+#toolbar[data-knot-state='reading'] #orb { --knot-accent: #59B9FF; }
+#toolbar[data-knot-state='working'] #orb { --knot-accent: #FFC76A; }
+/* Focus guard: coral while it is keeping the feeds shut, green for a beat when
+   it lets go. The working states above still paint over it. */
+#toolbar[data-knot-state='idle'] #orb[data-guard='active'], #toolbar[data-knot-state='ready'] #orb[data-guard='active'] { --knot-accent: #F2735E; --knot-accent-soft: rgba(242,115,94,.6); }
+#toolbar[data-knot-state='idle'] #orb[data-guard='done'], #toolbar[data-knot-state='ready'] #orb[data-guard='done'] { --knot-accent: #5BC48C; --knot-accent-soft: rgba(91,196,140,.6); }

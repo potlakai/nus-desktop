@@ -2,13 +2,15 @@
    bottom-left corner; state (idle/listening/thinking/ready) drives its motion. */
 
 :root {
-  --accent: #90A5FF;            /* light variant of --knot-accent, text/dots */
-  --accent-hi: #C4CFFF;
+  /* Palette comes from themes.css, so the light/dark choice is one file. The
+     fallbacks are the original Nūs violet, for a sheet loaded on its own. */
+  --accent: var(--accent-theme, #90A5FF);
+  --accent-hi: var(--accent-theme-hi, #C4CFFF);
   --accent-ink: #111425;
-  --live: #D94B43;
-  --marble: #F3F0E8;
-  --stone: #AAA59C;
-  --cobalt: #506CFF;            /* unified with --knot-accent */
+  --live: var(--live-theme, #D94B43);
+  --marble: var(--marble-theme, #F3F0E8);
+  --stone: var(--stone-theme, #AAA59C);
+  --cobalt: var(--cobalt-theme, #506CFF);
 
   --tx-1: rgba(255,255,255,0.95);
   --tx-2: rgba(255,255,255,0.90);
@@ -61,7 +63,7 @@ html, body {
   pointer-events: none;                  /* only the actual UI blocks; gaps pass through */
 }
 #stack { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; max-height: 100%; }
-#toolbar, #panel-wrap, #settings-scrim, #onboard-scrim, #daily-line { pointer-events: auto; }
+#toolbar, #panel-wrap, #settings-scrim, #tour, #tour-tuck, #daily-line { pointer-events: auto; }
 .no-drag, button, input, textarea { -webkit-app-region: no-drag; }
 
 /* ============================ The orb ============================ */
@@ -97,7 +99,7 @@ html, body {
   pointer-events: none;
   transition: opacity 180ms ease, transform 180ms ease;
 }
-#toolbar:hover #orb-controls { opacity: 1; transform: none; pointer-events: auto; }
+#toolbar:hover #orb-controls { opacity: 1; transform: none; }
 #orb-controls button {
   width: 28px; height: 28px;
   border: none; background: transparent; color: #fff; cursor: pointer;
@@ -150,7 +152,7 @@ button:focus { outline: none; }
   -webkit-user-select: text; user-select: text;
 }
 .ai-text.small { font-size: calc(14px * var(--text-zoom)); line-height: 1.55; }
-.ai-text .w { display: inline; opacity: 0; animation: fadeUp 180ms ease forwards; }
+.ai-text .w { display: inline; }
 .ai-text ul { margin: 8px 0; padding-left: 20px; }
 .ai-text li { margin: 4px 0; }
 .ai-text pre {
@@ -182,7 +184,7 @@ button:focus { outline: none; }
 #action-row-2:hover { opacity: 1; }
 /* A rehearsal in progress must be unmistakable, so it can never be confused
    with a real call. */
-#spar-btn.sparring { color: #ffd479; background: rgba(255, 212, 121, 0.12); }
+#spar-btn.sparring { color: #FFC76A; background: rgba(255,199,106,.12); }
 .act {
   display: inline-flex; align-items: center; gap: 5px;
   border: none; background: transparent; cursor: pointer;
@@ -328,29 +330,6 @@ button:focus { outline: none; }
 .s-status { color: var(--tx-mut); font-size: 12px; margin-top: 10px; min-height: 16px; }
 
 /* ============================ Onboarding / tutorial ============================ */
-#onboard-scrim { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(0,0,0,0.45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-#onboard-scrim.hidden { display: none; }
-#onboard { width: min(470px, 93vw); padding: 26px 28px 18px; text-align: center; -webkit-app-region: no-drag; animation: overlayIn 240ms cubic-bezier(0.22,1,0.36,1); }
-.ob-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; }
-.ob-dots span { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.20); transition: all 220ms ease; }
-.ob-dots span.on { background: var(--accent); width: 20px; border-radius: 4px; }
-.ob-icon { display: flex; justify-content: center; margin-bottom: 14px; font-size: 34px; line-height: 1; }
-.ob-title { font-size: 20px; font-weight: 700; color: var(--tx-1); margin-bottom: 10px; letter-spacing: -0.01em; }
-.ob-body { font-size: 14px; line-height: 1.6; color: var(--tx-2); text-align: left; -webkit-user-select: text; user-select: text; }
-.ob-body strong { color: #fff; font-weight: 600; }
-.ob-body .kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 6px; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.16); font-size: 12px; font-weight: 600; color: #fff; }
-.ob-body ul { padding-left: 18px; margin: 8px 0; }
-.ob-body li { margin: 6px 0; }
-.ob-body .hl { color: #FFFFFF; font-weight: 600; }
-.ob-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.ob-buttons:empty { display: none; }
-.ob-buttons button { flex: 1; min-width: 150px; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.40); background: rgba(255,255,255,0.14); color: #EDEDEF; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 140ms ease; }
-.ob-buttons button:hover { background: rgba(255,255,255,0.24); }
-.ob-actions { display: flex; align-items: center; margin-top: 22px; }
-.ob-ghost { border: none; background: transparent; color: var(--tx-mut); font-size: 13px; font-weight: 500; cursor: pointer; padding: 8px 10px; border-radius: 8px; }
-.ob-ghost:hover { color: #fff; background: rgba(255,255,255,0.06); }
-.ob-primary { border: none; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 600; padding: 9px 22px; border-radius: 999px; cursor: pointer; transition: filter 140ms ease; }
-.ob-primary:hover { filter: brightness(1.08); }
 
 /* ============================ Animations ============================ */
 @keyframes overlayIn { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
@@ -361,8 +340,26 @@ button:focus { outline: none; }
 
 .hidden { display: none !important; }
 
+/* Surface motion (surface.js). The bubble, the composer, the hint and the
+   keep chip are projected from the thread's tip with the Web Animations API
+   (timings in knot-spec.js), so they have no keyframes here. The sheet, the
+   daily line and the scrims use these classes: open with a small spring,
+   close with a fast plain ease. */
+@keyframes surfaceIn { from { opacity: 0; transform: translateY(6px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes surfaceOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(2px) scale(.98); } }
+@keyframes scrimIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scrimOut { from { opacity: 1; } to { opacity: 0; } }
+#daily-line.is-entering, #panel.is-entering { animation: surfaceIn 320ms cubic-bezier(.22,1.12,.36,1) both; }
+#daily-line.is-leaving, #panel.is-leaving { animation: surfaceOut 130ms cubic-bezier(.4,0,1,1) both; pointer-events: none !important; }
+#guide-bubble.is-leaving, #quick-ask.is-leaving, #knot-hint.is-leaving, #keep-chip.is-leaving { pointer-events: none !important; }
+#guide-bubble, #quick-ask, #knot-hint, #keep-chip { will-change: transform, opacity; }
+#settings-scrim.is-entering { animation: scrimIn 200ms ease both; }
+#settings-scrim.is-leaving { animation: scrimOut 130ms cubic-bezier(.4,0,1,1) both; pointer-events: none !important; }
+#settings-scrim.is-entering #settings { animation: surfaceIn 320ms cubic-bezier(.22,1.12,.36,1) both; }
+#panel.is-leaving .tile { animation: none; }
+
 @media (prefers-reduced-motion: reduce) {
-  #panel, .tile, .user-bubble, .ai-text .w { animation: none !important; opacity: 1 !important; transform: none !important; }
+  #panel, .tile, .user-bubble, .ai-text .w, .is-entering, .is-leaving { animation: none !important; opacity: 1 !important; transform: none !important; }
   #live-dot { animation: none !important; }
 }
 
@@ -419,7 +416,7 @@ button:focus { outline: none; }
 .act:hover { border-color: rgba(243,240,232,.1); background: rgba(243,240,232,.06); }
 #composer { border-radius: 11px; background: rgba(243,240,232,.035); }
 #send-btn { border-radius: 8px; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 5px 14px rgba(49,92,255,.22); }
-.s-close, .ob-primary { border-radius: 8px; }
+.s-close { border-radius: 8px; }
 
 @keyframes captureBlink { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 
@@ -472,7 +469,7 @@ button:focus { outline: none; }
   transition: transform 220ms cubic-bezier(.2,.8,.2,1), border-color 220ms ease, box-shadow 220ms ease;
 }
 #orb:hover,
-#knot-shell:focus-within #orb {
+#knot-shell:has(:focus-visible) #orb {
   transform: translateY(-2px) scale(1.035);
   border-color: rgba(242,239,230,.34);
   box-shadow: 0 20px 48px rgba(0,0,0,.58), 0 0 32px rgba(57,87,230,.18), inset 0 1px 0 rgba(255,255,255,.14);
@@ -497,8 +494,8 @@ button:focus { outline: none; }
 }
 #orb { --knot-accent: #506CFF; --knot-accent-soft: rgba(68,94,255,.58); }
 #orb.busy { --knot-accent: #5F73FF; --knot-accent-soft: rgba(95,115,255,.72); }
-#orb.listening { --knot-accent: #D6DBEA; --knot-accent-soft: rgba(214,219,234,.6); }
-#orb.spar { --knot-accent: #D9A758; --knot-accent-soft: rgba(217,167,88,.65); }
+#orb.listening { --knot-accent: #C58AFF; --knot-accent-soft: rgba(197,138,255,.6); }
+#orb.spar { --knot-accent: #FFC76A; --knot-accent-soft: rgba(255,199,106,.7); }
 .knot-thread { stroke-width: 5.1; }
 .knot-shadow { stroke: #0A0D19; stroke-width: 7.4; opacity: .94; }
 .knot-cream {
@@ -582,8 +579,10 @@ button:focus { outline: none; }
   pointer-events: none;
   transition: opacity 180ms ease, transform 240ms cubic-bezier(.2,.8,.2,1), border-color 180ms ease, left 240ms ease;
 }
-#knot-shell:hover #knot-bloom,
-#knot-shell:focus-within #knot-bloom,
+/* In free mode a hover shows the panel beside the Knot and nothing else (Pranav,
+   2026-11-03). The capsule still shows while listening and thinking. */
+body.island #knot-shell:hover #knot-bloom,
+#knot-shell:has(:focus-visible) #knot-bloom,
 #toolbar.panel-open #knot-bloom,
 #toolbar[data-knot-state='listening'] #knot-bloom,
 #toolbar[data-knot-state='thinking'] #knot-bloom {
@@ -624,7 +623,8 @@ button:focus { outline: none; }
   background: transparent;
   opacity: 1;
   transform: none;
-  pointer-events: auto;
+  /* What the capsule has: hidden, its buttons are not there to hit. */
+  pointer-events: inherit;
   backdrop-filter: none;
 }
 #knot-bloom #orb-controls button { width: 25px; height: 25px; }
@@ -644,11 +644,11 @@ button:focus { outline: none; }
 #knot-bloom #capture-chip.off { display: none; }
 
 #orb.listening {
-  border-color: rgba(214,219,234,.38);
-  box-shadow: 0 18px 44px rgba(0,0,0,.56), 0 0 30px rgba(214,219,234,.16), inset 0 1px 0 rgba(255,255,255,.12);
+  border-color: rgba(197,138,255,.38);
+  box-shadow: 0 18px 44px rgba(0,0,0,.56), 0 0 30px rgba(197,138,255,.16), inset 0 1px 0 rgba(255,255,255,.12);
 }
 #orb.listening .knot-blue { animation-duration: 2.8s; }
-#orb.listening .knot-halo { border-color: rgba(214,219,234,.36); animation-duration: 1.5s; }
+#orb.listening .knot-halo { border-color: rgba(197,138,255,.36); animation-duration: 1.5s; }
 #orb.busy .knot-cream { animation-duration: 2.1s; }
 #orb.busy .knot-blue { animation-duration: 1.55s; }
 #orb.busy .nus-knot { animation: knotTilt 2.4s ease-in-out infinite; }
@@ -671,10 +671,10 @@ button:focus { outline: none; }
      opacity breathe so it never looks dead. */
   .knot-orbit, .knot-halo, #orb.busy .nus-knot { animation: none !important; }
   .knot-thread, .knot-core { animation-duration: 18s !important; }
-  #knot-canvas.knot-static { animation: knotStaticBreathe 7s ease-in-out infinite; }
+  /* The static Knot is static: no loop of any kind under reduced motion. */
+  #app.file-drag #knot-shell::before { animation: none !important; }
   #knot-bloom { transition: opacity 120ms ease !important; transform: none !important; }
 }
-@keyframes knotStaticBreathe { 0%,100% { opacity: .82; } 50% { opacity: 1; } }
 
 
 /* ===================== Unified Knot system (final layer) ===================== */
@@ -691,14 +691,34 @@ button:focus { outline: none; }
 #tile-response { border-left: 2px solid var(--cobalt); }
 
 /* The 3D knot canvas fills the orb; the SVG stays as no-canvas fallback. */
-#knot-canvas { position: absolute; inset: -22px; width: calc(100% + 44px); height: calc(100% + 44px); pointer-events: none; }
+/* Exactly 180 px, centred on the orb: the engine draws a 180 px frame (room for
+   the tail), and a canvas of any other size is resampled. */
+#knot-canvas { position: absolute; left: 50%; top: 50%; width: 180px; height: 180px; margin: -90px 0 0 -90px; pointer-events: none; }
 #orb.k3d .nus-knot, #orb.k3d .knot-halo { display: none; }
+/* Three sizes by voice ("make yourself smaller"): the drawn mark scales, the
+   orb's place and its thread seam stay where they are. */
+#knot-canvas, #orb .nus-knot, #orb .knot-halo { scale: var(--knot-scale, 1); }
+#orb.sizing #knot-canvas, #orb.sizing .nus-knot, #orb.sizing .knot-halo { transition: scale 300ms cubic-bezier(.2,.8,.2,1); }
 /* Integrated on any desktop: no plate, no border, no drop shadow. The knot
    floats; states speak through a soft glow instead of a dark disc. */
 #orb.k3d { background: transparent; border-color: transparent; box-shadow: none; overflow: visible; }
-#orb.k3d:hover, #knot-shell:focus-within #orb.k3d { border-color: transparent; box-shadow: 0 0 26px rgba(80,108,255,.20); }
-#orb.k3d.listening { box-shadow: 0 0 26px rgba(214,219,234,.22); }
-#orb.k3d.busy { box-shadow: 0 0 28px rgba(140,150,255,.26); }
+#orb.k3d:hover, #knot-shell:has(:focus-visible) #orb.k3d { border-color: transparent; box-shadow: none; }
+/* The state colours are on the Knot itself now, with a glow in its own shape.
+   One signal stays beside it: the focus guard. */
+#orb.k3d[data-guard='active'] { box-shadow: 0 0 26px rgba(242,115,94,.26); }
+#orb.k3d[data-guard='done'] { box-shadow: 0 0 26px rgba(91,196,140,.26); }
+/* The canvas Knot is never scaled or nudged by CSS: the thread is drawn to
+   its seam, and a transform on the mark would pull the two apart. Its motion
+   comes from the engine. (The skater sets an inline transform in flight.) */
+#orb.k3d, #orb.k3d:hover, #knot-shell:has(:focus-visible) #orb.k3d, #orb.k3d:active { transform: none; }
+#orb.k3d { transition: border-color 220ms ease, box-shadow 220ms ease; }
+/* A finger on the Knot or the pill drags or holds; the browser must not take it
+   for a pan and cancel the pointer a few pixels in. */
+#orb, #island { touch-action: none; }
+/* On a light desktop the state glows (shadows round the orb) show as a tinted
+   ring with a hole in it. The mark carries its own state there. */
+#orb.k3d.on-light, #orb.k3d.on-light:hover, #knot-shell:has(:focus-visible) #orb.k3d.on-light, #orb.k3d.on-light.listening, #orb.k3d.on-light.busy, #orb.k3d.on-light[data-state] { box-shadow: none; }
+#orb.k3d[data-state="keeping"] #knot-canvas { animation: none; }
 
 /* Mode clusters: labeled, breathing room, no dot separators. */
 .mode-cluster { margin-bottom: 4px; }
@@ -738,6 +758,9 @@ html:not(.founder) [data-founder] { display: none !important; }
 .tile { transform-origin: 14% 100%; }
 @keyframes tileIn { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
 /* Stem: a light thread connecting the Knot to the tiles above it. */
+/* (Only while the tiles are open: with the sheet folded it used to hang over
+   the Knot as a stray blue tick.) */
+#panel-wrap:has(#panel.collapsed)::after { display: none; }
 #panel-wrap::after {
   content: '';
   position: absolute;
@@ -756,34 +779,34 @@ html:not(.founder) [data-founder] { display: none !important; }
 #panel-wrap { min-height: 0; }
 #messages { max-height: min(50vh, calc(100vh - 340px)); }
 
-/* No drag region at all: the window covers the work area and the Knot lives
-   in a corner. The corner picker in the bloom is the only way it moves. */
+/* No OS drag region at all: the window covers the work area and never moves.
+   The Knot itself is dragged inside it (renderer.js applyKnotPos) and stays
+   exactly where it is dropped. */
 #toolbar, #knot-shell, #knot-shell button, #knot-bloom { -webkit-app-region: no-drag; }
+#app.dragging #orb { transition: none; cursor: grabbing; }
+#app.dragging #knot-bloom { opacity: 0 !important; pointer-events: none !important; }
+/* The whole Knot travelling: it rides an inline transform, the capsule stays folded. */
+#app.skating #orb { transition: none; }
+#app.skating #knot-bloom { opacity: 0 !important; pointer-events: none !important; }
+/* A file is over the window: a breathing ring says "drop it here". */
+#app.file-drag #knot-shell::before { content: ''; position: absolute; inset: -26px; border-radius: 50%; border: 1.5px dashed rgba(214,219,234,.5); pointer-events: none; animation: dropRing 900ms ease-in-out infinite; }
+@keyframes dropRing { 0%, 100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.06); opacity: .9; } }
 
-/* ===== Tutorial in the Knot's own language ===== */
-#onboard-scrim { display: flex; align-items: flex-end; justify-content: flex-start; padding: 0 0 132px 14px; background: rgba(0,0,0,.28); }
-#onboard { width: min(430px, 92vw); text-align: left; padding: 20px 22px 14px; }
-#onboard::after { /* stem down toward the Knot */
-  content: ''; position: absolute; left: 33px; bottom: -26px; width: 2px; height: 26px;
-  background: linear-gradient(to bottom, var(--cobalt), transparent); opacity: .6;
-}
-#onboard { position: relative; }
-.ob-icon { font-size: 0; }
-.ob-knot { width: 40px; height: 40px; }
-.ob-knot path { stroke: var(--accent); stroke-width: 6; stroke-linecap: round; opacity: .9; }
-#ob-icon[data-state='listening'] .ob-knot path { stroke: #69E2CF; }
-#ob-icon[data-state='thinking'] .ob-knot path { stroke: #5F73FF; }
-#ob-icon[data-state='ready'] .ob-knot path { stroke: #AEB4FF; }
-.ob-title { text-align: left; font-size: 17px; }
-.ob-dots { justify-content: flex-start; }
 /* Highlight the element a step teaches. */
-.ob-target { outline: 2px solid var(--cobalt); outline-offset: 4px; border-radius: 14px; box-shadow: 0 0 24px rgba(80,108,255,.35); }
 /* While the tutorial runs, hold the bloom open so steps can point at it. */
 #toolbar.tour-open #knot-bloom { opacity: 1; transform: none; pointer-events: auto; }
+/* A tour card is up: the card carries the state ("Listening, release to send"),
+   so the capsule stays folded; it used to slide out under the sheet and get
+   cut by it (live 2026-11-03). The tucked line is not a card. */
+body:has(#tour:not(.hidden)) #toolbar #knot-bloom { opacity: 0 !important; transform: translateX(-18px) scaleX(.84) !important; pointer-events: none !important; }
 
 /* Desktop link tick in the bloom head */
 #desktop-link { font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #7fd4b4; opacity: .9; }
 #desktop-link.off { color: #6a7086; opacity: .55; }
+/* Hidden from screen sharing, said in words on the capsule. Amber when visible
+   in shares: that is the state a person about to share wants to notice. */
+#share-state { font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #6a7086; opacity: .7; white-space: nowrap; }
+#share-state.visible-in-shares { color: #FFC76A; opacity: .95; }
 
 /* ===== Voice wave: proof the mic is hearing you ===== */
 .voice-wave { display: inline-flex; align-items: center; gap: 1.5px; height: 16px; max-width: 96px; overflow: hidden; }
@@ -794,7 +817,7 @@ html:not(.founder) [data-founder] { display: none !important; }
 /* ===== Companion theme unification =====
    Every remaining surface picks up the same tokens as the Knot bloom, so the
    settings sheet, tutorial, status line and tiles read as one product. */
-#settings, #onboard, .tile, #nus-status {
+#settings, .tile, #nus-status {
   background: linear-gradient(150deg, rgba(18,20,31,.96), rgba(8,10,18,.93));
   border: 1px solid rgba(242,239,230,.13);
   color: var(--tx-1);
@@ -808,20 +831,18 @@ html:not(.founder) [data-founder] { display: none !important; }
   border: 1px solid rgba(242,239,230,.14); border-radius: 9px; background: rgba(255,255,255,.05); color: var(--tx-1);
 }
 .s-field input:focus, #settings input:focus, #settings select:focus { outline: none; border-color: rgba(80,108,255,.6); box-shadow: 0 0 0 2px rgba(80,108,255,.2); }
-.act, .more-btn, .ob-primary, .ob-ghost, .s-close { transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.act, .more-btn, .s-close { transition: background .15s ease, border-color .15s ease, color .15s ease; }
 .act:hover, .more-btn:hover { background: rgba(255,255,255,.07); border-color: rgba(242,239,230,.18); }
-.ob-primary { background: var(--cobalt); color: #fff; border: 0; }
-.ob-primary:hover { background: #6478ff; }
 .user-bubble { background: var(--cobalt); color: #fff; }
 .ai-caret { background: var(--knot-accent, var(--cobalt)); }
 
 
 /* ============================ The Knot strand ============================ */
-/* The thread's canvas covers the window under every other surface and never
-   takes the mouse. Task colour rides on --thread-accent: the strand reads it
+/* The thread's canvas sits under every other surface and never takes the
+   mouse. The engine sizes and places it round the path it is drawing. Task colour rides on --thread-accent: the strand reads it
    from its canvas, the bubble from itself. Amber is reserved for the Knot's
    own "reading your screen" glow and is never a thread colour. */
-#strand-layer { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none; }
+#strand-layer { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 1; pointer-events: none; display: none; }
 [data-task] { --thread-accent: #D6DBEA; }
 [data-task="guide"] { --thread-accent: #7890FF; }
 [data-task="nudge"] { --thread-accent: #69E2CF; }
@@ -829,17 +850,16 @@ html:not(.founder) [data-founder] { display: none !important; }
 [data-task="remember"] { --thread-accent: #A78BFA; }
 
 /* Knot glow by state. Thread colour = task, Knot glow = state. */
-#orb[data-state="listening"] { --knot-accent: #D6DBEA; --knot-accent-soft: rgba(214,219,234,.6); }
-#orb[data-state="thinking"], #orb[data-state="speaking"] { --knot-accent: #8C96FF; --knot-accent-soft: rgba(140,150,255,.7); }
-#orb[data-state="reading"] { --knot-accent: #E0B663; --knot-accent-soft: rgba(224,182,99,.75); }
-#orb.k3d[data-state="reading"] { box-shadow: 0 0 34px rgba(224,182,99,.34); }
-#orb.k3d[data-state="listening"] { box-shadow: 0 0 26px rgba(214,219,234,.22); }
-#orb.k3d[data-state="pointing"], #orb.k3d[data-state="unwinding"] { box-shadow: 0 0 22px rgba(120,144,255,.16); }
-#orb.k3d[data-state="keeping"] { box-shadow: 0 0 30px rgba(167,139,250,.32); }
+#orb[data-state="listening"] { --knot-accent: #C58AFF; --knot-accent-soft: rgba(197,138,255,.6); }
+#orb[data-state="thinking"], #orb[data-state="transcribing"] { --knot-accent: #FFC76A; --knot-accent-soft: rgba(255,199,106,.7); }
+#orb[data-state="reading"] { --knot-accent: #59B9FF; --knot-accent-soft: rgba(89,185,255,.75); }
 /* "Remember this": the Knot tightens as it stores the line. */
 #orb[data-state="keeping"] #knot-canvas { animation: knotTighten 760ms cubic-bezier(.2,.8,.2,1) both; }
 @keyframes knotTighten { 0% { transform: scale(1); } 45% { transform: scale(.8); } 75% { transform: scale(1.06); } 100% { transform: scale(1); } }
 
+/* The card the Knot's tail touches wears the Knot's own line: white with its ink
+   edge. (Assignment mode's gutter stack has no tail, so it keeps the plain frame.) */
+#guide-bubble:not([data-task="solve"]), #quick-ask, #knot-hint, #keep-chip { border: 2px solid #fff; box-shadow: 0 0 0 2.8px rgb(13,15,25), 0 18px 42px rgba(0,0,0,.5); }
 /* Guide bubble at the thread tip (or beside the Knot when there is no thread). */
 #guide-bubble {
   position: fixed; z-index: 6;
@@ -847,9 +867,19 @@ html:not(.founder) [data-founder] { display: none !important; }
   border-radius: 12px;
   color: var(--tx-1); font-family: var(--font); font-size: 13.5px; line-height: 1.42;
   pointer-events: auto;
-  animation: fadeUp 200ms ease both;
 }
+/* A problem walkthrough step: more words than a pointing step, with line breaks. */
+#guide-bubble[data-task="solve"] { box-sizing: border-box; width: min(360px, calc(30vw - 24px)); max-width: calc(30vw - 24px); max-height: calc(100vh - 120px); overflow-y: auto; animation: none; }
+#guide-bubble[data-style="answers"] .gb-text { font-size: 22px; font-weight: 600; overflow-wrap: anywhere; }
+#guide-bubble[data-task="solve"] .gb-text { white-space: pre-wrap; }
+/* A brief, a task list or an answer from the person's notes and chats: longer, kept in lines, scrolls. */
+#guide-bubble[data-style="recall"] { box-sizing: border-box; max-width: 340px; max-height: calc(100vh - 160px); overflow-y: auto; }
+#guide-bubble[data-style="recall"] .gb-text { white-space: pre-wrap; }
 .gb-kicker { margin-bottom: 5px; color: var(--thread-accent, #90A5FF); font: 700 8.5px/1 var(--font); letter-spacing: .16em; text-transform: uppercase; }
+/* An error bubble: same glass, the kicker turns the error red so the eye
+   knows before reading. The fix is always a button on it. */
+#guide-bubble[data-kind="error"] { --thread-accent: #E06A5A; }
+#guide-bubble[data-kind="error"] .gb-kicker { color: #E06A5A; }
 .gb-kicker:empty { display: none; }
 .gb-text { -webkit-user-select: text; user-select: text; }
 .gb-hint { margin-top: 5px; color: rgba(243,240,232,.45); font-size: 10.5px; line-height: 1.35; }
@@ -871,28 +901,16 @@ html:not(.founder) [data-founder] { display: none !important; }
   display: flex; align-items: center; gap: 8px;
   padding: 7px 8px 7px 13px; border-radius: 999px;
   color: var(--tx-1); font-family: var(--font); font-size: 12.5px;
-  pointer-events: auto; animation: fadeUp 200ms ease both;
+  pointer-events: auto;
 }
 #keep-chip button { border: 0; border-radius: 999px; padding: 5px 11px; font: 600 12px var(--font); cursor: pointer; }
 #keep-yes { background: var(--cobalt); color: #fff; }
 #keep-no { background: rgba(255,255,255,.08); color: var(--tx-2); }
 #keep-chip button:hover { filter: brightness(1.1); }
 
-/* Corner picker: four dots in the bloom foot, the lit one is where the Knot lives. */
-#corner-pick {
-  display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px;
-  width: 24px; height: 24px; margin-left: 5px; padding: 3px;
-  border-radius: 6px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03);
-}
-#knot-bloom #orb-controls #corner-pick button {
-  width: auto; height: auto; min-width: 0; padding: 0; border: 0; border-radius: 2px;
-  background: rgba(255,255,255,.16); cursor: pointer; transition: background 140ms ease;
-}
-#knot-bloom #orb-controls #corner-pick button:hover { background: rgba(255,255,255,.4); }
-#knot-bloom #orb-controls #corner-pick button.on { background: var(--accent); }
-
-/* ============================ Corners ============================ */
-/* The stack hugs whichever corner the Knot is pinned to. Tiles, the daily
+/* ============================ Quadrants ============================ */
+/* The stack hugs whichever quadrant the Knot sits in (renderer.js sets
+   data-corner and the padding from the dragged position). Tiles, the daily
    line and the bloom all open toward the screen centre. */
 #app { padding: 0 0 14px 22px; }
 #app[data-corner="br"] { align-items: flex-end; padding: 0 22px 14px 0; }
@@ -909,8 +927,8 @@ html:not(.founder) [data-founder] { display: none !important; }
   transform: translateX(18px) scaleX(.84);
 }
 #app[data-corner="tl"] #knot-bloom, #app[data-corner="tr"] #knot-bloom { bottom: auto; top: 1px; }
-#app[data-corner="br"] #knot-shell:hover #knot-bloom, #app[data-corner="br"] #knot-shell:focus-within #knot-bloom, #app[data-corner="br"] #toolbar.panel-open #knot-bloom, #app[data-corner="br"] #toolbar[data-knot-state='listening'] #knot-bloom, #app[data-corner="br"] #toolbar[data-knot-state='thinking'] #knot-bloom, #app[data-corner="br"] #toolbar.tour-open #knot-bloom,
-#app[data-corner="tr"] #knot-shell:hover #knot-bloom, #app[data-corner="tr"] #knot-shell:focus-within #knot-bloom, #app[data-corner="tr"] #toolbar.panel-open #knot-bloom, #app[data-corner="tr"] #toolbar[data-knot-state='listening'] #knot-bloom, #app[data-corner="tr"] #toolbar[data-knot-state='thinking'] #knot-bloom, #app[data-corner="tr"] #toolbar.tour-open #knot-bloom { transform: none; }
+#app[data-corner="br"] #knot-shell:hover #knot-bloom, #app[data-corner="br"] #knot-shell:has(:focus-visible) #knot-bloom, #app[data-corner="br"] #toolbar.panel-open #knot-bloom, #app[data-corner="br"] #toolbar[data-knot-state='listening'] #knot-bloom, #app[data-corner="br"] #toolbar[data-knot-state='thinking'] #knot-bloom, #app[data-corner="br"] #toolbar.tour-open #knot-bloom,
+#app[data-corner="tr"] #knot-shell:hover #knot-bloom, #app[data-corner="tr"] #knot-shell:has(:focus-visible) #knot-bloom, #app[data-corner="tr"] #toolbar.panel-open #knot-bloom, #app[data-corner="tr"] #toolbar[data-knot-state='listening'] #knot-bloom, #app[data-corner="tr"] #toolbar[data-knot-state='thinking'] #knot-bloom, #app[data-corner="tr"] #toolbar.tour-open #knot-bloom { transform: none; }
 #app[data-corner="br"] .tile, #app[data-corner="tr"] .tile { transform-origin: 86% 100%; }
 #app[data-corner="tl"] .tile { transform-origin: 14% 0; }
 #app[data-corner="tr"] .tile { transform-origin: 86% 0; }
@@ -918,9 +936,6 @@ html:not(.founder) [data-founder] { display: none !important; }
 #app[data-corner="tl"] #panel-wrap::after, #app[data-corner="tr"] #panel-wrap::after { bottom: auto; top: -10px; background: linear-gradient(to bottom, var(--cobalt), transparent); }
 #app[data-corner="tl"] #daily-line, #app[data-corner="tr"] #daily-line { margin: 10px 0 0 0; }
 /* The tutorial card sits by whichever corner the Knot is in. */
-#app[data-corner="br"] ~ #onboard-scrim { justify-content: flex-end; padding: 0 14px 132px 0; }
-#app[data-corner="tl"] ~ #onboard-scrim { align-items: flex-start; padding: 132px 0 0 14px; }
-#app[data-corner="tr"] ~ #onboard-scrim { align-items: flex-start; justify-content: flex-end; padding: 132px 14px 0 0; }
 
 /* The quick ask: a single line by the Knot. No tiles, no verbs, no chrome. */
 #quick-ask {
@@ -928,7 +943,6 @@ html:not(.founder) [data-founder] { display: none !important; }
   display: flex; align-items: center; gap: 4px;
   width: min(380px, 62vw); padding: 5px 5px 5px 14px;
   border-radius: 999px; pointer-events: auto;
-  animation: fadeUp 160ms ease both;
 }
 #quick-input {
   flex: 1; min-width: 0; border: 0; outline: none; background: transparent;
@@ -949,7 +963,6 @@ html:not(.founder) [data-founder] { display: none !important; }
   padding: 6px 12px; border-radius: 999px;
   color: var(--tx-1); font-family: var(--font); font-size: 12px; line-height: 1.2;
   cursor: pointer; pointer-events: auto;
-  animation: fadeUp 200ms ease both;
 }
 #knot-hint::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 7px 1px 0; border-radius: 50%; background: #69E2CF; }
 #knot-hint:hover { border-color: rgba(105,226,207,.45); }
@@ -957,3 +970,223 @@ html:not(.founder) [data-founder] { display: none !important; }
 /* While the one-line composer is open the capsule stays folded: the two used
    to overlap by the Knot (Pranav, 2026-09-15). */
 #toolbar.quick-open #knot-bloom { opacity: 0 !important; transform: translateX(-18px) scaleX(.84) !important; pointer-events: none !important; }
+/* Same fold for anything else in the Knot's slot (bubble, hint, keep chip),
+   and mirrored on the right, where the capsule opens the other way. */
+#toolbar.slot-open #knot-bloom { opacity: 0 !important; transform: translateX(-18px) scaleX(.84) !important; pointer-events: none !important; }
+#app[data-corner="br"] #toolbar.quick-open #knot-bloom, #app[data-corner="tr"] #toolbar.quick-open #knot-bloom,
+#app[data-corner="br"] #toolbar.slot-open #knot-bloom, #app[data-corner="tr"] #toolbar.slot-open #knot-bloom { transform: translateX(18px) scaleX(.84) !important; }
+
+html.standalone [data-desktop-only]{display:none!important}
+html:not(.standalone) [data-standalone-only]{display:none!important}
+
+/* The checklist under a guide step: done, now, next. */
+.gb-steps { list-style: none; margin: 6px 0 2px; padding: 0; display: grid; gap: 3px; font-size: 12px; line-height: 1.3; opacity: .9; }
+.gb-steps li { padding-left: 18px; position: relative; }
+.gb-steps li::before { content: ""; position: absolute; left: 4px; top: .45em; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid currentColor; opacity: .5; }
+.gb-steps li.done { opacity: .55; text-decoration: line-through; }
+.gb-steps li.done::before { background: currentColor; opacity: .5; }
+.gb-steps li.now { font-weight: 600; }
+.gb-steps li.now::before { background: currentColor; opacity: 1; }
+.gb-steps.hidden { display: none; }
+
+/* "Circle it": a hand-drawn ring around the control the thread points at. */
+.guide-circle { position: fixed; z-index: 2; pointer-events: none; overflow: visible; }
+.guide-circle ellipse { fill: none; stroke: #fff; stroke-width: 3.4; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; animation: guideCircleDraw 520ms cubic-bezier(.3,.7,.2,1) forwards; }
+@keyframes guideCircleDraw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .guide-circle ellipse { animation: none; stroke-dashoffset: 0; } }
+
+/* Marks: what an answer draws on the screen while it is spoken (marks.js).
+   The Knot's thread laid on the page: ink outline under a white core, drawn
+   on by its dash offset. Under the bubbles, over the strand, never the mouse. */
+#marks-layer { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; overflow: visible; opacity: 1; transition: opacity 260ms ease; }
+#marks-layer.leaving { opacity: 0; }
+#marks-layer path { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 100 100; stroke-dashoffset: 100; animation: markDraw 500ms cubic-bezier(.3,.7,.2,1) forwards; }
+#marks-layer .mark-ink { stroke: rgb(13,15,25); stroke-width: 6.2; }
+#marks-layer .mark-core { stroke: #fff; stroke-width: 3.2; }
+#marks-layer .mark-underline .mark-ink { stroke-width: 5.6; }
+#marks-layer .mark-underline .mark-core { stroke-width: 2.8; }
+/* On a bright page the thread turns over: a dark line with a white edge. */
+#marks-layer .mark-on-light .mark-ink { stroke: #fff; }
+#marks-layer .mark-on-light .mark-core { stroke: rgb(13,15,25); }
+/* The red pen (a check of someone's work): the mistake in red with the fix
+   written beside it, a right part ticked in green. The ink outline keeps both
+   readable on a dark page, a white one on a bright page. */
+#marks-layer .mark-wrong .mark-core { stroke: #ff4d4f; }
+#marks-layer .mark-wrong.mark-on-light .mark-core { stroke: #d92d20; }
+#marks-layer .mark-right .mark-core { stroke: #34c77b; }
+#marks-layer .mark-right.mark-on-light .mark-core { stroke: #128a4b; }
+#marks-layer .mark-wrong.mark-on-light .mark-ink, #marks-layer .mark-right.mark-on-light .mark-ink { stroke: #fff; }
+#marks-layer .mark-wrong .mark-ink, #marks-layer .mark-right .mark-ink { stroke: rgb(13,15,25); }
+#marks-layer .mark-note { font-family: 'Ink Free', 'Segoe Print', 'Bradley Hand ITC', 'Comic Sans MS', cursive; font-weight: 700; fill: #ff4d4f; stroke: rgb(13,15,25); stroke-width: 4.5px; paint-order: stroke fill; stroke-linejoin: round; opacity: 0; animation: markNote 260ms ease-out forwards; }
+#marks-layer .mark-on-light .mark-note { fill: #d92d20; stroke: #fff; }
+#marks-layer text.mark-still { animation: none; opacity: 1; }
+@keyframes markNote { from { opacity: 0; } to { opacity: 1; } }
+/* A mark Windows could not confirm: lighter, it says "about here". */
+#marks-layer .mark-loose { opacity: .72; }
+#marks-layer path.mark-still { animation: none; stroke-dashoffset: 0; }
+@keyframes markDraw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { #marks-layer path { animation: none; stroke-dashoffset: 0; } #marks-layer .mark-note { animation: none; opacity: 1; } }
+
+/* ============================== The tour ============================== */
+/* The first-run tour's sheet: the Knot's own card on its tail, wider than a
+   bubble (renders-0115-2026-11-02, O1 direction B). It morphs from card to
+   card in place; #tour-tuck is the one line at the bottom left it folds into
+   while a demo has the screen. */
+#tour { position: fixed; z-index: 6; box-sizing: border-box; width: min(400px, 92vw); padding: 14px 16px 40px; border-radius: 14px; color: var(--tx-1); font-family: var(--font); font-size: 13.5px; line-height: 1.45; pointer-events: auto; border: 2px solid #fff; box-shadow: 0 0 0 2.8px rgb(13,15,25), 0 18px 42px rgba(0,0,0,.5); will-change: transform, opacity; }
+#tour.is-leaving, #tour-tuck.is-leaving { pointer-events: none !important; }
+/* The ask line with a tour card up and no room beside it: above the card (renderer.js clearOfTour). */
+#quick-ask.over-tour { z-index: 7; }
+/* One card into the next: the frame's height eases while a ghost of the old
+   words fades out over the new (renderer.js, morphTour). */
+#tour.is-morphing { overflow: hidden; }
+.tr-ghost { position: absolute; inset: 0; padding: 14px 16px 40px; box-sizing: border-box; pointer-events: none; overflow: hidden; }
+.tr-ghost .tr-skip { display: none; }
+/* The voice download, a thin line under the dots while it runs. */
+.tr-progress { display: flex; align-items: center; gap: 8px; margin: -2px 0 8px; font-size: 10.5px; color: var(--tx-mut); }
+.tr-progress.hidden { display: none; }
+.tr-progress-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.14); overflow: hidden; }
+.tr-progress-bar i { display: block; height: 100%; width: 0; border-radius: 2px; background: #fff; transition: width .4s ease; }
+/* Card 5: the two homes, each a small picture of the screen with the Knot in it. */
+.tr-choices { display: flex; gap: 10px; align-self: stretch; }
+.tr-choice { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 8px 9px; border-radius: 10px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.04); color: var(--tx-2); font: 600 12.5px var(--font); cursor: pointer; }
+.tr-choice.on { border-color: #fff; color: #fff; background: rgba(255,255,255,.1); }
+.tr-pic { position: relative; display: block; width: 92px; height: 56px; border-radius: 5px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.06); }
+.tr-pic i { position: absolute; display: block; background: #fff; border-radius: 50%; width: 10px; height: 10px; right: 7px; bottom: 6px; box-shadow: 0 0 0 2px rgba(13,15,25,.9); }
+.tr-choice[data-pic="island"] .tr-pic i { left: 50%; top: 4px; right: auto; bottom: auto; width: 34px; height: 8px; border-radius: 4px; transform: translateX(-50%); }
+.tr-choice.on .tr-pic { border-color: rgba(255,255,255,.7); }
+/* Card 6: the one switch. */
+.tr-switch { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border: 0; background: transparent; color: #fff; font: 600 13px var(--font); cursor: pointer; }
+.tr-switch:disabled { opacity: .45; cursor: default; }
+.tr-switch-track { position: relative; display: inline-block; width: 36px; height: 20px; border-radius: 10px; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); transition: background .18s ease; }
+.tr-switch-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .18s cubic-bezier(.22,1,.36,1); }
+.tr-switch.on .tr-switch-track { background: #fff; }
+.tr-switch.on .tr-switch-knob { transform: translateX(16px); background: #0B1020; }
+.tr-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.tr-kicker { color: var(--thread-accent, #90A5FF); font: 700 8.5px/1 var(--font); letter-spacing: .16em; text-transform: uppercase; }
+.tr-dots { display: flex; gap: 5px; }
+.tr-dots i { display: block; width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.25); }
+.tr-dots i.on { width: 16px; border-radius: 3px; background: #fff; }
+.tr-title { font-size: 16px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 4px; }
+.tr-body { color: var(--tx-2); }
+.tr-mid { margin: 12px 0 4px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.tr-mid:empty { display: none; }
+.tr-bars { width: 340px; max-width: 100%; height: 56px; }
+.tr-note { font-size: 11px; color: var(--tx-mut); }
+.tr-mics { display: flex; flex-direction: column; gap: 6px; align-self: stretch; }
+.tr-mics:empty { display: none; }
+.tr-mic { text-align: left; padding: 7px 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.04); color: var(--tx-2); font: 600 12px var(--font); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-mic.on { border-color: #fff; color: #fff; background: rgba(255,255,255,.1); }
+.tr-keys { display: flex; gap: 8px; }
+.tr-keys kbd { min-width: 44px; padding: 10px 12px; border-radius: 9px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.35); font: 600 14px var(--font); color: #fff; text-align: center; }
+.tr-chip { padding: 7px 14px; border-radius: 999px; background: #fff; color: #0B1020; font-weight: 600; font-size: 13px; }
+.tr-qa { align-self: stretch; display: grid; gap: 4px; }
+.tr-q { padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); color: var(--tx-2); }
+.tr-q.on { color: #fff; border-color: #fff; }
+.tr-a { padding: 0 10px 4px; color: var(--tx-mut); font-size: 12.5px; text-align: right; }
+.tr-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.tr-chips span { padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.3); font-size: 12px; color: var(--tx-2); }
+.tr-input { display: flex; gap: 6px; align-self: stretch; }
+.tr-input input { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.06); color: #fff; font: 13px var(--font); }
+.tr-input button, .tr-actions button, #tour-tuck button { padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; font: 600 12.5px var(--font); cursor: pointer; }
+.tr-actions button.primary, #tour-tuck button.primary { background: #fff; color: #0B1020; border-color: transparent; }
+.tr-actions button:disabled { opacity: .4; cursor: default; }
+.tr-status { min-height: 18px; margin-top: 8px; font-size: 12.5px; color: var(--tx-2); text-align: center; }
+.tr-status:empty { display: none; }
+.tr-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.tr-actions:empty { display: none; }
+.tr-skip { position: absolute; left: 12px; bottom: 10px; border: 0; background: transparent; color: var(--tx-mut); font: 12px var(--font); cursor: pointer; padding: 4px 6px; }
+.tr-skip.hidden { display: none; }
+#tour-tuck { position: fixed; left: 14px; bottom: 14px; z-index: 6; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; border: 2px solid #fff; box-shadow: 0 0 0 2.8px rgb(13,15,25), 0 10px 26px rgba(0,0,0,.45); color: var(--tx-1); font: 12.5px var(--font); pointer-events: auto; }
+#tour-tuck.hidden { display: none; }
+#tour-tuck button { padding: 3px 10px; font-size: 12px; }
+
+/* ========================== Hands edge glow ========================== */
+/* One cool blue glow round the whole screen edge while Hands has the mouse
+   (renders-0115-2026-11-02, O3 direction A). Four edge strips, each painted
+   once; the renderer sets their opacity a few times a second (a full screen
+   layer on a CSS animation cost 19 percent of a core). No transition: when
+   Hands stops, they are simply gone. */
+#hands-glow { position: fixed; inset: 0; z-index: 0; display: none; pointer-events: none; contain: strict; }
+body.hands-driving #hands-glow { display: block; }
+#hands-glow i { position: absolute; display: block; opacity: 0; will-change: opacity; }
+#hands-glow .top    { left: 0; right: 0; top: 0;    height: 130px; background: linear-gradient(to bottom, rgba(104,150,255,.58), rgba(104,150,255,.22) 30%, rgba(104,150,255,0)); }
+#hands-glow .bottom { left: 0; right: 0; bottom: 0; height: 130px; background: linear-gradient(to top,    rgba(104,150,255,.58), rgba(104,150,255,.22) 30%, rgba(104,150,255,0)); }
+#hands-glow .left   { top: 0; bottom: 0; left: 0;   width: 130px;  background: linear-gradient(to right,  rgba(104,150,255,.58), rgba(104,150,255,.22) 30%, rgba(104,150,255,0)); }
+#hands-glow .right  { top: 0; bottom: 0; right: 0;  width: 130px;  background: linear-gradient(to left,   rgba(104,150,255,.58), rgba(104,150,255,.22) 30%, rgba(104,150,255,0)); }
+
+/* ============================ Island mode ============================ */
+/* The Knot's home at the top centre (design/island-2026-10-19/DESIGN.md,
+   words and timing from renders-0115-2026-11-02, O2 direction B). A black
+   pill, 8 px down, fully rounded, centred; the state word at the left with
+   one small accent per state, the Knot at the right end. Its width is set
+   by the renderer (it rides an explicit width while it opens and closes),
+   so nothing here sizes it. It never takes the mouse. */
+#island {
+  position: fixed; top: 8px; left: 50%; translate: -50% 0; z-index: 1; display: none;
+  align-items: flex-start; box-sizing: border-box; overflow: hidden;
+  min-height: 40px; max-width: 560px; padding: 0 4px;
+  background: #000; color: #eceef5; border-radius: 20px;
+  box-shadow: 0 8px 26px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,255,255,.07);
+  font-family: var(--font); pointer-events: none;
+  transition: box-shadow 180ms ease;
+}
+body.island #island { display: flex; }
+#island .isl-slot { flex: 0 0 40px; height: 40px; }
+#island .isl-text { display: none; flex-direction: column; justify-content: center; min-height: 40px; padding: 0 6px 0 14px; min-width: 0; opacity: 0; transition: opacity 70ms ease-out; }
+#island.has-text .isl-text { display: flex; opacity: 1; }
+#island.has-line .isl-text { padding-top: 7px; padding-bottom: 9px; }
+#island .isl-row { display: flex; align-items: center; gap: 8px; }
+#island .isl-dot { display: none; flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--isl-acc, 245,245,247)); }
+#island[data-state]:not([data-state='idle']) .isl-dot { display: block; }
+#island .isl-word { font-size: 12px; font-weight: 600; letter-spacing: .01em; line-height: 16px; color: #eceef5; white-space: nowrap; }
+#island .isl-word:empty { display: none; }
+#island .isl-line { font-size: 13px; line-height: 1.38; color: #c9ccd8; max-width: 440px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+#island .isl-line:empty { display: none; }
+/* Esc to stop, only while Hands has the mouse. */
+#island .isl-esc { display: none; align-items: center; gap: 6px; align-self: center; padding: 0 10px 0 2px; font-size: 12px; color: #9aa0b4; white-space: nowrap; }
+#island.hands-live .isl-esc { display: flex; }
+#island .isl-esc kbd { font: 600 11px/1 var(--font); color: #eceef5; border: 1px solid rgba(255,255,255,.35); border-radius: 5px; padding: 3px 6px; }
+/* One accent per state: the dot and a 1 px ring. The numbers are character.island.accents in knot-spec.js; a test keeps them equal. */
+#island[data-state='listening'] { --isl-acc: 197,138,255; box-shadow: 0 8px 26px rgba(0,0,0,.42), 0 0 0 1px rgba(var(--isl-acc),.55), 0 0 18px rgba(var(--isl-acc),.25); }
+#island[data-state='thinking'] { --isl-acc: 255,199,106; box-shadow: 0 8px 26px rgba(0,0,0,.42), 0 0 0 1px rgba(var(--isl-acc),.5), 0 0 18px rgba(var(--isl-acc),.22); }
+#island[data-state='hands'] { --isl-acc: 255,199,106; box-shadow: 0 8px 26px rgba(0,0,0,.42), 0 0 0 1px rgba(var(--isl-acc),.6), 0 0 20px rgba(var(--isl-acc),.28); }
+#island[data-state='reading'] { --isl-acc: 89,185,255; box-shadow: 0 8px 26px rgba(0,0,0,.42), 0 0 0 1px rgba(var(--isl-acc),.5), 0 0 18px rgba(var(--isl-acc),.22); }
+#island[data-state='speaking'] { --isl-acc: 89,185,255; box-shadow: 0 8px 26px rgba(0,0,0,.42), 0 0 0 1px rgba(var(--isl-acc),.5), 0 0 18px rgba(var(--isl-acc),.22); }
+/* Docked: no status capsule on hover, no skating chrome. */
+body.island #knot-bloom { display: none !important; }
+body.island #knot-hint { display: none !important; }
+
+/* The task list: the pill, unfolded (renders-0115, O6). It takes the mouse where the closed pill never does. */
+#island.unfolded { flex-wrap: wrap; align-content: flex-start; border-radius: 22px; padding: 0 4px 4px; }
+#island.unfolded .isl-text { flex: 1 1 0; }
+#island.unfolded .isl-slot { margin-left: auto; }
+#knot-panel .tp, #island .tp { flex: 0 0 100%; box-sizing: border-box; padding: 0 10px 6px; pointer-events: auto; max-height: calc(100vh - 40px); overflow-y: auto; scrollbar-width: none; }
+#knot-panel .tp[hidden], #island .tp[hidden] { display: none; }
+/* With no state word, the greeting shares the Knot's row. */
+#island.unfolded:not(.has-text) .tp { margin-top: -28px; }
+#knot-panel .tp-top, #island .tp-top { padding: 0 44px 8px 2px; }
+#knot-panel .tp-detail > .tp-head-row, #island .tp-detail > .tp-head-row { padding-right: 40px; }
+#knot-panel .tp-greeting, #island .tp-greeting { font-size: 17px; font-weight: 600; line-height: 22px; color: #fff; }
+#knot-panel .tp-count, #island .tp-count { font-size: 13px; line-height: 18px; color: #c9ccd8; }
+#knot-panel .tp-cards, #island .tp-cards { display: flex; flex-direction: column; gap: 10px; }
+#knot-panel .tp-card, #island .tp-card { box-sizing: border-box; padding: 11px 12px 10px; border: 1px solid rgba(255,255,255,.2); border-radius: 13px; cursor: default; }
+#knot-panel .tp-card:hover, #island .tp-card:hover { border-color: rgba(255,255,255,.34); }
+/* Needs you wears the Knot's line: white, with the same dark ring round it. */
+#knot-panel .tp-card.needs, #island .tp-card.needs { margin: 3px; padding: 11px 12px 12px; border: 2px solid #fff; border-radius: 15px; box-shadow: 0 0 0 2.8px rgb(13,15,25); }
+#knot-panel .tp-head-row, #island .tp-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#knot-panel .tp-title, #knot-panel .tp-detail-title, #island .tp-title, #island .tp-detail-title { min-width: 0; font-size: 13.5px; font-weight: 600; line-height: 20px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#knot-panel .tp-chip, #island .tp-chip { flex: none; padding: 2px 8px; border: 1px solid rgba(255,255,255,.3); border-radius: 10px; font-size: 11.5px; font-weight: 600; line-height: 15px; color: #eceef5; white-space: nowrap; }
+#knot-panel .tp-card.needs .tp-chip, #island .tp-card.needs .tp-chip { background: #fff; border-color: #fff; color: #000; }
+#knot-panel .tp-line, #island .tp-line { margin-top: 3px; font-size: 13px; line-height: 18px; color: #d7d9e3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+#knot-panel .tp-bar, #island .tp-bar { height: 3px; margin-top: 9px; border-radius: 2px; background: rgba(255,255,255,.18); overflow: hidden; }
+#knot-panel .tp-bar i, #island .tp-bar i { display: block; height: 100%; border-radius: 2px; background: #fff; }
+#knot-panel .tp-actions, #island .tp-actions { display: flex; gap: 6px; margin-top: 9px; }
+#knot-panel .tp-btn, #island .tp-btn { padding: 4px 11px; border: 1px solid rgba(255,255,255,.3); border-radius: 7px; background: transparent; font: 600 12px/17px var(--font); color: #fff; cursor: pointer; }
+#knot-panel .tp-btn.primary, #island .tp-btn.primary { background: #fff; border-color: #fff; color: #000; }
+#knot-panel .tp-foot, #island .tp-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 2px 2px; font-size: 13px; line-height: 18px; color: #c9ccd8; }
+#knot-panel .tp-more, #island .tp-more { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+#knot-panel .tp-sub, #island .tp-sub { margin-top: 12px; font-size: 12px; font-weight: 600; line-height: 16px; color: #9aa0b4; }
+#knot-panel .tp-left, #island .tp-left { margin: 4px 0 0; padding: 0 0 0 16px; font-size: 13px; line-height: 19px; color: #d7d9e3; }
+#knot-panel .tp-follow, #island .tp-follow { box-sizing: border-box; width: 100%; margin-top: 12px; padding: 7px 11px; border: 1px solid rgba(255,255,255,.26); border-radius: 10px; background: transparent; font: 13px/18px var(--font); color: #fff; outline: none; }
+#knot-panel .tp-follow:focus, #island .tp-follow:focus { border-color: rgba(255,255,255,.6); }
+#knot-panel .tp-follow::placeholder, #island .tp-follow::placeholder { color: #9aa0b4; }

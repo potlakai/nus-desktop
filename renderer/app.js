@@ -1,11 +1,17 @@
 const isPreview = !window.nus;
 const previewApi = isPreview ? createPreviewApi() : null;
 if (previewApi) Object.assign(previewApi, {
-  licenseStatus: async () => ({ plan: 'free', isPro: false, source: 'preview', usage: { syllabusImports: { used: 1, limit: 3 }, questions: { used: 2, limit: 10 }, companionMs: { used: 180000, limit: 1200000 } } }),
+  licenseStatus: async () => ({ plan: 'personal', isPro: true, source: 'preview', usage: {} }),
   licenseRefresh: async () => previewApi.licenseStatus(),
   licenseCheckout: async () => ({ error: 'checkout_unavailable' }),
   licensePortal: async () => ({ error: 'portal_unavailable' }),
   licenseTrack: async () => true,
+  // The preview has no main process, so the theme lives in localStorage alone.
+  // It still works, which is the point: the switch is not decoration.
+  themeGet: async () => { const theme = window.JarvisTheme ? JarvisTheme.choose({}) : 'jarvis'; return { theme, name: theme === 'nus' ? 'Nūs' : 'J.A.R.V.I.S' }; },
+  themeSet: async (t) => ({ theme: window.JarvisTheme ? JarvisTheme.apply(t) : t }),
+  themeToggle: async () => ({ theme: window.JarvisTheme ? JarvisTheme.apply(JarvisTheme.other(JarvisTheme.choose({}))) : 'jarvis' }),
+  onTheme: () => {},
   statsStatus: async () => ({ enabled: true, active: true, envDisabled: false, installId: 'preview', askSource: true }),
   statsSetEnabled: async (enabled) => ({ enabled: Boolean(enabled), active: Boolean(enabled), envDisabled: false, installId: 'preview', askSource: false }),
   statsSourceAnswer: async () => ({ ok: true, sent: true }),
@@ -68,7 +74,7 @@ function renderSaveState(state) {
   const banner = $('#save-banner');
   if (!banner) return;
   if (!state || state.ok) { banner.hidden = true; return; }
-  $('#save-banner-text').textContent = state.message || 'Nūs is not able to save to disk right now.';
+  $('#save-banner-text').textContent = state.message || 'J.A.R.V.I.S is not able to save to disk right now.';
   banner.hidden = false;
 }
 
@@ -202,17 +208,17 @@ function renderToday() {
   const overdue = ranked.filter((item) => item.days_left < 0);
   $('#brief-copy').textContent = next
     ? `${urgent.length ? `${urgent.length} item${urgent.length === 1 ? ' needs' : 's need'} attention.` : 'Your near-term load is calm.'} ${next.title} is the clearest next move.`
-    : 'Your semester is quiet. Import one real syllabus or add one commitment and Nūs will shape the day around it.';
+    : 'Your semester is quiet. Import one real syllabus or add one commitment and J.A.R.V.I.S will shape the day around it.';
   $('#today-list').innerHTML = ranked.length ? ranked.slice(0,3).map((item) => `<div class="move-row"><button class="check-button" data-move="${item.id}" title="Mark done">✓</button><div><strong>${esc(item.title)}</strong><small>${esc(item.course_name || 'General')} · ${esc(relativeDue(item.due_date))}</small></div><span class="due-chip">${esc(shortDate(item.due_date))}</span></div>`).join('') : '<div class="empty-state"><strong>Nothing ranked yet.</strong>Import a syllabus or add a task and your next three moves appear here.</div>';
   renderHero();
   renderActivity();
   renderInbox();
   const overall = gpa.overall;
   $('#gpa-pulse').innerHTML = `<div class="section-kicker">Semester pulse</div><div class="metric-row"><div class="metric-big">${overall == null ? '—' : overall.toFixed(2)}</div><div class="metric-caption">${overall == null ? 'Add grading weights to project your GPA.' : 'Projected GPA from known and assumed work.'}</div></div><div class="projection-track"><i style="width:${overall == null ? 0 : Math.min(100,overall/4*100)}%"></i></div>`;
-  $('#risk-pulse').innerHTML = `<div class="section-kicker">Risk watch</div>${overdue.length ? overdue.slice(0,2).map((item) => `<div class="risk-item"><i></i><div><strong>${esc(item.title)}</strong><small>${esc(item.course_name)}</small></div><span>${Math.abs(item.days_left)}d late</span></div>`).join('') : '<p class="calm-note">Nothing is overdue. Nūs will surface pressure here before it becomes a surprise.</p>'}`;
+  $('#risk-pulse').innerHTML = `<div class="section-kicker">Risk watch</div>${overdue.length ? overdue.slice(0,2).map((item) => `<div class="risk-item"><i></i><div><strong>${esc(item.title)}</strong><small>${esc(item.course_name)}</small></div><span>${Math.abs(item.days_left)}d late</span></div>`).join('') : '<p class="calm-note">Nothing is overdue. J.A.R.V.I.S will surface pressure here before it becomes a surprise.</p>'}`;
   const openTasks = state.data.tasks.filter((task) => !task.done).length;
   const activeRules = state.data.automations.filter((item) => item.enabled).length;
-  $('#system-pulse').innerHTML = `<div class="section-kicker">This semester in Nūs</div>
+  $('#system-pulse').innerHTML = `<div class="section-kicker">This semester in J.A.R.V.I.S</div>
     <div class="routine-row"><span class="routine-icon">▤</span><div><strong>${state.data.courses.length} course${state.data.courses.length===1?'':'s'}</strong><small>${state.data.sources.length} imported source${state.data.sources.length===1?'':'s'}</small></div><span class="routine-state">${state.data.courses.length ? 'tracked' : 'empty'}</span></div>
     <div class="routine-row"><span class="routine-icon">✓</span><div><strong>${openTasks} open task${openTasks===1?'':'s'}</strong><small>${state.data.assignments.filter((item)=>item.status==='pending').length} pending deadline${state.data.assignments.filter((item)=>item.status==='pending').length===1?'':'s'}</small></div><span class="routine-state">${openTasks ? 'live' : 'clear'}</span></div>
     <div class="routine-row"><span class="routine-icon">↻</span><div><strong>${activeRules} automation${activeRules===1?'':'s'}</strong><small>Local rules you approved</small></div><span class="routine-state">${activeRules ? 'active' : 'none'}</span></div>`;
@@ -280,7 +286,7 @@ function renderTasks() {
   $('#task-list').innerHTML = tasks.length ? tasks.map((task)=>{
     const doneSteps=task.steps.filter((step)=>step.done).length;
     return `<article class="task-card${task.done?' done':''}" data-task="${task.id}"><div class="task-head"><button class="check-button" data-task-done="${task.id}">✓</button><div><strong>${esc(task.title)}</strong><div class="task-meta">${esc(task.course_name)} · ${task.due_date?esc(relativeDue(task.due_date)):'No due date'} · ${task.estimated_minutes || 30} min</div></div><span class="task-progress">${doneSteps}/${task.steps.length}</span></div><div class="task-steps">${task.steps.map((step)=>`<div class="step-row${step.done?' done':''}"><button data-step="${step.id}">✓</button><div>${esc(step.title)}</div><span>${step.estimated_minutes}m</span></div>`).join('')}</div></article>`;
-  }).join('') : '<div class="empty-state"><strong>No tasks yet.</strong>Give Nūs an outcome and it will suggest a small path you control.</div>';
+  }).join('') : '<div class="empty-state"><strong>No tasks yet.</strong>Give J.A.R.V.I.S an outcome and it will suggest a small path you control.</div>';
   $$('[data-task-done]').forEach((button)=>button.addEventListener('click',async()=>{await api.updateTask(Number(button.dataset.taskDone),{done:button.closest('.task-card').classList.contains('done')?0:1});await load();}));
   $$('[data-step]').forEach((button)=>button.addEventListener('click',async()=>{const row=button.closest('.step-row');await api.updateTaskStep(Number(button.dataset.step),{done:row.classList.contains('done')?0:1});await load();}));
 }
@@ -294,7 +300,7 @@ function renderTodo(){
     const days=dayDistance(task.due_date);
     const chip=task.due_date?`<span class="todo-chip${days!==null&&days<=2?' hot':''}">${esc(relativeDue(task.due_date))}</span>`:'';
     return`<div class="todo-row"><button class="todo-check" data-task-done="${task.id}" aria-label="Mark done"></button><div class="todo-body"><strong>${esc(task.title)}</strong><span>${esc(task.course_name||'')}</span></div>${chip}</div>`;
-  }).join(''):'<div class="empty-state"><strong>Nothing queued.</strong>Add a smart task or ask Nūs what to start.</div>';
+  }).join(''):'<div class="empty-state"><strong>Nothing queued.</strong>Add a smart task or ask J.A.R.V.I.S what to start.</div>';
   host.querySelectorAll('[data-task-done]').forEach((button)=>button.addEventListener('click',async()=>{await api.updateTask(Number(button.dataset.taskDone),{done:1});await load();showToast('Done. Nice.');}));
   $('#todo-open').onclick=()=>setView('tasks');
 }
@@ -316,7 +322,7 @@ function renderConnections(){
 }
 
 async function createTaskFrom(titleEl,dueEl,minutesEl) {
-  const title=titleEl.value.trim(); if(!title){showToast('Give Nūs a concrete outcome first.');return false;}
+  const title=titleEl.value.trim(); if(!title){showToast('Give J.A.R.V.I.S a concrete outcome first.');return false;}
   await api.addTask({title,due_date:dueEl.value||null,estimated_minutes:Number(minutesEl.value)||60,breakdown:true});
   titleEl.value=''; await load(); showToast('Task created with a reviewable five-step path.'); return true;
 }
@@ -410,7 +416,7 @@ function renderKbDetail() {
       const course = courses.find((item) => item.id === source.course_id);
       target.innerHTML = `<div class="kb-detail-head"><div class="section-kicker">Imported source</div><h2>${esc(sourceLabel(source))}</h2><p>${esc(source.source_type)} · ${course ? `filed under ${esc(course.name)}` : 'unfiled'}</p></div>
         <div class="kb-detail-body"><article class="source-row"><div class="source-glyph">${sourceGlyph(source)}</div><div class="source-name"><strong>${esc(source.file_path || sourceLabel(source))}</strong><small>Stored on this device</small></div><div class="source-meta">Imported locally</div><div class="confidence">Source file</div></article>${source.content_bytes > 0 && !source.course_id ? `<button class="primary-button" data-extract-source="${source.id}" style="margin-top:12px">Read with AI: extract courses &amp; deadlines</button>` : ''}</div>
-        <p class="kb-provenance">Nothing here left your machine. Delete the source and everything Nūs read from it goes with it.</p>`;
+        <p class="kb-provenance">Nothing here left your machine. Delete the source and everything J.A.R.V.I.S read from it goes with it.</p>`;
       return;
     }
   }
@@ -419,13 +425,13 @@ function renderKbDetail() {
     if (item) {
       const course = courses.find((row) => row.id === item.course_id);
       target.innerHTML = `<div class="kb-detail-head"><div class="section-kicker">Confirmed deadline</div><h2>${esc(item.title)}</h2><p>${esc(course?.name || 'No course')} · ${esc(item.category || 'Uncategorised')} · ${esc(item.due_date ? relativeDue(item.due_date) : 'No due date')}</p></div>
-        <p class="kb-provenance">You confirmed this in the review table. Nūs does not move a date on its own.</p>`;
+        <p class="kb-provenance">You confirmed this in the review table. J.A.R.V.I.S does not move a date on its own.</p>`;
       return;
     }
   }
   const total = state.data.sources.length + state.data.courses.length;
-  target.innerHTML = `<div class="kb-detail-head"><div class="section-kicker">Transparent by design</div><h2>Everything Nūs knows has a source.</h2><p>Course records and personal context stay separate, local, inspectable, and removable.</p></div>
-    <div class="kb-detail-body">${total ? '<div class="empty-state">Pick anything on the left to see where it came from.</div>' : '<div class="empty-state"><strong>Nūs only knows what you add.</strong>Import a syllabus, calendar, or personal export to begin.</div>'}</div>`;
+  target.innerHTML = `<div class="kb-detail-head"><div class="section-kicker">Transparent by design</div><h2>Everything J.A.R.V.I.S knows has a source.</h2><p>Course records and personal context stay separate, local, inspectable, and removable.</p></div>
+    <div class="kb-detail-body">${total ? '<div class="empty-state">Pick anything on the left to see where it came from.</div>' : '<div class="empty-state"><strong>J.A.R.V.I.S only knows what you add.</strong>Import a syllabus, calendar, or personal export to begin.</div>'}</div>`;
 }
 
 $('#kb-search').addEventListener('input', (event) => { state.kb.query = event.target.value; renderSources(); });
@@ -518,8 +524,8 @@ async function importDefault(){const result=await api.importSource('calendar_fil
 $('#import-primary').addEventListener('click',importSyllabusFlow);
 $('#source-import').addEventListener('click',()=>setView('integrations'));
 
-const AI_ERRORS={no_ai:'Connect an AI provider first. Taking you to Settings.',empty_text:'No readable text in that file. Scanned PDFs need selectable text.',bad_json:'The AI reply was not readable. Try the import again.',read_failed:'Could not read that file.',storage_limit:'Nūs local storage is full. Remove an import before adding another.',limit_syllabus_imports:'Free includes three AI syllabus imports. Upgrade to Pro for more.',limit_questions:'Free includes ten Ask or chat questions each day. Upgrade to Pro or come back tomorrow.',limit_connected_accounts:'Free includes one connected account. Disconnect the current account or upgrade to Pro.',limit_automation_rules:'Free includes one automation rule. Remove it or upgrade to Pro.',limit_companion_minutes:'Free Companion listening is used for today. Upgrade to Pro or come back tomorrow.',limit_companion_history:'Free includes seven days of Companion history. Upgrade to Pro for full history.',cli_timeout:'Claude Code took too long. Try again.',cli_failed:'Claude Code returned an error.',cli_spend_limit:'Your Claude subscription hit its spend limit. Add an Anthropic API key in Settings, or raise the limit in Claude Code.',cli_not_logged_in:'Claude Code is installed but signed out. Open a terminal, run "claude", then /login, or paste an Anthropic API key in Settings.',cli_spawn_failed:'Claude Code could not start.',api_failed:'The Anthropic API returned an error.',api_refused:'The AI declined this content.',api_timeout:'The API call timed out. Try again.',api_network:'Network problem reaching Anthropic.',unexpected_reply:'The provider answered, but not as expected.',source_missing:'That import is no longer on file.',course_name_required:'The course needs a name.',target_not_found:'I could not find that item. Try its exact name.',incomplete_command:'I need a bit more: which item, and what date?',unknown_intent:'That request did not survive the trip. Try again.'};
-Object.assign(AI_ERRORS, { voice_setup_required:'Complete voice setup in Nūs before recording.', capture_finalizing:'Nūs is saving the last words. Please wait a moment.', companion_busy:'Finish your guide or voice question before recording.' });
+const AI_ERRORS={no_ai:'Connect an AI provider first. Taking you to Settings.',empty_text:'No readable text in that file. Scanned PDFs need selectable text.',bad_json:'The AI reply was not readable. Try the import again.',read_failed:'Could not read that file.',storage_limit:'J.A.R.V.I.S local storage is full. Remove an import before adding another.',cli_timeout:'Claude Code took too long. Try again.',cli_failed:'Claude Code returned an error.',cli_spend_limit:'Your Claude subscription hit its spend limit. Add an Anthropic API key in Settings, or raise the limit in Claude Code.',cli_not_logged_in:'Claude Code is installed but signed out. Open a terminal, run "claude", then /login, or paste an Anthropic API key in Settings.',cli_spawn_failed:'Claude Code could not start.',api_failed:'The Anthropic API returned an error.',api_refused:'The AI declined this content.',api_timeout:'The API call timed out. Try again.',api_network:'Network problem reaching Anthropic.',unexpected_reply:'The provider answered, but not as expected.',source_missing:'That import is no longer on file.',course_name_required:'The course needs a name.',target_not_found:'I could not find that item. Try its exact name.',incomplete_command:'I need a bit more: which item, and what date?',unknown_intent:'That request did not survive the trip. Try again.'};
+Object.assign(AI_ERRORS, { voice_setup_required:'Complete voice setup in J.A.R.V.I.S before recording.', capture_finalizing:'J.A.R.V.I.S is saving the last words. Please wait a moment.', companion_busy:'Finish your guide or voice question before recording.' });
 function aiError(code,detail){const base=AI_ERRORS[code]||`Request failed (${code}).`;return detail?`${base} (${String(detail).slice(0,120)})`:base;}
 
 // Multi-file import: the picker allows several syllabi at once. The first is
@@ -544,7 +550,7 @@ function nextQueuedImport(){
 const reviewScrim=$('#syllabus-scrim');
 function openReview(data,fileName,sourceId){
   state.review={sourceId,course:{...data.course},weights:data.grade_weights.map((row)=>({...row})),assignments:data.assignments.map((row)=>({...row}))};
-  $('#review-heading').textContent=`Check what Nūs read from ${fileName}`;
+  $('#review-heading').textContent=`Check what J.A.R.V.I.S read from ${fileName}`;
   $('#rev-course-name').value=state.review.course.name||'';
   $('#rev-course-code').value=state.review.course.code||'';
   $('#rev-course-hours').value=state.review.course.credit_hours??'';
@@ -661,7 +667,7 @@ $('#ai-key-clear').addEventListener('click',async()=>{
 
 function renderAutomations() {
   const signals=state.data.repeated_signals;
-  $('#automation-suggestions').innerHTML=signals.length?signals.map((signal)=>`<div class="suggestion-card"><div><strong>${esc(signal.example_title)} keeps appearing.</strong><span>${signal.occurrences} similar tasks found. Turn the pattern into a weekly local rule?</span></div><button class="quiet-button" data-suggest="${esc(signal.example_title)}">Review rule</button></div>`).join(''):'<div class="empty-state">Nūs will suggest a rule after it sees the same kind of task twice. It never creates one silently.</div>';
+  $('#automation-suggestions').innerHTML=signals.length?signals.map((signal)=>`<div class="suggestion-card"><div><strong>${esc(signal.example_title)} keeps appearing.</strong><span>${signal.occurrences} similar tasks found. Turn the pattern into a weekly local rule?</span></div><button class="quiet-button" data-suggest="${esc(signal.example_title)}">Review rule</button></div>`).join(''):'<div class="empty-state">J.A.R.V.I.S will suggest a rule after it sees the same kind of task twice. It never creates one silently.</div>';
   $$('[data-suggest]').forEach((button)=>button.addEventListener('click',()=>{$('#automation-title').value=button.dataset.suggest;$('#automation-scrim').classList.remove('hidden');}));
   $('#automation-list').innerHTML=state.data.automations.length?state.data.automations.map((item)=>`<article class="automation-row"><div class="automation-glyph">↻</div><div><strong>${esc(item.name)}</strong><small>${esc(item.trigger_type)} → create local task</small></div><div class="automation-stat">${item.run_count} run${item.run_count===1?'':'s'}</div><button class="toggle-button${item.enabled?' on':''}" data-automation-toggle="${item.id}">${item.enabled?'Active':'Paused'}</button></article>`).join(''):'<div class="empty-state"><strong>No automation rules yet.</strong>Start with one recurring study task, not a general workflow maze.</div>';
   $$('[data-automation-toggle]').forEach((button)=>button.addEventListener('click',async()=>{await api.updateAutomation(Number(button.dataset.automationToggle),{enabled:button.classList.contains('on')?0:1});await load();}));
@@ -669,7 +675,69 @@ function renderAutomations() {
 const automationScrim=$('#automation-scrim');
 $('#new-automation').addEventListener('click',()=>automationScrim.classList.remove('hidden'));
 $('#automation-close').addEventListener('click',()=>automationScrim.classList.add('hidden'));
-$('#automation-save').addEventListener('click',async()=>{const title=$('#automation-title').value.trim();if(!title)return showToast('Name the recurring task.');const trigger=$('#automation-trigger').value;const next=new Date();next.setDate(next.getDate()+(trigger==='daily'?1:7));const result=await api.addAutomation({name:title,trigger_type:trigger,trigger:{timezone:Intl.DateTimeFormat().resolvedOptions().timeZone},action_type:'create_task',action:{title,estimated_minutes:Number($('#automation-minutes').value)||45},next_run_at:next.toISOString()});if(result?.error)return reportAiError(result);automationScrim.classList.add('hidden');await load();showToast('Local automation approved.');});
+// A rule is either a local task or a scheduled ask. The fields that do not apply
+// are hidden rather than shown and ignored, so what is saved is what was seen.
+function automationKind(){
+  const kind=$('#automation-kind').value;
+  const cron=kind==='ask_ai'&&$('#automation-trigger').value==='cron';
+  $('#automation-cron-row').classList.toggle('hidden',!cron);
+  $('#automation-ask-row').classList.toggle('hidden',kind!=='ask_ai');
+  $('#automation-minutes').closest('.field').classList.toggle('hidden',kind==='ask_ai');
+  $('#automation-cron-note').textContent=cron?'Five fields: minute hour day month weekday. 0 9 * * 1-5 is every weekday at nine.':'';
+  return {kind,cron};
+}
+$('#automation-kind').addEventListener('change',automationKind);
+$('#automation-trigger').addEventListener('change',automationKind);
+$('#automation-cron').addEventListener('input',()=>{
+  const expr=$('#automation-cron').value.trim();
+  if(!expr){$('#automation-cron-note').textContent='';return;}
+  try{const c=cronPreview(expr);$('#automation-cron-note').textContent=c;$('#automation-cron-note').classList.remove('error');}
+  catch(e){$('#automation-cron-note').textContent='Five fields: minute hour day month weekday. 0 9 * * 1-5 is every weekday at nine.';$('#automation-cron-note').classList.add('error');}
+});
+// The parser lives in src/cron.js, which the renderer cannot require. A tiny
+// check here is enough to catch a typo before saving; the main process runs the
+// real parser and refuses anything it does not like.
+function cronPreview(expr){
+  const parts=String(expr||'').trim().split(/\s+/);
+  if(parts.length!==5) throw new Error('five fields');
+  const bounds=[[0,59,'minute'],[0,23,'hour'],[1,31,'day'],[1,12,'month'],[0,7,'weekday']];
+  parts.forEach((p,idx)=>{
+    const [lo,hi,label]=bounds[idx];
+    String(p).split(',').forEach(one=>{
+      const [range,step]=one.split('/');
+      if(step!==undefined&&(!/^\d+$/.test(step)||Number(step)<1))throw new Error('bad step');
+      const bad=v=>!/^\d+$/.test(v)||Number(v)<lo||Number(v)>hi;
+      if(range!=='*'){for(const v of range.split('-'))if(bad(v))throw new Error('bad '+label);}
+    });
+  });
+  const [m,h]=parts;
+  return 'Runs at '+(!/^\d+$/.test(m)||!/^\d+$/.test(h)?'the minutes you named':String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'))+'. Checked again when saved.';
+}
+$('#automation-save').addEventListener('click',async()=>{
+  const title=$('#automation-title').value.trim();
+  if(!title)return showToast('Name the recurring task.');
+  const kind=$('#automation-kind').value;
+  const trigger=$('#automation-trigger').value;
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if(kind==='ask_ai'){
+    const ask=$('#automation-ask').value.trim();
+    if(!ask)return showToast('Say what to ask J.A.R.V.I.S.');
+    const action={ask};
+    if(trigger==='cron'){
+      action.cron=$('#automation-cron').value.trim();
+      try{cronPreview(action.cron);}catch{return showToast('That schedule does not read: five fields, like 0 9 * * 1-5.');}
+    }
+    const result=await api.addAutomation({name:title,trigger_type:trigger,trigger:{timezone:tz},action_type:'ask_ai',action,next_run_at:null});
+    if(result?.error==='bad_schedule')return showToast(result.message||'That schedule does not read.');
+    if(result?.error)return reportAiError(result);
+    automationScrim.classList.add('hidden');await load();showToast('Scheduled.');
+    return;
+  }
+  const next=new Date();next.setDate(next.getDate()+(trigger==='daily'?1:7));
+  const result=await api.addAutomation({name:title,trigger_type:trigger,trigger:{timezone:tz},action_type:'create_task',action:{title,estimated_minutes:Number($('#automation-minutes').value)||45},next_run_at:next.toISOString()});
+  if(result?.error)return reportAiError(result);
+  automationScrim.classList.add('hidden');await load();showToast('Local automation approved.');
+});
 
 function courseStatus(course){
   const pending=state.data.assignments.filter((item)=>item.course_id===course.id&&item.status==='pending');
@@ -683,7 +751,7 @@ function renderBrain() {
   const stage=$('#brain-stage'); if(!stage)return;
   let shouldFitViewport=false;
   const nodes=[]; const edges=[];
-  nodes.push({id:'nus',type:'core',label:'Nūs',meta:'Semester intelligence',status:state.data.courses.length?'live':'empty',tone:'ok'});
+  nodes.push({id:'nus',type:'core',label:'J.A.R.V.I.S',meta:'Semester intelligence',status:state.data.courses.length?'live':'empty',tone:'ok'});
   state.data.courses.forEach((course,index)=>{const[status,tone]=courseStatus(course);nodes.push({id:`c${course.id}`,type:'course',label:course.name,meta:course.code||'Course',status,tone});edges.push(['nus',`c${course.id}`]);});
   state.data.sources.slice(0,8).forEach((source,index)=>{const id=`s${source.id}`;nodes.push({id,type:'source',label:source.title||'Imported source',meta:source.source_type,status:'imported',tone:'ok'});const courseId=source.course_id?`c${source.course_id}`:'nus';edges.push([courseId,id]);});
   state.data.tasks.filter((task)=>!task.done).slice(0,12).forEach((task,index)=>{const id=`t${task.id}`;const days=dayDistance(task.due_date);nodes.push({id,type:'task',label:task.title,meta:task.due_date?relativeDue(task.due_date):'Open task',status:days!==null&&days<=2?'due soon':'open',tone:days!==null&&days<=2?'risk':'ok'});const course=state.data.courses.find((item)=>item.name===task.course_name);edges.push([course?`c${course.id}`:'nus',id]);});
@@ -898,7 +966,7 @@ $('#brain-fit').addEventListener('click',()=>fitBrainViewport());
 async function renderSettings(){
   const status=await api.bridgeStatus();
   $('#bridge-title').textContent=status.connected?'Companion context is linked':'Companion context is offline';
-  $('#bridge-copy').textContent=status.connected?`Shared snapshot refreshed ${new Date(status.updated_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}. The Companion never opens the database.`:'Open Nūs once to refresh the shared snapshot.';
+  $('#bridge-copy').textContent=status.connected?`Shared snapshot refreshed ${new Date(status.updated_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}. The Companion never opens the database.`:'Open J.A.R.V.I.S once to refresh the shared snapshot.';
   $('#bridge-badge').textContent=status.connected?'Linked':'Offline';
   $('#bridge-badge').classList.toggle('good',status.connected);
   renderAuthState();
@@ -909,27 +977,66 @@ async function renderSettings(){
   renderStorage();
 }
 
-// The Companion's provider key, managed from the desktop so the overlay is
-// usable without hunting for its gear icon.
+// The Companion's provider, managed from the desktop so the overlay is usable
+// without hunting for its gear icon. Personal build: nine providers, two of
+// which (Ollama, a custom endpoint) can answer with no key at all.
+const COMPANION_PROVIDER_LABELS = {
+  gemini: ['Gemini', 'AIza…'], openai: ['OpenAI', 'sk-…'], anthropic: ['Anthropic', 'sk-ant-…'],
+  nvidia: ['Nvidia', 'nvapi-…'], ollama: ['Ollama (no key needed)', 'not used'],
+  groq: ['Groq', 'gsk_…'], openrouter: ['OpenRouter', 'sk-or-…'],
+  opencode: ['opencode go', 'your opencode key'], custom: ['Custom key (optional)', 'optional'],
+};
+// Providers whose model may not take an image. The overlay's screen features
+// attach a screenshot, so say so before the operator relies on them.
+const NO_VISION_PROVIDERS = new Set(['opencode', 'custom']);
+function syncCompanionProviderFields(){
+  const provider=$('#companion-ai-provider')?.value||'gemini';
+  const [label,placeholder]=COMPANION_PROVIDER_LABELS[provider]||COMPANION_PROVIDER_LABELS.gemini;
+  const labelEl=$('#companion-ai-key-label'); if(labelEl)labelEl.textContent=label+' key';
+  const input=$('#companion-ai-key'); if(input)input.placeholder=placeholder;
+  // Ollama needs no key, so hide the field rather than inviting one.
+  const keyField=input?.closest('.field'); if(keyField)keyField.classList.toggle('hidden',provider==='ollama');
+  $('#companion-ai-base-field')?.classList.toggle('hidden',provider!=='custom');
+  $('#companion-ai-vision')?.classList.toggle('hidden',!NO_VISION_PROVIDERS.has(provider));
+}
 async function renderCompanionAiState(){
   const badge=$('#companion-ai-badge'); if(!badge)return;
   const status=await api.companionAiStatus?.().catch(()=>null);
-  const has=Boolean(status?.keys?.gemini||status?.keys?.openai);
-  badge.textContent=has?'Key saved':'Desktop fallback';
+  const provider=status?.provider||'gemini';
+  const select=$('#companion-ai-provider');
+  if(select&&!select.dataset.userPicked)select.value=provider;
+  const keyless=provider==='ollama'||provider==='custom';
+  const has=keyless||Boolean(status?.keys?.[provider]);
+  badge.textContent=has?'Configured':'No key yet';
   badge.classList.toggle('good',has);
-  $('#companion-ai-title').textContent=has?'Companion provider configured':'Screen guidance can use desktop Claude';
-  $('#companion-ai-clear')?.classList.toggle('hidden',!status?.keys?.gemini);
+  $('#companion-ai-title').textContent=has
+    ? `Companion answers through ${(COMPANION_PROVIDER_LABELS[provider]||['this provider'])[0]}`
+    : 'Screen guidance can use desktop Claude';
+  if(status?.model)$('#companion-ai-result').textContent=`Model: ${status.model}`;
+  const base=$('#companion-ai-base'); if(base&&status?.customBaseUrl&&!base.value)base.value=status.customBaseUrl;
+  $('#companion-ai-clear')?.classList.toggle('hidden',keyless||!status?.keys?.[provider]);
+  syncCompanionProviderFields();
 }
+$('#companion-ai-provider')?.addEventListener('change',()=>{
+  const select=$('#companion-ai-provider'); select.dataset.userPicked='1';
+  $('#companion-ai-result').textContent='';
+  syncCompanionProviderFields();
+});
 $('#companion-ai-save')?.addEventListener('click',async()=>{
-  const input=$('#companion-ai-key'); const key=(input.value||'').trim();
-  if(!key){$('#companion-ai-result').textContent='Paste a key first.';return;}
-  const result=await api.companionAiSetKey({provider:'gemini',key});
-  input.value='';
+  const provider=$('#companion-ai-provider')?.value||'gemini';
+  const key=($('#companion-ai-key')?.value||'').trim();
+  const baseUrl=($('#companion-ai-base')?.value||'').trim();
+  const keyless=provider==='ollama'||provider==='custom';
+  if(!key&&!keyless){$('#companion-ai-result').textContent='Paste a key first.';return;}
+  if(provider==='custom'&&!baseUrl){$('#companion-ai-result').textContent='A custom endpoint needs a base URL.';return;}
+  const result=await api.companionAiSetKey({provider,key,baseUrl});
+  if($('#companion-ai-key'))$('#companion-ai-key').value='';
   $('#companion-ai-result').textContent=result?.error?'That key was not accepted.':'Saved. The Knot can answer now.';
   renderCompanionAiState();
 });
 $('#companion-ai-clear')?.addEventListener('click',async()=>{
-  await api.companionAiClearKey('gemini');
+  const provider=$('#companion-ai-provider')?.value||'gemini';
+  await api.companionAiClearKey(provider);
   $('#companion-ai-result').textContent='Key removed.';
   renderCompanionAiState();
 });
@@ -960,311 +1067,85 @@ async function renderStorage(){
   else{badge.textContent=formatBytes(used);badge.classList.add('good');}
 }
 
+// Personal build: no account, so this only names the local profile in the rail.
 async function renderAuthState() {
-  const [authConfig, session] = await Promise.all([api.authConfig(), api.authSession()]);
-  const signedIn = Boolean(session && session.user);
-  const email = session?.user?.email || '';
-  $('#auth-form').classList.toggle('hidden', signedIn);
-  $('#auth-signedin').classList.toggle('hidden', !signedIn);
-  if (signedIn) {
-    $('#auth-user-email').textContent = email;
-    $('#auth-title').textContent = 'Signed in';
-    $('#auth-copy').textContent = 'Your semester stays on this device. Supabase holds only your identity and subscription status.';
-    $('#auth-badge').textContent = 'Signed in';
-    $('#auth-badge').classList.add('good');
-    $('#rail-name').textContent = email.split('@')[0];
-    $('#rail-avatar').textContent = email.slice(0, 1).toUpperCase();
-    $('#rail-mode').firstChild.textContent = 'Signed in';
-    $('#rail-signout')?.classList.remove('hidden');
-    $('#settings-name').textContent = email.split('@')[0];
-    $('#settings-email').textContent = email;
-  } else {
-    $('#auth-title').textContent = authConfig.supabase ? 'Sign in to Nūs' : 'Accounts are coming soon';
-    $('#auth-copy').textContent = authConfig.supabase
-      ? 'Google or email. Local mode stays available if you skip sign-in.'
-      : 'Nūs runs fully on this device today. Optional accounts ship in an update. Nothing you add now is lost.';
-    $('#auth-badge').textContent = 'Local';
-    $('#auth-badge').classList.remove('good');
-    $('#rail-name').textContent = 'You';
-    $('#rail-avatar').textContent = 'N';
-    $('#rail-mode').firstChild.textContent = 'Local profile';
-    $('#rail-plan')?.classList.add('hidden');
-    $('#rail-signout')?.classList.add('hidden');
-    $('#settings-name').textContent = 'Local';
-    $('#settings-email').textContent = 'Not signed in';
-    if (!authConfig.supabase) {
-      $('#auth-form').classList.add('hidden');
-    }
-  }
+  const name = $('#rail-name'); if (name) name.textContent = 'You';
+  const avatar = $('#rail-avatar'); if (avatar) avatar.textContent = 'J';
+  const mode = $('#rail-mode'); if (mode && mode.firstChild) mode.firstChild.textContent = 'Local profile';
+  $('#rail-plan')?.classList.add('hidden');
+  $('#rail-signout')?.classList.add('hidden');
+  const sname = $('#settings-name'); if (sname) sname.textContent = 'Local';
+  const smail = $('#settings-email'); if (smail) smail.textContent = 'This machine only';
 }
 
-const CAP_LABELS = {
-  syllabusImports: ['AI syllabus imports', (n) => String(n), 'lifetime'],
-  questions: ['Questions today', (n) => String(n), 'resets at midnight'],
-  companionMs: ['Companion minutes today', (n) => String(Math.floor(n / 60000)), 'resets at midnight'],
-};
 let licenseState = null;
-function usageMeter(key, row) {
-  const [label, fmt, note] = CAP_LABELS[key];
-  const used = Number(row?.used) || 0;
-  const limit = row?.limit;
-  if (!limit) return `<div class="usage-meter unlimited"><span>${label}</span><i style="--p:100%"></i><b>${fmt(used)} · unlimited</b></div>`;
-  const pct = Math.min(100, Math.round((used / limit) * 100));
-  return `<div class="usage-meter${pct >= 100 ? ' full' : pct >= 70 ? ' warm' : ''}" title="${note}"><span>${label}</span><i style="--p:${pct}%"></i><b>${fmt(used)}/${fmt(limit)}</b></div>`;
+// Refresh re-reads the plan from main. It cannot change (there is one plan),
+// so the card is repainted and nothing is announced.
+// ---- the look -------------------------------------------------------------
+// Two themes, one switch. The buttons are a radiogroup so the arrow keys work;
+// the badge is there because a colour change alone should not be the only
+// confirmation that something happened.
+function paintThemeChoice({ theme, name } = {}) {
+  const t = theme === 'nus' ? 'nus' : 'jarvis';
+  for (const el of document.querySelectorAll('[data-theme-value]')) {
+    const on = el.dataset.themeValue === t;
+    el.classList.toggle('on', on);
+    el.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+  const badge = $('#theme-badge');
+  if (badge) badge.textContent = name || (t === 'nus' ? 'Nūs' : 'J.A.R.V.I.S');
 }
+async function chooseTheme(value) {
+  const res = await api.themeSet(value);
+  if (!res || res.error) return;
+  if (window.JarvisTheme) JarvisTheme.apply(res.theme);
+  paintThemeChoice(res);
+}
+for (const el of document.querySelectorAll('[data-theme-value]')) {
+  el.addEventListener('click', () => chooseTheme(el.dataset.themeValue));
+  el.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const other = el.dataset.themeValue === 'nus' ? 'jarvis' : 'nus';
+    $(other === 'nus' ? '#theme-nus' : '#theme-jarvis')?.focus();
+    chooseTheme(other);
+  });
+}
+// Ctrl+Shift+L flips it from anywhere in the window. Registered here rather than
+// as a global shortcut: a look is not worth a system-wide key grab.
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.key.toLowerCase() !== 'l') return;
+  e.preventDefault();
+  api.themeToggle().then((res) => { if (res && !res.error) { if (window.JarvisTheme) JarvisTheme.apply(res.theme); paintThemeChoice(res); } });
+});
+api.themeGet?.().then(paintThemeChoice).catch(() => {});
+api.onTheme?.(paintThemeChoice);
+
+$('#license-refresh')?.addEventListener('click', async () => {
+  renderLicenseState(await api.licenseRefresh());
+});
+
 async function renderLicenseState(nextState) {
   if (!api.licenseStatus) return;
   const plan = nextState || await api.licenseStatus().catch(() => null);
   if (!plan) return;
   licenseState = plan;
-  const pro = Boolean(plan.isPro);
-  const usage = plan.usage || {};
-  $('#license-title').textContent = pro ? 'Nūs Pro' : 'Nūs Free';
-  $('#license-badge').textContent = pro ? 'Pro' : 'Free';
-  $('#license-badge').classList.toggle('good', pro);
-  $('#license-upgrade').classList.toggle('hidden', pro);
-  $('#license-portal').classList.toggle('hidden', !pro);
-  $('#rail-plan')?.classList.toggle('hidden', !pro);
-  if (pro) {
-    const ends = plan.currentPeriodEnd ? new Date(plan.currentPeriodEnd).toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) : null;
-    $('#license-copy').textContent = plan.cancelAtPeriodEnd && ends
-      ? `Pro stays active through ${ends}, then this account returns to Free.`
-      : `Imports, questions, connections, automations, and the Companion are uncapped.${ends ? ` Renews ${ends}.` : ''}`;
-    $('#license-usage').innerHTML = `<div class="usage-meter unlimited"><span>${plan.source === 'offline_cache' ? 'Verified recently. Offline grace active.' : 'Entitlement verified with your account.'}</span></div>`;
-    return;
-  }
-  // The account service could not be reached and no recent Pro cache exists.
-  // Say so; a silent "Free" reads as a lost subscription.
-  const unreachable = plan.source === 'offline_no_valid_cache';
-  $('#license-copy').textContent = unreachable
-    ? 'Could not reach the account service just now, so this session runs as Free. Everything local still works. Use Refresh plan once you are back online.'
-    : 'Free is a full local semester with honest caps. Pro lifts them.';
-  $('#license-usage').innerHTML = ['syllabusImports', 'questions', 'companionMs'].map((key) => usageMeter(key, usage[key])).join('');
+  // Personal build: one plan, no caps. Say where the data lives instead of
+  // showing meters against limits that do not exist.
+  const title = $('#license-title'); if (title) title.textContent = 'Personal build';
+  $('#license-badge')?.classList.add('hidden');
+  $('#license-upgrade')?.classList.add('hidden');
+  $('#license-portal')?.classList.add('hidden');
+  $('#rail-plan')?.classList.add('hidden');
+  const copy = $('#license-copy');
+  if (copy) copy.textContent = 'Uncapped: imports, questions, connections, automations, Voice and the Companion. No account, no subscription, no telemetry. Everything stays in the local database.';
+  const usage = $('#license-usage');
+  if (usage) usage.innerHTML = '<div class="usage-meter unlimited"><span>Operating locally</span><i style="--p:100%"></i><b>no limits</b></div>';
 }
 
-// ---- Upgrade sheet: every refused cap lands here, never in a toast. ----
-const upgradeScrim = $('#upgrade-scrim');
-const LIMIT_COPY = {
-  limit_syllabus_imports: ['Syllabus imports', 'Free includes three AI syllabus imports for the life of this install. You have used all three.'],
-  limit_questions: ['Questions today', 'Free includes ten Ask or chat questions a day. Today\'s ten are used. They reset at midnight.'],
-  limit_connected_accounts: ['Connected accounts', 'Free includes one connected account. Disconnect the current one, or go Pro to run Google Calendar and Outlook together.'],
-  limit_automation_rules: ['Automation rules', 'Free includes one automation rule. Remove it, or go Pro for as many as you want.'],
-  limit_companion_minutes: ['Companion minutes', 'Free Companion listening is twenty minutes a day, and today\'s are used. They reset at midnight.'],
-  limit_companion_history: ['Companion history', 'Free keeps seven days of Companion history. Pro keeps all of it.'],
-};
-let upgradeReason = null;
-function isLimitError(result) { return Boolean(result && (result.upgrade === true || String(result.error || '').startsWith('limit_'))); }
-function showUpgradeSheet(result) {
-  const code = String(result?.error || 'limit');
-  const [kicker, reason] = LIMIT_COPY[code] || ['Free limit reached', aiError(code)];
-  upgradeReason = code.replace(/^limit_/, '');
-  $('#upgrade-kicker').textContent = `Free limit: ${kicker}`;
-  $('#upgrade-reason').textContent = reason;
-  const signedIn = Boolean($('#auth-signedin') && !$('#auth-signedin').classList.contains('hidden'));
-  $('#upgrade-go').textContent = signedIn ? 'Upgrade to Pro' : 'Sign in to upgrade';
-  $('#upgrade-status').textContent = signedIn ? '' : 'Pro is tied to your Nūs account so it follows you to any PC.';
-  upgradeScrim.classList.remove('hidden');
-  requestAnimationFrame(() => upgradeScrim.classList.add('open'));
-  $('#upgrade-go').focus();
-}
-function closeUpgradeSheet() { upgradeScrim.classList.remove('open'); upgradeScrim.classList.add('hidden'); }
-function handleLimit(result) { if (!isLimitError(result)) return false; showUpgradeSheet(result); return true; }
-// One door for every provider or cap error: caps open the sheet, the rest toast.
-function reportAiError(result) { if (handleLimit(result)) return; showToast(aiError(result?.error, result?.detail)); }
-$('#upgrade-close').addEventListener('click', closeUpgradeSheet);
-$('#upgrade-later').addEventListener('click', closeUpgradeSheet);
-upgradeScrim.addEventListener('click', (event) => { if (event.target === upgradeScrim) closeUpgradeSheet(); });
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !upgradeScrim.classList.contains('hidden')) closeUpgradeSheet(); });
-
-const CHECKOUT_ERRORS = {
-  sign_in_required: 'Sign in first. Pro is attached to your account.',
-  already_subscribed: 'This account already has Pro. Refreshing your plan.',
-  billing_not_configured: 'Checkout is not switched on yet on the server. Try again soon.',
-  network: 'No connection. Try again when you are back online.',
-  not_authenticated: 'Your session expired. Sign in again and retry.',
-  checkout_unavailable: 'Stripe could not open a checkout right now. Try again in a minute.',
-};
-async function startCheckout(reason, statusEl) {
-  const setStatus = (text) => { if (statusEl) statusEl.textContent = text; };
-  setStatus('Opening Stripe Checkout…');
-  const result = await api.licenseCheckout({ reason: reason || 'settings' });
-  if (result?.error === 'sign_in_required') { setStatus(''); closeUpgradeSheet(); focusSettingsCard('auth-card'); showToast(CHECKOUT_ERRORS.sign_in_required); return false; }
-  if (result?.error === 'already_subscribed') { setStatus(''); closeUpgradeSheet(); renderLicenseState(await api.licenseRefresh()); showToast(CHECKOUT_ERRORS.already_subscribed); return false; }
-  if (result?.error) { const text = CHECKOUT_ERRORS[result.error] || `Checkout failed (${result.error}).`; setStatus(text); showToast(text); return false; }
-  setStatus('Stripe Checkout is open in your browser. Pro turns on here the moment it completes.');
-  showToast('Stripe Checkout opened in your browser.');
-  return true;
-}
-$('#upgrade-go').addEventListener('click', async () => {
-  const button = $('#upgrade-go'); button.disabled = true;
-  try { await startCheckout(upgradeReason, $('#upgrade-status')); } finally { button.disabled = false; }
-});
-$('#license-upgrade').addEventListener('click', async () => {
-  const button = $('#license-upgrade'); button.disabled = true;
-  try { await startCheckout('settings', null); } finally { button.disabled = false; }
-});
-$('#license-portal').addEventListener('click', async () => {
-  const button = $('#license-portal'); button.disabled = true; button.textContent = 'Opening…';
-  try {
-    const result = await api.licensePortal();
-    if (result?.error === 'no_subscription') showToast('No Stripe subscription is attached to this account yet.');
-    else if (result?.error) showToast(result.error === 'network' ? CHECKOUT_ERRORS.network : 'The billing portal could not open. Try again in a minute.');
-    else showToast('Stripe billing portal opened in your browser.');
-  } finally { button.disabled = false; button.textContent = 'Manage subscription'; }
-});
-$('#license-refresh').addEventListener('click', async () => {
-  const button = $('#license-refresh'); button.disabled = true; button.textContent = 'Checking…';
-  try { renderLicenseState(await api.licenseRefresh()); showToast(licenseState?.isPro ? 'Pro is active.' : 'Plan checked. Still on Free.'); }
-  finally { button.disabled = false; button.textContent = 'Refresh plan'; }
-});
-$('#auth-plan-link')?.addEventListener('click', () => focusSettingsCard('license-card'));
-
-// Optional setup code from the download page: campaign labels only, no
-// identity. Applied at most once per install; the main process enforces that.
-(async () => {
-  if (!api.acquisitionStatus) { $('#acq-card')?.setAttribute('hidden', ''); return; }
-  const applied = (dims) => {
-    $('#acq-title').textContent = 'Setup code applied';
-    $('#acq-copy').textContent = `This install is linked to ${dims?.utm_campaign || 'a campaign'}. Thanks, that's all it does.`;
-    $('#acq-form')?.classList.add('hidden');
-    const badge = $('#acq-badge'); if (badge) badge.textContent = 'Linked';
-  };
-  try { const dims = await api.acquisitionStatus(); if (dims && dims.acq_action_id) applied(dims); } catch {}
-  $('#acq-redeem')?.addEventListener('click', async () => {
-    const input = $('#acq-token');
-    const note = $('#acq-result');
-    const token = String(input?.value || '').trim();
-    if (!token) { if (note) note.textContent = 'Paste the code first.'; return; }
-    let result;
-    try { result = await api.acquisitionRedeem(token); } catch { result = { ok: false, reason: 'error' }; }
-    if (result?.ok) { applied(result.dims); showToast('Setup code applied.'); }
-    else if (note) {
-      note.textContent = result?.reason === 'already_assigned' ? 'This install is already linked to a code.'
-        : result?.reason === 'no_secret' ? 'This build cannot verify codes yet.'
-        : 'That code is not valid or has expired.';
-    }
-  });
-})();
-
-// Anonymous usage stats (TELEMETRY-CONTRACT.md): the Settings switch, and the
-// one-click "Where did you hear about Nūs?" row shown once after install.
-let statsState = null;
-function paintStatsState(status) {
-  statsState = status || statsState;
-  const toggle = $('#stats-toggle');
-  const label = $('#stats-label');
-  const badge = $('#stats-badge');
-  const note = $('#stats-status');
-  if (!toggle || !statsState) return;
-  toggle.checked = Boolean(statsState.enabled);
-  const on = Boolean(statsState.enabled);
-  label.textContent = on ? 'Anonymous usage stats are on' : 'Anonymous usage stats are off';
-  if (badge) { badge.textContent = on ? 'On' : 'Off'; badge.classList.toggle('good', on); }
-  if (note) note.textContent = statsState.envDisabled ? 'Nothing is sent from this build (NUS_STATS or a dev run).' : '';
-  // Keep the onboarding switch, if it is on screen, in step with Settings.
-  const onboardSwitch = $('#ob-stats-toggle'); if (onboardSwitch) onboardSwitch.checked = on;
-}
-async function renderStatsState() {
-  if (!api.statsStatus) { $('#stats-card')?.setAttribute('hidden', ''); return; }
-  try { paintStatsState(await api.statsStatus()); } catch {}
-}
-async function setStatsEnabled(enabled) {
-  if (!api.statsSetEnabled) return;
-  try { paintStatsState(await api.statsSetEnabled(Boolean(enabled))); }
-  catch { await renderStatsState(); }
-  if (!enabled) hideSourceAsk();
-}
-$('#stats-toggle')?.addEventListener('change', (event) => { setStatsEnabled(event.target.checked); });
-renderStatsState();
-
-function hideSourceAsk() {
-  const row = $('#source-ask');
-  if (!row || row.classList.contains('hidden')) return;
-  if (reducedMotion) { row.classList.add('hidden'); return; }
-  row.classList.add('leaving');
-  setTimeout(() => { row.classList.add('hidden'); row.classList.remove('leaving'); }, 260);
-}
-async function maybeShowSourceAsk() {
-  const row = $('#source-ask');
-  if (!row || !api.statsStatus) return;
-  let status = null;
-  try { status = await api.statsStatus(); } catch { return; }
-  if (!status || !status.askSource) return;
-  row.classList.remove('hidden');
-}
-$('#source-ask')?.addEventListener('click', async (event) => {
-  const button = event.target.closest('[data-source]');
-  if (!button) return;
-  $$('#source-ask button').forEach((b) => { b.disabled = true; });
-  try { await api.statsSourceAnswer?.(button.dataset.source); } catch {}
-  hideSourceAsk();
-  if (button.dataset.source !== 'skipped') showToast('Thanks. That is all it is used for.');
-});
-api.onLicenseLimit?.((result) => handleLimit(result));
-api.onLicenseActivated?.(async (plan) => {
-  closeUpgradeSheet();
-  await renderLicenseState(plan);
-  showToast(`Pro is active${plan?.email ? ` on ${plan.email}` : ''}. Caps are off.`);
-  pulseKnot();
-});
-api.onLicenseReturn?.(async (info) => {
-  if (info?.isPro) { closeUpgradeSheet(); await renderLicenseState(await api.licenseStatus()); showToast('Pro is active. Caps are off.'); pulseKnot(); }
-  else showToast('Welcome back. Checking your plan with Stripe…');
-});
-
-
-// Shared by the Settings card and the first-launch step. Each returns
-// { ok, message } and leaves the UI refresh to the caller.
-async function authEmailLogin(email, password) {
-  if (!email || !password) return { ok: false, message: 'Enter email and password.' };
-  const result = await api.loginEmail(email, password);
-  if (result.error) return { ok: false, message: result.error };
-  await renderAuthState();
-  await renderLicenseState(await api.licenseRefresh());
-  renderSyncState();
-  return { ok: true, message: 'Signed in.' };
-}
-async function authEmailSignup(email, password) {
-  if (!email || !password) return { ok: false, message: 'Enter email and password.' };
-  if (password.length < 8) return { ok: false, message: 'Password must be at least 8 characters.' };
-  const result = await api.signupEmail(email, password);
-  if (result.error) return { ok: false, message: result.error };
-  await renderAuthState();
-  await renderLicenseState(await api.licenseRefresh());
-  return { ok: true, pending: !result.session, message: result.session ? 'Account created and signed in.' : 'Check your email for the confirmation link, then sign in here.' };
-}
-async function authGoogle() {
-  const result = await api.loginGoogle();
-  if (result.error) return { ok: false, message: result.error };
-  return { ok: true, message: 'Continuing in your browser. Come back to Nūs after approving.' };
-}
-$('#auth-login').addEventListener('click', async () => {
-  const result = await authEmailLogin($('#auth-email').value.trim(), $('#auth-password').value);
-  showToast(result.message);
-});
-$('#auth-signup').addEventListener('click', async () => {
-  const result = await authEmailSignup($('#auth-email').value.trim(), $('#auth-password').value);
-  showToast(result.message);
-});
-$('#auth-google').addEventListener('click', async () => {
-  const result = await authGoogle();
-  showToast(result.message);
-});
-api.onAuthChanged?.(async () => {
-  showToast('Signed in with Google.');
-  await renderAuthState();
-  await renderLicenseState(await api.licenseRefresh());
-  await renderSyncState();
-  if (onboardStep === 'auth' && !$('#onboard-scrim').classList.contains('hidden')) advanceFromAuthStep();
-});
-$('#auth-logout').addEventListener('click', async () => {
-  const result=await api.logout();
-  if(result?.error)return showToast(result.error);
-  showToast('Signed out.');
-  renderAuthState();
-  renderLicenseState(await api.licenseRefresh());
-  renderSyncState();
-});
+// Personal build: there is no billing to return from and no plan to activate,
+// so these listeners are gone. renderLicenseState() still runs at start so the
+// Settings card can say what it really is.
 
 async function renderSyncState() {
   // Cloud content sync is not shipped. The card stays in the DOM as a visible
@@ -1345,7 +1226,6 @@ $('#outlook-connect').addEventListener('click', async () => {
   if (result.error) {
     $('#outlook-status').textContent = aiError(result.error, result.detail);
     if (result.needsAdminConsent) $('#outlook-note').textContent = 'Many universities block third-party mail access until IT approves the app. You can request approval from that screen, or connect a personal Microsoft account. Either way, the drafter below works right now and the Copy button puts the email on your clipboard.';
-    if (handleLimit(result)) return;
     return showToast(result.needsAdminConsent ? 'Your school needs to approve mail access.' : aiError(result.error, result.detail));
   }
   showToast(result.connected ? 'Outlook connected (read-only).' : 'Outlook disconnected.');
@@ -1480,7 +1360,6 @@ async function submitGlobalAsk(){
   state.busy=true;renderHero();
   try{
     const result=await api.assistantParse(text);
-    if(handleLimit(result)){globalAnswer.classList.add('hidden');return;}
     if(result.error||!result.proposal||!result.proposal.needs_confirm){await answerWithAi(result?.proposal?.command?.question||text,globalAnswer,Boolean(result.error));return;}
     state.proposal=result.proposal;setView('today');renderProposal();
   }finally{state.busy=false;renderHero();}
@@ -1489,11 +1368,11 @@ $('#global-ask-go').addEventListener('click',submitGlobalAsk);
 $('#global-ask').addEventListener('keydown',(event)=>{if(event.key==='Enter')submitGlobalAsk();if(event.key==='Escape')globalAnswer.classList.add('hidden');});
 document.addEventListener('click',(event)=>{if(!globalAnswer.classList.contains('hidden')&&!event.target.closest('#global-answer,.topbar-ask'))globalAnswer.classList.add('hidden');});
 
-// Email: let Nūs fill the form from what it already knows.
+// Email: let J.A.R.V.I.S fill the form from what it already knows.
 $('#draft-fill')?.addEventListener('click',async()=>{
   const courseId=Number($('#draft-course').value)||state.data.courses[0]?.id;
   const course=state.data.courses.find((c)=>c.id===courseId);
-  if(!course){showToast('Add a course first, then Nūs can fill this.');return;}
+  if(!course){showToast('Add a course first, then J.A.R.V.I.S can fill this.');return;}
   if(course.code&&!$('#draft-section').value)$('#draft-section').value=course.code;
   const syllabus=state.data.sources.find((src)=>src.source_type==='syllabus'&&src.course_id===courseId);
   // Imported text lives in a file now, not in the sources row. Without this
@@ -1509,19 +1388,19 @@ $('#draft-fill')?.addEventListener('click',async()=>{
 });
 
 const APP_GUIDE=[
-  {match:/syllab|import.*(course|class|pdf)|upload.*(syllab|pdf)/,go:'semester',label:'Open Semester',answer:'Import a syllabus from the Import button up top or the Semester view. Nūs reads it with your AI, then shows every extracted course, weight, and deadline in a review table. Nothing is saved until you confirm it.'},
+  {match:/syllab|import.*(course|class|pdf)|upload.*(syllab|pdf)/,go:'semester',label:'Open Semester',answer:'Import a syllabus from the Import button up top or the Semester view. J.A.R.V.I.S reads it with your AI, then shows every extracted course, weight, and deadline in a review table. Nothing is saved until you confirm it.'},
   {match:/where.*(map|graph|brain)|mind ?map|constellation/,go:'brain',label:'Open the Map',answer:'The Map is item 02 in the rail. Every course, source, and open task is a node you can drag; scroll to zoom around your cursor, drag the canvas to pan, and Center map reframes everything.'},
   {match:/turn off|remove|disable|get rid.*(companion|knot|overlay)|companion.*(off|remove)/,go:'companion',label:'Open Knot settings',answer:'Turn off Companion, on the Knot > Companion pane, removes it completely: capture stops, the overlay closes, and the hotkeys go back to your system. It stays off across restarts until you press Turn on Companion in the same place.'},
-  {match:/close|quit|exit|background|still running|stays open/,go:'companion',label:'Open Knot settings',answer:'Closing the dashboard leaves the Companion running on your desktop with every hotkey live, the same way it works after a restart. The tray icon reopens the dashboard or quits Nūs entirely, and Turn off Companion on this pane removes the overlay for good.'},
+  {match:/close|quit|exit|background|still running|stays open/,go:'companion',label:'Open Knot settings',answer:'Closing the dashboard leaves the Companion running on your desktop with every hotkey live, the same way it works after a restart. The tray icon reopens the dashboard or quits J.A.R.V.I.S entirely, and Turn off Companion on this pane removes the overlay for good.'},
   {match:/stealth|invisible|hide.*(companion|overlay|knot)/,go:'companion',label:'Open Knot settings',answer:`${MOD}+Shift+Space hides the whole Companion, ${MOD}+Shift+X stops listening and vanishes. The Knot mark alone can be hidden or shown from this pane, and this pane is always the way back.`},
   {match:/history|transcript|recording|session/,go:'history',label:'Open History',answer:'Every Companion capture session lands under Knot > History: full transcript, search, and upload into your Jarvis vault with a preview before anything is written.'},
   {match:/gemini|companion.*(key|api)|key.*companion|overlay.*key/,go:'settings',label:'Open Settings',answer:'Screen guidance can use desktop Claude when no Companion key is set. The Companion AI key card in Settings adds Gemini for Companion answers and cloud speech fallback. For keyless voice, click Talk on the Knot and complete local voice setup.'},
   {match:/api key|anthropic|claude key|which model/,go:'settings',label:'Open Settings',answer:'Two keys, two jobs. Desktop app: Claude, found automatically if Claude Code is installed, otherwise an Anthropic API key in Settings > AI provider. It runs on Sonnet so syllabus reading stays affordable. Companion overlay: its own Gemini key in the Companion AI key card just below.'},
   {match:/gmail/,go:'email',label:'Open Email',answer:'Gmail needs no connection: draft the email in the Email tab, then press Open in Gmail. The finished draft opens in a Gmail compose window in your browser with everything filled in, and you press send there.'},
   {match:/email|professor|outlook/,go:'email',label:'Open Email',answer:'Email has its own tab in the rail. Connect Outlook read-only for the inbox brief and your writing style; the professor drafter works even without connecting, and any draft can open straight into Gmail with the Open in Gmail button.'},
-  {match:/dashboard|home page|main page|back to today/,go:'today',label:'Open Today',answer:'The dashboard is the Today tab, item 01 in the rail. If the app window is closed, the tray icon has Open Nūs dashboard.'},
-  {match:/chat|talk to n|ask.*question/,go:'companion',label:'Open the chat',answer:'Chat with Nūs lives under Knot in the rail, on the Companion pane: a running thread that answers questions and can set up tasks, dates, and email drafts with a confirm step. The Ask bar on Today does one-shot requests from anywhere.'},
-  {match:/automat|rule|repeat/,go:'automations',label:'Open Automations',answer:'Automations live under Connections. Nūs proposes a rule after it sees the same kind of task twice; every rule needs your approval before it ever runs.'},
+  {match:/dashboard|home page|main page|back to today/,go:'today',label:'Open Today',answer:'The dashboard is the Today tab, item 01 in the rail. If the app window is closed, the tray icon has Open J.A.R.V.I.S dashboard.'},
+  {match:/chat|talk to n|ask.*question/,go:'companion',label:'Open the chat',answer:'Chat with J.A.R.V.I.S lives under Knot in the rail, on the Companion pane: a running thread that answers questions and can set up tasks, dates, and email drafts with a confirm step. The Ask bar on Today does one-shot requests from anywhere.'},
+  {match:/automat|rule|repeat/,go:'automations',label:'Open Automations',answer:'Automations live under Connections. J.A.R.V.I.S proposes a rule after it sees the same kind of task twice; every rule needs your approval before it ever runs.'},
   {match:/calendar|gcal|google/,go:'calendar',label:'Open Calendar',answer:'Calendar shows confirmed deadlines, smart tasks, and Google Calendar events in one month. The mini calendar on the dashboard jumps to any day.'},
   {match:/tutorial|walkthrough|tour|how.*(use|work)/,go:'settings',label:'Open Settings',answer:'Replay the walkthrough any time from Settings, and the Knot tutorial from the Knot > Companion pane. The two tours link to each other.'},
   {match:/gpa|grade/,go:'semester',label:'Open Semester',answer:'GPA projection lives on the dashboard pulse and in Semester. It splits what is known from what is assumed, and never guesses missing weights: verify your GPA scale once in Settings.'},
@@ -1543,11 +1422,10 @@ async function answerWithAi(query,target,skipAi){
   target=target||askAnswer;
   if(guideAnswer(query,target))return;
   if(skipAi){answerLocally(query,target);return;}
-  target.textContent='Nūs is thinking…';target.classList.remove('hidden');
+  target.textContent='J.A.R.V.I.S is thinking…';target.classList.remove('hidden');
   setKnotSpeaking(true);
   const result=await api.chatSend([{role:'user',text:query}],{qaOnly:true}).catch(()=>null);
   setTimeout(()=>setKnotSpeaking(false),1400);
-  if(handleLimit(result)){target.classList.add('hidden');return;}
   if(!result||result.error||!result.text){answerLocally(query,target);return;}
   target.textContent=result.text;
 }
@@ -1555,7 +1433,7 @@ function answerLocally(query,target){
   target=target||askAnswer;
   if(guideAnswer(query,target))return;
   const q=String(query||'').toLowerCase(),next=state.data.ranked[0];
-  if(/gpa|grade/.test(q))target.textContent=state.data.gpa.overall==null?'Add grading weights first. Nūs will not guess your GPA.':`Your current projection is ${state.data.gpa.overall.toFixed(2)}.`;
+  if(/gpa|grade/.test(q))target.textContent=state.data.gpa.overall==null?'Add grading weights first. J.A.R.V.I.S will not guess your GPA.':`Your current projection is ${state.data.gpa.overall.toFixed(2)}.`;
   else if(/calendar|when|due|today/.test(q)){
     const rk=state.data.ranked||[],dd=(r)=>dayDistance(r.due_date);
     const today=rk.filter((r)=>dd(r)===0),overdue=rk.filter((r)=>dd(r)!==null&&dd(r)<0),upcoming=rk.filter((r)=>dd(r)!==null&&dd(r)>0);
@@ -1580,7 +1458,7 @@ let heroStarsSeeded=false;
 // Voice chat state lives up here because renderHero and constellationItems
 // read it on every paint; the machinery itself is below the chat section.
 let voiceState='off'; // off | listening | transcribing | thinking | speaking
-let voiceTraces=[];   // short-lived gold stars for files Nūs is reading
+let voiceTraces=[];   // short-lived gold stars for files J.A.R.V.I.S is reading
 function pulseKnot(){const orb=$('#hero-orb');if(!orb)return;orb.classList.remove('pulse');void orb.offsetWidth;orb.classList.add('pulse');setTimeout(()=>orb.classList.remove('pulse'),1400);}
 let knotSpeaking=false;
 function setKnotSpeaking(on){
@@ -1628,7 +1506,7 @@ function constellationItems(){
   const tasks=state.data.tasks.filter((task)=>!task.done).slice(0,2).map((task)=>({kind:'task',label:task.title,attention:risky(task.due_date),go:'tasks'}));
   const items=[...courses,...sources,...tasks].slice(0,7);
   if(!items.length)items.push({kind:'source',label:'Import a syllabus',attention:false,go:'semester'});
-  // Live thinking traces: files Nūs is reading right now join the sky as
+  // Live thinking traces: files J.A.R.V.I.S is reading right now join the sky as
   // short-lived gold stars, displacing the tail so the total stays at 7.
   const traces=voiceTraces.slice(-3);
   return traces.length?[...items.slice(0,7-traces.length),...traces]:items;
@@ -1739,7 +1617,7 @@ let lastActivityId=null;
 function renderActivity(){
   const feed=state.data.activity||[];
   const glyphs={done:'✓',review:'✦',waiting:'○'};
-  $('#activity-feed').innerHTML=feed.length?feed.slice(0,6).map((row,index)=>`<div class="feed-row" style="--i:${index}"><span class="feed-glyph ${esc(row.status)}">${glyphs[row.status]||'✓'}</span><div><strong>${esc(row.summary)}</strong>${row.detail?`<small>${esc(row.detail)}</small>`:''}</div><span class="feed-time">${relativeTime(row.created_at)}</span></div>`).join(''):'<div class="empty-state">Nūs has not acted yet. Ask it to handle something above.</div>';
+  $('#activity-feed').innerHTML=feed.length?feed.slice(0,6).map((row,index)=>`<div class="feed-row" style="--i:${index}"><span class="feed-glyph ${esc(row.status)}">${glyphs[row.status]||'✓'}</span><div><strong>${esc(row.summary)}</strong>${row.detail?`<small>${esc(row.detail)}</small>`:''}</div><span class="feed-time">${relativeTime(row.created_at)}</span></div>`).join(''):'<div class="empty-state">J.A.R.V.I.S has not acted yet. Ask it to handle something above.</div>';
   const newest=(state.data.activity||[])[0]?.id??null;
   if(lastActivityId!==null&&newest!==null&&newest!==lastActivityId)pulseKnot();
   lastActivityId=newest;
@@ -1797,8 +1675,8 @@ function renderChat(){
   const thread=$('#chat-thread'); if(!thread) return;
   const actions=chatProposal?'<div class="chat-actions"><button id="chat-confirm" class="primary-button" type="button">Confirm</button><button id="chat-cancel" class="quiet-button" type="button">Not now</button></div>':'';
   thread.innerHTML=state.chat.length
-    ?state.chat.map((m)=>`<div class="chat-bubble ${m.role==='nus'?'nus':'you'}">${esc(m.text)}</div>`).join('')+actions+(chatPending?'<div class="chat-bubble nus pending">Nūs is thinking…</div>':'')
-    :'<div class="empty-state">Ask about deadlines, or tell Nūs to add a task, move a date, or draft an email. It talks it through and confirms before it touches anything.</div>';
+    ?state.chat.map((m)=>`<div class="chat-bubble ${m.role==='nus'?'nus':'you'}">${esc(m.text)}</div>`).join('')+actions+(chatPending?'<div class="chat-bubble nus pending">J.A.R.V.I.S is thinking…</div>':'')
+    :'<div class="empty-state">Ask about deadlines, or tell J.A.R.V.I.S to add a task, move a date, or draft an email. It talks it through and confirms before it touches anything.</div>';
   thread.scrollTop=thread.scrollHeight;
 }
 async function sendChat(){
@@ -1831,7 +1709,7 @@ $('#chat-thread')?.addEventListener('click',async(e)=>{
   if(b.id!=='chat-confirm'||!chatProposal)return;
   const proposal=chatProposal;chatProposal=null;renderChat();
   const result=await api.assistantExecute(proposal);
-  if(result?.error){if(handleLimit(result))state.chat.push({role:'nus',text:'That needs Pro. The upgrade sheet is open.'});else state.chat.push({role:'nus',text:aiError(result.error,result.detail)});}
+  if(result?.error){state.chat.push({role:'nus',text:aiError(result.error,result.detail)});}
   else{
     state.chat.push({role:'nus',text:result.message||'Done.'});
     if(result.navigate==='email'){
@@ -1847,9 +1725,9 @@ api.onCompanionMessage?.((m)=>{ if(state.view==='history' && state.historySessio
 // ---- Voice: talk to the Knot. ----
 // Click the Knot (or the mic button) and just talk: local whisper turns speech
 // into text, the reply streams back token by token, and the constellation
-// grows gold trace stars for every file Nūs reads while thinking. Speaking
+// grows gold trace stars for every file J.A.R.V.I.S reads while thinking. Speaking
 // during the spoken reply interrupts it (barge-in).
-let voiceOn=false, voicePendingAsk=false, voiceProposal=null, voiceNusLine=null;
+let voiceOn=false, voicePendingAsk=false, voiceProposal=null, voiceJarvisLine=null;
 let voiceTurns=[];
 let voiceCtx=null, voiceStream=null, voiceSrcNode=null, voiceProc=null;
 let voiceTraceTimer=null, voiceLevelAt=0;
@@ -1861,7 +1739,7 @@ function setVoiceState(next){
   voiceState=next;
   const hint=$('#voice-hint');
   if(hint){
-    hint.textContent={listening:'Listening. Just talk.',transcribing:'Heard you. Writing it down…',thinking:'Nūs is thinking…',speaking:'Nūs is speaking. Talk over it to interrupt.'}[next]||'';
+    hint.textContent={listening:'Listening. Just talk.',transcribing:'Heard you. Writing it down…',thinking:'J.A.R.V.I.S is thinking…',speaking:'J.A.R.V.I.S is speaking. Talk over it to interrupt.'}[next]||'';
     hint.classList.toggle('live',next==='listening');
   }
   renderHero();
@@ -1899,7 +1777,7 @@ function renderVoiceThread(){
     ?voiceTurns.map((m)=>m.role==='note'
       ?`<div class="voice-line note">${esc(m.text)}</div>`
       :`<div class="voice-line ${m.role==='nus'?'nus':'you'}${m.pending?' pending':''}">${esc(m.text)}</div>`).join('')
-    :'<div class="voice-line note">Say something. Nūs is listening.</div>')+actions;
+    :'<div class="voice-line note">Say something. J.A.R.V.I.S is listening.</div>')+actions;
   thread.scrollTop=thread.scrollHeight;
 }
 
@@ -2002,15 +1880,14 @@ async function finishUtterance(chunks,durMs){
 }
 
 async function askVoice(){
-  voicePendingAsk=true;voiceNusLine=null;
+  voicePendingAsk=true;voiceJarvisLine=null;
   setVoiceState('thinking');
   const turns=voiceTurns.filter((t)=>t.role==='user'||t.role==='nus').slice(-12).map(({role,text})=>({role,text}));
   const result=await api.voiceAsk(turns).catch(()=>null);
   if(!voiceOn){voicePendingAsk=false;return;}
-  if(!result){voicePendingAsk=false;voiceNote('Nūs could not answer that one.');setVoiceState('listening');return;}
+  if(!result){voicePendingAsk=false;voiceNote('J.A.R.V.I.S could not answer that one.');setVoiceState('listening');return;}
   if(result.streaming)return; // ai:event events finish this turn
   voicePendingAsk=false;
-  if(handleLimit(result)){stopVoice();return;}
   if(result.error){voiceNote(aiError(result.error,result.detail));setVoiceState('listening');return;}
   voiceTurns.push({role:'nus',text:result.text||'Done.'});
   voiceProposal=result.proposal||null;
@@ -2025,21 +1902,21 @@ api.onAiEvent?.((ev)=>{
   if(!voiceOn||!voicePendingAsk)return; // a stream that outlived voice mode
   if(ev.type==='tool'){addVoiceTrace(ev.label);return;}
   if(ev.type==='delta'){
-    if(!voiceNusLine){voiceNusLine={role:'nus',text:'',pending:true};voiceTurns.push(voiceNusLine);}
-    voiceNusLine.text+=ev.text||'';renderVoiceThread();return;
+    if(!voiceJarvisLine){voiceJarvisLine={role:'nus',text:'',pending:true};voiceTurns.push(voiceJarvisLine);}
+    voiceJarvisLine.text+=ev.text||'';renderVoiceThread();return;
   }
   if(ev.type==='done'){
-    const text=String(ev.text||(voiceNusLine&&voiceNusLine.text)||'').trim()||'Done.';
-    if(!voiceNusLine){voiceNusLine={role:'nus',text};voiceTurns.push(voiceNusLine);}
-    voiceNusLine.text=text;delete voiceNusLine.pending;
-    voiceNusLine=null;voicePendingAsk=false;
+    const text=String(ev.text||(voiceJarvisLine&&voiceJarvisLine.text)||'').trim()||'Done.';
+    if(!voiceJarvisLine){voiceJarvisLine={role:'nus',text};voiceTurns.push(voiceJarvisLine);}
+    voiceJarvisLine.text=text;delete voiceJarvisLine.pending;
+    voiceJarvisLine=null;voicePendingAsk=false;
     renderVoiceThread();
     syncVoiceIntoChat(lastVoiceUser(),text);
     speakReply(text);
     return;
   }
   if(ev.type==='error'){
-    voicePendingAsk=false;voiceNusLine=null;
+    voicePendingAsk=false;voiceJarvisLine=null;
     voiceNote(aiError(ev.error,ev.detail));
     setVoiceState('listening');
   }
@@ -2052,11 +1929,11 @@ function renderVoiceSetup(status){
   const noBinary=!status||!status.binary;
   thread.innerHTML=`<div class="voice-setup">
     <strong>Set up free local voice</strong>
-    <span>Nūs transcribes speech on this computer with an open source Whisper model. This local engine transcribes on this device. The Companion can also use a configured cloud speech provider as fallback.</span>
+    <span>J.A.R.V.I.S transcribes speech on this computer with an open source Whisper model. This local engine transcribes on this device. The Companion can also use a configured cloud speech provider as fallback.</span>
     ${noBinary
       ?(IS_MAC
         ?'<span>Local voice is not bundled on macOS. Companion speech needs a configured provider, and verified screen pointing is unavailable there.</span>'
-        :'<span>The voice engine is missing from this build. Install a complete Nūs build, or configure a speech provider in Companion Settings.</span>')
+        :'<span>The voice engine is missing from this build. Install a complete J.A.R.V.I.S build, or configure a speech provider in Companion Settings.</span>')
       :'<button id="voice-setup-go" class="primary-button" type="button">Download voice model (57 MB)</button>'}
     <small id="voice-setup-status"></small>
   </div>`;
@@ -2088,7 +1965,7 @@ async function startVoice(){
 }
 function stopVoice(){
   const wasOn=voiceOn;
-  voiceOn=false;voicePendingAsk=false;voiceNusLine=null;voiceProposal=null;
+  voiceOn=false;voicePendingAsk=false;voiceJarvisLine=null;voiceProposal=null;
   try{speechSynthesis.cancel();}catch{}
   if(wasOn)api.voiceCancel?.().catch(()=>{});
   stopVoiceMic();
@@ -2121,7 +1998,7 @@ $('#voice-thread')?.addEventListener('click',async(e)=>{
   const proposal=voiceProposal;voiceProposal=null;renderVoiceThread();
   const result=await api.assistantExecute(proposal);
   let reply;
-  if(result?.error){reply=handleLimit(result)?'That needs Pro. The upgrade sheet is open.':aiError(result.error,result.detail);}
+  if(result?.error){reply=aiError(result.error,result.detail);}
   else{
     reply=result.message||'Done.';
     if(result.navigate==='email'){
@@ -2162,7 +2039,7 @@ async function renderHistoryDetail(sessionId){
   const messages=await api.companionMessages?.(sessionId)||[];
   const sessions=await api.companionSessions?.()||[];
   const s=sessions.find((x)=>x.id===sessionId)||{};
-  const roleName={you:'Me',them:'Them',nus:'Nūs'};
+  const roleName={you:'Me',them:'Them',nus:'J.A.R.V.I.S'};
   const rows=messages.map((m)=>{
     const t=(m.ts||'').slice(11,16);
     return `<div class="hist-line ${esc(m.channel)}"><span class="hist-who">${roleName[m.channel]||m.channel}</span><span class="hist-time">${t}</span><p>${esc(m.text)}</p></div>`;
@@ -2173,7 +2050,7 @@ async function renderHistoryDetail(sessionId){
     `<div class="hist-transcript">${rows||'<div class="history-empty">This session has no transcript lines.</div>'}</div>`;
 }
 // Vault upload is a two-step, preview-then-write flow: it shows the exact
-// markdown Nūs will create before anything touches the vault, honoring the
+// markdown J.A.R.V.I.S will create before anything touches the vault, honoring the
 // no-silent-side-effects rule.
 $('#history-detail')?.addEventListener('click',async(e)=>{
   const up=e.target.closest('#hist-upload'); if(!up) return;
@@ -2205,7 +2082,7 @@ function renderInbox(){
   box.innerHTML=messages.length?messages.map((m)=>`<div class="inbox-row${m.unread?' unread':''}"><div><strong>${esc(m.from_name)}</strong><small>${esc(m.subject)} · ${esc(m.preview)}</small></div><span class="feed-time">${relativeTime(m.received_at)}</span></div>`).join(''):'<div class="empty-state">Inbox is quiet.</div>';
 }
 
-async function submitToNus(text){
+async function submitToJarvis(text){
   state.busy=true;renderHero();
   try{
     const result=await api.assistantParse(text);
@@ -2224,15 +2101,15 @@ function renderProposal(){
   if(p.command.intent==='draft_email'){renderEmailWizard(box,p);return;}
   const target=p.resolved.target?`<small>Matched: "${esc(p.resolved.target.title)}"${p.resolved.target.course_name?` in ${esc(p.resolved.target.course_name)}`:''}</small>`:'';
   const notes=(p.notes||[]).map((n)=>`<small>${esc(n)}</small>`).join('');
-  box.innerHTML=`<strong>Nūs wants to:</strong> ${esc(p.command.summary_for_user)}${target}${notes}<div class="proposal-actions"><button id="proposal-confirm" class="primary-button">Confirm</button><button id="proposal-cancel" class="quiet-button">Cancel</button></div>`;
+  box.innerHTML=`<strong>J.A.R.V.I.S wants to:</strong> ${esc(p.command.summary_for_user)}${target}${notes}<div class="proposal-actions"><button id="proposal-confirm" class="primary-button">Confirm</button><button id="proposal-cancel" class="quiet-button">Cancel</button></div>`;
   box.classList.remove('hidden');
 }
 // Email requests get a short guided conversation: pick the kind of help, pick
-// the course, then Nūs opens the drafter, fills it from the syllabus, and
+// the course, then J.A.R.V.I.S opens the drafter, fills it from the syllabus, and
 // writes the draft. Sending stays a human click.
 function renderEmailWizard(box,p){
   const c=p.command;
-  let body=`<strong>Nūs wants to:</strong> ${esc(c.summary_for_user)}`;
+  let body=`<strong>J.A.R.V.I.S wants to:</strong> ${esc(c.summary_for_user)}`;
   if(!c.help_type){
     body+=`<small>What kind of help is this email asking for?</small><div class="proposal-actions wizard">${HELP_TYPE_OPTIONS.map(([v,l])=>`<button class="quiet-button" data-wiz-help="${v}">${l}</button>`).join('')}</div>`;
   }else if(!p.resolved.course_id&&!p.resolved.course_picked&&state.data.courses.length){
@@ -2286,11 +2163,11 @@ $('#today-list').addEventListener('click',async(event)=>{
 $('#view-history').addEventListener('click',()=>setView('history'));
 window.nus?.onDesktopHistory?.(()=>setView('history'));
 window.nus?.onDesktopVoiceSetup?.(async()=>{setView('today');renderVoiceSetup(await api.voiceStatus?.().catch(()=>null));$('#voice-panel')?.scrollIntoView({block:'nearest'});});
-$('#ask-go').addEventListener('click',()=>{const value=askInput.value.trim();if(!value)return;askInput.value='';submitToNus(value);});
+$('#ask-go').addEventListener('click',()=>{const value=askInput.value.trim();if(!value)return;askInput.value='';submitToJarvis(value);});
 askInput.addEventListener('keydown',(event)=>{
   if(event.key==='Escape'){askAnswer.classList.add('hidden');state.proposal=null;renderProposal();return;}
   if(event.key!=='Enter'||!askInput.value.trim())return;
-  const value=askInput.value.trim();askInput.value='';submitToNus(value);
+  const value=askInput.value.trim();askInput.value='';submitToJarvis(value);
 });
 
 const focusOptions=[
@@ -2314,17 +2191,17 @@ const focusPromise={
   'Coming back after a break':'start small and show only what is confirmed, so week one is not a wall',
 };
 const tourSteps=[
-  {view:'today',rail:'today',title:'This is your Jarvis',body:'The Ask bar takes plain requests like "push the calc homework to Friday" and proposes the exact change before anything is written. Below it: your three moves, what Nūs has done lately, and your inbox once email is connected.'},
+  {view:'today',rail:'today',title:'This is your Jarvis',body:'The Ask bar takes plain requests like "push the calc homework to Friday" and proposes the exact change before anything is written. Below it: your three moves, what J.A.R.V.I.S has done lately, and your inbox once email is connected.'},
   {view:'brain',rail:'brain',title:'The map is the whole point',body:'Every course, source, and open task as a node you can drag. Drag the canvas to pan, scroll to zoom around your cursor, and hit Center map to frame everything again. Your layout and viewport save locally.'},
   {view:'calendar',rail:'calendar',title:'Calendar is the month as it is',body:'Confirmed deadlines, your smart tasks, and anything you imported, in one grid. Click a day to pull its agenda up beside it.'},
-  {view:'tasks',rail:'tasks',title:'Smart tasks turn pressure into steps',body:'Give Nūs an outcome and it proposes a small path you can edit. Nothing schedules itself and nothing runs without you checking it off.'},
-  {view:'sources',rail:'semester',title:'Knowledge is what Nūs has read',body:'Under Semester, next to the overview. Courses, unfiled items, and raw imports each keep their own count, so you always know what Nūs read versus what you handed it.'},
-  {view:'companion',rail:'companion',title:'The Knot rides on top of everything',body:`The Nūs Knot floats over your screen, answers "What should I do?" from your real semester, and listens when you ask it to. ${MOD}+Shift+Space hides it, ${MOD}+Shift+X stops and vanishes in one stroke.`,action:{label:'Show me the Knot',run:async()=>{await api.companionControl?.('tour');}}},
+  {view:'tasks',rail:'tasks',title:'Smart tasks turn pressure into steps',body:'Give J.A.R.V.I.S an outcome and it proposes a small path you can edit. Nothing schedules itself and nothing runs without you checking it off.'},
+  {view:'sources',rail:'semester',title:'Knowledge is what J.A.R.V.I.S has read',body:'Under Semester, next to the overview. Courses, unfiled items, and raw imports each keep their own count, so you always know what J.A.R.V.I.S read versus what you handed it.'},
+  {view:'companion',rail:'companion',title:'The Knot rides on top of everything',body:`The J.A.R.V.I.S Knot floats over your screen, answers "What should I do?" from your real semester, and listens when you ask it to. ${MOD}+Shift+Space hides it, ${MOD}+Shift+X stops and vanishes in one stroke.`,action:{label:'Show me the Knot',run:async()=>{await api.companionControl?.('tour');}}},
   {view:'history',rail:'companion',title:'Every session is kept',body:'Transcripts from the Companion land here, searchable, with the briefing pack that was live at the time. Any session can be uploaded into your Jarvis vault as a note, and you see the exact markdown before it is written.'},
   {view:'settings',rail:'settings',title:'Settings is where the wiring lives',body:'Your two AI keys, email and calendar connections, Companion options, and your school\'s GPA scale all live here. The next three steps cover the ones you actually have to do.'},
-  {view:'settings',rail:'settings',title:'Key 1 of 2: Claude, for the desktop app',body:'The AI provider card on this page. Claude reads your syllabi and powers the Ask bar and the chat thread. If Claude Code is installed on this machine, Nūs finds it automatically and there is nothing to paste. If not, put an Anthropic API key in that card. It is encrypted on this device and only ever used to call Anthropic.'},
+  {view:'settings',rail:'settings',title:'Key 1 of 2: Claude, for the desktop app',body:'The AI provider card on this page. Claude reads your syllabi and powers the Ask bar and the chat thread. If Claude Code is installed on this machine, J.A.R.V.I.S finds it automatically and there is nothing to paste. If not, put an Anthropic API key in that card. It is encrypted on this device and only ever used to call Anthropic.'},
   {view:'settings',rail:'settings',title:'Key 2 of 2: Gemini, for the Companion',body:'The Companion AI key card, right below the AI provider one. The floating Knot is a separate agent: it sees your screen and listens, so it runs on its own provider to stay fast and cheap. Paste a Google Gemini key there (the free tier at aistudio.google.com/apikey is enough) and the Knot starts answering with AI. Even without it, "What should I do?" answers from your semester on this machine. The Knot\'s own gear icon sets the same key if you prefer.'},
-  {view:'settings',rail:'settings',title:'Fix your GPA scale',body:'Scroll to the GPA scale card, or click Data in the left column. Every school maps percentages to letters differently, so match that table to your syllabus or the registrar once. Semester setup and every GPA projection read from it, and Nūs never guesses a missing row.'},
+  {view:'settings',rail:'settings',title:'Fix your GPA scale',body:'Scroll to the GPA scale card, or click Data in the left column. Every school maps percentages to letters differently, so match that table to your syllabus or the registrar once. Semester setup and every GPA projection read from it, and J.A.R.V.I.S never guesses a missing row.'},
   {view:'companion',rail:'companion',title:'Driving the Companion',action:{label:'Show me the Knot',run:()=>{api.companionControl?.('tour');}},body:`On screen: click the Knot, then press "What should I do?" or type anything. ${MOD}+Enter asks from anywhere, even with no key set. ${MOD}+Shift+Space hides or shows it, ${MOD}+Shift+X stops listening and vanishes. It keeps running with the hotkeys live after you close this dashboard, and the ${IS_MAC?'menu bar':'tray'} icon brings the dashboard back. Turn off Companion on this pane removes it entirely.`},
   {view:'today',rail:null,title:'You are set',body:'That is the tour. Anything you import lands in a review table before it is saved, so nothing enters your semester without you seeing it. You can replay this walkthrough any time from Settings.',done:true},
 ];
@@ -2334,38 +2211,25 @@ let tourIndex=0;
 let welcomeTimer=null;
 
 let onboardStep = 'focus';
-// The plain first-run notice with the switch right there (TELEMETRY-CONTRACT.md).
-// Rendered on whichever onboarding screen comes first, once per fresh install.
+// Personal build: nothing is transmitted, so there is no telemetry switch to
+// put in front of the operator. The first-run screen says what stays local
+// instead of asking a question with one answer.
 function statsNoticeHtml(){
-  if(!api.statsStatus)return '';
-  const on=statsState?Boolean(statsState.enabled):true;
-  return `<label class="onboard-stats"><span class="switch"><input id="ob-stats-toggle" type="checkbox"${on?' checked':''} /><span class="slider"></span></span><span>Nūs sends anonymous usage stats (which features get used, never your coursework or what you type). Turn off in Settings.</span></label>`;
+  return `<p class="onboard-stats">Nothing leaves this machine. Your semester, your notes and your transcripts stay in a local database; the only network calls are the ones your own model provider sees.</p>`;
 }
-function bindStatsNotice(){
-  $('#ob-stats-toggle')?.addEventListener('change',(e)=>{setStatsEnabled(e.target.checked);});
-}
+function bindStatsNotice(){}
+// Personal build: this was the sign-in step. There is no account to create, so
+// it is now the one thing a first run should say before anything else: where the
+// data lives, and what the app will reach for over the network.
 function renderAuthStep(){
   onboardStep='auth';
   $('.onboard-card').dataset.step='auth';
-  $('#onboard-content').innerHTML=`<div class="section-kicker">Welcome</div><h2>Hey. I am Nūs.</h2><p>Sign in and Pro, whenever you want it, follows you to any PC. Your syllabi, notes, and transcripts stay on this machine either way; your account is only an email and a plan.</p>
-    <div class="onboard-auth">
-      <button id="ob-google" class="primary-button" type="button">Continue with Google</button>
-      <div class="auth-divider"><span>or use email</span></div>
-      <div class="onboard-auth-grid"><input id="ob-email" type="email" placeholder="School or personal email" autocomplete="email" /><input id="ob-password" type="password" placeholder="Password, 8+ characters" autocomplete="current-password" /></div>
-      <div class="onboard-auth-row"><button id="ob-login" class="quiet-button" type="button">Sign in</button><button id="ob-signup" class="quiet-button" type="button">Create account</button><span id="ob-status" class="onboard-auth-status"></span></div>
-    </div>${statsNoticeHtml()}`;
-  bindStatsNotice();
+  $('#onboard-content').innerHTML=`<div class="section-kicker">First run</div><h2>Everything stays on this machine.</h2><p>Your syllabus, notes, tasks and transcripts live in a local database next to the app. There is no account and no plan to sign up for; the app talks to the model provider you chose and nothing else.</p>${statsNoticeHtml()}`;
   $('#onboard-dots').innerHTML='';
   $('#onboard-back').style.visibility='hidden';
-  $('#onboard-next').textContent='Continue without an account';
+  $('#onboard-next').textContent='Continue';
   $('#onboard-skip').textContent='Skip setup';
-  const status=(text,bad)=>{const el=$('#ob-status');if(!el)return;el.textContent=text;el.classList.toggle('bad',Boolean(bad));};
-  const busy=(on)=>$$('#ob-google,#ob-login,#ob-signup').forEach((b)=>{b.disabled=on;});
-  $('#ob-google').addEventListener('click',async()=>{busy(true);const r=await authGoogle();status(r.message,!r.ok);busy(false);});
-  $('#ob-login').addEventListener('click',async()=>{busy(true);const r=await authEmailLogin($('#ob-email').value.trim(),$('#ob-password').value);status(r.message,!r.ok);busy(false);if(r.ok)setTimeout(advanceFromAuthStep,500);});
-  $('#ob-signup').addEventListener('click',async()=>{busy(true);const r=await authEmailSignup($('#ob-email').value.trim(),$('#ob-password').value);status(r.message,!r.ok);busy(false);if(r.ok&&!r.pending)setTimeout(advanceFromAuthStep,500);});
-  $('#ob-password').addEventListener('keydown',(e)=>{if(e.key==='Enter')$('#ob-login').click();});
-  setTimeout(()=>$('#ob-email')?.focus(),350);
+  setTimeout(()=>$('#onboard-next')?.focus(),350);
 }
 async function advanceFromAuthStep(){
   await api.setPreference('auth_prompted',true);
@@ -2380,7 +2244,7 @@ function renderFocusPicker(){
   // The notice rides on this screen only when it is the first one (no auth
   // step was shown and the install is not onboarded yet), never on replays.
   const firstScreen=!state.data.preferences.onboarded&&!state.data.preferences.auth_prompted;
-  $('#onboard-content').innerHTML=`<div class="section-kicker">Before we start</div><h2>What are you carrying this semester?</h2><p>Pick everything that applies. Nūs will shape the first week around it.</p><div class="choice-grid">${focusOptions.map(([label,detail],index)=>`<div class="choice-card${focusPicked.includes(label)?' active':''}" data-focus="${esc(label)}" style="--i:${index}"><strong>${esc(label)}</strong><span>${esc(detail)}</span></div>`).join('')}</div>${firstScreen?statsNoticeHtml():''}`;
+  $('#onboard-content').innerHTML=`<div class="section-kicker">Before we start</div><h2>What are you carrying this semester?</h2><p>Pick everything that applies. J.A.R.V.I.S will shape the first week around it.</p><div class="choice-grid">${focusOptions.map(([label,detail],index)=>`<div class="choice-card${focusPicked.includes(label)?' active':''}" data-focus="${esc(label)}" style="--i:${index}"><strong>${esc(label)}</strong><span>${esc(detail)}</span></div>`).join('')}</div>${firstScreen?statsNoticeHtml():''}`;
   bindStatsNotice();
   $('#onboard-dots').innerHTML='';
   $('#onboard-back').style.visibility='hidden';
@@ -2538,10 +2402,9 @@ $('#coach-close').addEventListener('click',finishOnboard);
 $('#replay-tour').addEventListener('click',()=>{focusPicked=state.data.preferences.focus_areas||[];onboardStep='focus';mountOnboardKnot();knotMood('ready');renderFocusPicker();$('#onboard-scrim').classList.remove('hidden');});
 window.addEventListener('resize',()=>{if(!$('#coach-card').classList.contains('hidden'))positionCoach(tourSteps[tourIndex]);});
 
+// Personal build: always the local-first notice, once per install.
 async function needsAuthStep(){
-  if(state.data.preferences.auth_prompted)return false;
-  const [cfg,sess]=await Promise.all([api.authConfig().catch(()=>({})),api.authSession().catch(()=>null)]);
-  return Boolean(cfg?.supabase)&&!sess?.user;
+  return !state.data.preferences.auth_prompted;
 }
 let onboardKnot=null;
 function mountOnboardKnot(){
@@ -2592,10 +2455,8 @@ async function start(){
     const auth=await needsAuthStep();
     openOnboarding(()=>{if(auth)renderAuthStep();else renderFocusPicker();});
   }
-  // One row, one click, once per install: where they heard about Nūs.
-  maybeShowSourceAsk();
 }
-start().catch((error)=>{console.error(error);showToast('Nūs could not read the local semester.');});
+start().catch((error)=>{console.error(error);showToast('J.A.R.V.I.S could not read the local semester.');});
 
 function createPreviewApi(){
   const today=isoDay(),plus=(days)=>{const d=new Date();d.setDate(d.getDate()+days);return isoDay(d);};

@@ -116,8 +116,11 @@ test('the marble-era surface blurs are gone; scrim blurs may stay', () => {
 
 test('the 3D knot renderer is mounted and the overlay boots clean', () => {
   assert.match(companionHtml, /id="knot-canvas"/);
-  assert.match(companionHtml, /knot3d\.js/);
-  assert.match(companionJs, /NusKnot3D\.mount/);
+  // The Knot is still the same 3D renderer, mounted through the engine: the
+  // engine owns the spring/gesture numbers (knot-spec.js) and drives the body.
+  assert.match(companionHtml, /knot3d\.js|knot-engine\.js/);
+  assert.match(companionHtml, /knot-spec\.js/);
+  assert.match(companionJs, /NusKnot3D\.mount|engine\.knot/);
   assert.ok(!companionJs.includes('showExample'), 'no fake conversation at boot');
   const knot3d = read('companion/renderer/knot3d.js');
   assert.match(knot3d, /trefoilPoint/);
@@ -150,8 +153,10 @@ test('the tutorials link to each other', () => {
 });
 
 test('all three hide levels exist, with a way back that does not need a hotkey', () => {
-  assert.match(companionIndex, /globalShortcut\.register\('CommandOrControl\+Shift\+Space', toggleOverlay\)/);
-  assert.match(companionIndex, /globalShortcut\.register\('CommandOrControl\+Shift\+X', panicHide\)/);
+  // Shortcuts go through chord(), which logs an accelerator another app owns.
+  // Three hotkeys only: hide/show, panic, and the ask chord below.
+  assert.match(companionIndex, /chord\('CommandOrControl\+Shift\+Space', toggleOverlay\)/, 'hide/show hotkey');
+  assert.match(companionIndex, /chord\('CommandOrControl\+Shift\+X', panicHide\)/, 'panic hotkey');
   // The Knot-mark level lost its hotkey in the simplification: the desktop
   // Knot pane is the only toggle, and the function stays wired to it.
   assert.match(companionIndex, /toggleKnot,/, 'toggleKnot still exported to the desktop');
@@ -356,56 +361,4 @@ test('the renderer never reads source.raw_text, which listSources no longer retu
   assert.match(read('src/preload.js'), /sourceText: \(id\)/, 'preload exposes sourceText');
   assert.match(read('src/main.js'), /'sources:text'/, 'main handles sources:text');
   assert.match(appJs, /await api\.sourceText\(/, 'the drafter fetches the text');
-});
-
-test('the desktop exposes real license state and upgrade wiring', () => {
-  const preload = read('src/preload.js');
-  const main = read('src/main.js');
-  assert.match(indexHtml, /id="license-card"/);
-  assert.match(preload, /licenseStatus: \(\) => ipcRenderer\.invoke\('license:status'\)/);
-  assert.match(preload, /licenseCheckout: \(meta\) => ipcRenderer\.invoke\('license:checkout', meta \|\| \{\}\)/);
-  assert.match(preload, /licensePortal: \(\) => ipcRenderer\.invoke\('license:portal'\)/);
-  assert.match(appJs, /renderLicenseState/);
-  assert.match(main, /'license:checkout'/);
-  assert.match(main, /'license:portal'/);
-  assert.match(main, /usageLimits\.reserveQuestion\(\)/);
-  assert.match(main, /usageLimits\.syllabusAllowed/);
-});
-
-test('every refused cap opens the upgrade sheet instead of a toast', () => {
-  const main = read('src/main.js');
-  assert.match(indexHtml, /id="upgrade-scrim"/, 'the sheet exists');
-  assert.match(indexHtml, /id="upgrade-go"/);
-  assert.match(appJs, /function handleLimit\(result\)/);
-  assert.match(appJs, /function reportAiError\(result\)/);
-  // The only raw aiError toasts left are provider setup errors, never a cap.
-  const rawToasts = appJs.match(/showToast\(aiError\([^)]*\)\)/g) || [];
-  for (const call of rawToasts) assert.ok(!/limit_/.test(call), `cap toast slipped through: ${call}`);
-  assert.match(appJs, /api\.onLicenseLimit\?\.\(/, 'the Companion cap reaches the sheet');
-  assert.match(main, /onCaptureLimit: \(\) =>/, 'main forwards the Companion cap');
-  assert.match(read('companion/index.js'), /hooks\.onCaptureLimit\?\.\(\)/);
-  // Every denied cap is one funnel row.
-  assert.ok(!/if \(!allowed\.ok\) return allowed;/.test(main), 'all cap refusals go through denied()');
-  assert.match(main, /function denied\(result\)/);
-});
-
-test('the Plan card reads its caps from the limits payload, never from literals', () => {
-  assert.ok(!/\/3 syllabus imports/.test(appJs), 'no hardcoded /3');
-  assert.match(appJs, /function usageMeter\(key, row\)/);
-  assert.match(indexHtml, /id="license-portal"/);
-  assert.match(indexHtml, /id="license-refresh"/);
-});
-
-test('first launch offers sign-in before the focus picker, and local mode stays one click away', () => {
-  assert.match(appJs, /function renderAuthStep\(\)/);
-  assert.match(appJs, /Continue without an account/);
-  assert.match(appJs, /async function needsAuthStep\(\)/);
-  assert.match(read('src/main.js'), /'auth_prompted'/, 'the renderer may persist auth_prompted');
-  assert.match(appJs, /advanceFromAuthStep\(\)/);
-});
-
-test('the account chip shows the plan and opens a menu', () => {
-  assert.match(indexHtml, /id="rail-plan"/);
-  assert.match(indexHtml, /id="rail-menu"/);
-  assert.match(appJs, /dataset\.menu === 'signout'/);
 });

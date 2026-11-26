@@ -30,4 +30,13 @@ function rms16(pcm) {
   return Math.sqrt(sum / n);
 }
 
-module.exports = { pcmToWav, rms16 };
+// Int16 LE bytes to the -1..1 floats a speech model takes. The bytes may come
+// through IPC as a plain Uint8Array at any offset, so they are read, never cast.
+function pcm16ToFloat32(bytes) {
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out = new Float32Array(buf.length >> 1);
+  for (let i = 0; i < out.length; i++) out[i] = buf.readInt16LE(i * 2) / 32768;
+  return out;
+}
+
+module.exports = { pcmToWav, rms16, pcm16ToFloat32 };

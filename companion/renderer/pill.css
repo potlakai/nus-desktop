@@ -1,0 +1,65 @@
+/* What the pill wears during a task, and the options menu. The base pill is in
+   styles.css. No accent is named here but the needs-you white, which is the task
+   panel's own: every other ring and dot reads --isl-acc, which comes from the
+   spec or, until the spec names one, from the rules in styles.css. */
+#island.live { pointer-events: auto; }
+#island[data-state]:not([data-state='idle']):not([data-state='needs']) {
+  box-shadow: 0 8px 26px rgba(0,0,0,.42), 0 0 0 1px rgba(var(--isl-acc, 214,219,234), .55), 0 0 18px rgba(var(--isl-acc, 214,219,234), .25);
+}
+#island[data-state='needs'] { --isl-acc: 255,255,255; box-shadow: 0 8px 26px rgba(0,0,0,.42), 0 0 0 1.5px #fff, 0 0 18px rgba(255,255,255,.2); }
+#island.has-step { align-items: center; }
+#island.can-unfold .isl-text { cursor: pointer; }
+
+/* The second line: what Hands is doing right now. */
+#island .isl-step { display: none; padding-left: 14px; max-width: 360px; font-size: 12px; line-height: 16px; color: #c9ccd8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#island.has-step .isl-step { display: block; }
+#island.has-step .isl-text { padding-top: 6px; padding-bottom: 7px; }
+#island.has-bar .isl-text { padding-top: 5px; padding-bottom: 10px; }
+#island .isl-bar { display: none; position: absolute; left: 28px; right: 52px; bottom: 3px; height: 2px; border-radius: 1px; background: rgba(255,255,255,.16); overflow: hidden; }
+#island.has-bar .isl-bar { display: block; }
+#island .isl-bar i { display: block; height: 100%; border-radius: 1px; background: rgb(var(--isl-acc, 214,219,234)); }
+#island .isl-count { display: none; flex: none; align-self: center; margin: 0 8px 0 0; padding: 2px 7px; border: 1px solid rgba(255,255,255,.3); border-radius: 10px; font-size: 11.5px; font-weight: 600; line-height: 15px; color: #eceef5; white-space: nowrap; }
+#island.has-count .isl-count { display: block; }
+/* Unfolded, the cards carry all of this. */
+#island.unfolded .isl-step, #island.unfolded .isl-bar, #island.unfolded .isl-count { display: none; }
+#island.unfolded.has-step { align-items: flex-start; }
+#island.unfolded.has-step .isl-text { padding-top: 0; padding-bottom: 0; }
+
+/* The free Knot's pill: only during a task, with no Knot riding it. */
+body.pill-free #island { display: flex; }
+body.pill-free #island .isl-slot { display: none; }
+body.pill-free #island { padding-right: 8px; }
+body.pill-free #island.has-bar .isl-bar { right: 14px; }
+body.pill-free #island.unfolded:not(.has-text) .tp { margin-top: 10px; }
+body.pill-free #island .tp-top { padding-right: 2px; }
+
+/* The free Knot's hover panel: the pill's list, by the same rules, beside the Knot. */
+#knot-panel { position: fixed; z-index: 6; display: none; box-sizing: border-box; width: 460px; max-width: calc(100vw - 16px); padding: 14px 4px 4px; border-radius: 22px; background: #000; color: #eceef5; box-shadow: 0 8px 26px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,255,255,.07); font-family: var(--font); pointer-events: auto; }
+#knot-panel.unfolded { display: block; animation: knot-panel-in 160ms cubic-bezier(.2,.8,.2,1); }
+#knot-panel[data-side='left'] { --panel-from: -12px; }
+#knot-panel[data-side='right'] { --panel-from: 12px; }
+#knot-panel .tp { max-height: calc(100vh - 34px); }
+#knot-panel .tp-top { padding-right: 2px; }
+@keyframes knot-panel-in { from { opacity: 0; translate: var(--panel-from, 0) 0; } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { #knot-panel.unfolded { animation: none; } }
+
+/* The options menu, in the panel's black. */
+#knot-menu { position: fixed; z-index: 7; box-sizing: border-box; width: 268px; padding: 6px; border-radius: 16px; background: #000; box-shadow: 0 18px 42px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.16); color: #eceef5; font: 13px/18px var(--font); pointer-events: auto; outline: none; }
+#knot-menu[hidden] { display: none; }
+#knot-menu .m-seg { display: flex; margin: 2px 2px 6px; padding: 2px; border: 1px solid rgba(255,255,255,.2); border-radius: 13px; }
+#knot-menu .m-seg button { flex: 1; padding: 4px 0; border: 0; border-radius: 10px; background: none; font: 600 12.5px/18px var(--font); color: #9aa0b4; cursor: pointer; }
+#knot-menu .m-seg button:hover { color: #fff; }
+#knot-menu .m-seg button.on { background: #fff; color: #000; cursor: default; }
+#knot-menu .m-row { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: none; font: 13px/18px var(--font); color: #eceef5; text-align: left; cursor: pointer; }
+#knot-menu .m-row:hover, #knot-menu .m-row:focus-visible { background: rgba(255,255,255,.09); outline: none; }
+#knot-menu .m-row u { position: relative; display: block; flex: none; width: 26px; height: 15px; border-radius: 8px; background: rgba(255,255,255,.2); text-decoration: none; }
+#knot-menu .m-row u::after { content: ''; position: absolute; left: 2px; top: 2px; width: 11px; height: 11px; border-radius: 50%; background: #c9ccd8; }
+#knot-menu .m-row.on u { background: #fff; }
+#knot-menu .m-row.on u::after { left: 13px; background: #000; }
+#knot-menu .m-sep { height: 1px; margin: 5px 8px; background: rgba(255,255,255,.12); }
+#knot-menu .m-dim { color: #9aa0b4; }
+
+/* In the pill only the Knot itself takes the mouse from the Knot's own layer: the
+   layer is wider than the Knot and lies over the pill's words. */
+body.island #toolbar, body.island #knot-shell { pointer-events: none; }
+body.island #orb { pointer-events: auto; }

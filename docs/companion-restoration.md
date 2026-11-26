@@ -118,7 +118,7 @@ Suite: 267 passing (was 256). Fixed with regression tests:
   WinUI app return "no control".
 - Same-snapshot follow-up from the Knot click and an "Ask more" action.
 - "Ask without screen" no longer captures; click bursts no longer toggle;
-  window-sized hits become "Select a region"; a control covered by the Nūs
+  window-sized hits become "Select a region"; a control covered by the J.A.R.V.I.S
   dashboard is not pointed at; clarification prompts carry the goal and
   current step; Escape on a selection keeps a paused walkthrough; an explicit
   Show rebuilds a crashed renderer; every voice stop logs its reason; the
@@ -144,7 +144,7 @@ Implemented (269 tests passing):
   ("Failed to authenticate: OAuth session expired"), and the Companion
   reported it as "Claude could not answer". `src/ai.js` now classifies that
   as `cli_not_logged_in`, and both the selection path and the guide fallback
-  say "Claude is signed out. Reconnect Claude in Nūs desktop Settings, or run
+  say "Claude is signed out. Reconnect Claude in J.A.R.V.I.S desktop Settings, or run
   claude in a terminal and sign in, then try again." Verified live.
 
 Not yet verified live: the bridge itself and Resume walkthrough, because
@@ -169,7 +169,7 @@ with the PNG pairs beside it:
 Caveats: Chromium logged `DxgiDuplicatorController failed` and fell back to
 GDI on this machine, so the DXGI/WGC path is not covered. Zoom, Teams
 (store), Discord, OBS and Game Bar are installed but were NOT tested; the
-manual table is `SHARE-CHECKLIST.md`. The Nūs dashboard window is never
+manual table is `SHARE-CHECKLIST.md`. The J.A.R.V.I.S dashboard window is never
 protected and appears in every capture, by design. The `NUS_NO_PROTECT=0`
 misparse from the earlier launcher is fixed (`=== '1'` only).
 
@@ -204,7 +204,7 @@ Suite 272 (two new regression tests). Two more live-found defects fixed:
   rebuilt packaged build: the click reached the app and the walkthrough ran
   through completion, confirmation and Keep on a fresh profile.
 
-- Evening: with Pranav's installed Nūs 0.2.3 running beside the dev build,
+- Evening: with Pranav's installed J.A.R.V.I.S 0.2.3 running beside the dev build,
   Ctrl+Shift+T recognized nothing because the installed app's click-through
   Companion overlay was "the window under the cursor". The probe now skips
   WS_EX_TRANSPARENT windows in both its cursor and foreground walks
@@ -228,12 +228,12 @@ first run in a throwaway data dir on the packaged build: onboarding appears
 and walks through, the Companion is present, the first Ctrl+Shift+T selected
 the right control and Claude answered in 6.4s, "Walk me through it" pointed at
 the exact button, and Talk on a profile with no speech provider says "Set up
-voice in Nūs, or add a speech provider in Settings." The first Keep on the
+voice in J.A.R.V.I.S, or add a speech provider in Settings." The first Keep on the
 packaged build was reached in the third fresh run (one real click on the
 pointed button, "Did the task finish?", Keep, one saved walkthrough in the
 throwaway profile). The second-account
 install stays untested: Pranav declined creating a test account; the
-per-user installer would overwrite his real install. `Nus-Setup.exe` was never
+per-user installer would overwrite his real install. `Jarvis-Setup.exe` was never
 run. Note: the packaged build contacts the update feed on launch.
 
 ## Phase 5 — demo-honest readiness (2026-09-10, Claude)

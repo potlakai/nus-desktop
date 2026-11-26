@@ -50,9 +50,10 @@ function adHocSignMac(context) {
 
 /** @type {import('electron-builder').Configuration} */
 const config = {
-  appId: 'com.nus.desktop',
-  productName: 'Nus',
-  copyright: 'Copyright 2026 Pranav Desu',
+  appId: 'com.jarvis.desktop',
+  productName: 'JARVIS',
+  // Upstream MIT copyright is kept (see LICENSE and NOTICE).
+  copyright: 'Copyright 2026 Om Senjalia; upstream portions Copyright 2026 Pranav Desu',
   directories: { output: 'dist', buildResources: 'build' },
   files: [
     'src/**/*',
@@ -63,13 +64,12 @@ const config = {
     '!docs/**',
     '!companion/test/**',
     '!scripts/**',
-    '!supabase/**',
     '!electron-builder.config.js',
   ],
   // nus-desktop:// carries the OAuth callback, the billing return, and the
   // acquisition token. Windows registers it at runtime (src/protocol.js);
   // macOS only honours CFBundleURLTypes in Info.plist, which this produces.
-  protocols: [{ name: 'Nus', schemes: ['nus-desktop'] }],
+  protocols: [{ name: 'JARVIS', schemes: ['jarvis'] }],
   afterPack: adHocSignMac,
   win: {
     target: [
@@ -77,7 +77,7 @@ const config = {
       { target: 'portable', arch: ['x64'] },
     ],
     icon: 'build/icon.ico',
-    artifactName: 'Nus-Setup.${ext}',
+    artifactName: 'JARVIS-Setup.${ext}',
     // whisper.cpp lives outside the asar so it can be spawned as a real exe.
     // The model is NOT bundled: it downloads to userData on first use. These
     // are Windows binaries, so only the Windows target carries them.
@@ -96,25 +96,25 @@ const config = {
       },
     } : {}),
   },
-  portable: { artifactName: 'Nus-Portable.${ext}' },
+  portable: { artifactName: 'JARVIS-Portable.${ext}' },
   nsis: {
     oneClick: true,
     perMachine: false,
     runAfterFinish: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: 'Nus',
-    uninstallDisplayName: 'Nūs',
+    shortcutName: 'JARVIS',
+    uninstallDisplayName: 'J.A.R.V.I.S',
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    // Two downloads with stable names, so the site can link
-    // releases/latest/download/Nus-arm64.dmg and Nus-x64.dmg forever.
+    // Two downloads with stable names, so a release page can link to
+    // releases/latest/download/JARVIS-arm64.dmg forever.
     target: [{ target: 'dmg', arch: ['arm64', 'x64'] }],
     // 1024px PNG; electron-builder renders the .icns from it.
     icon: 'build/icon.png',
     category: 'public.app-category.education',
-    artifactName: 'Nus-${arch}.${ext}',
+    artifactName: 'JARVIS-${arch}.${ext}',
     darkModeSupport: true,
     // No zip target and no latest-mac.yml on purpose: the updater is off on
     // macOS until the build is notarized (src/updater.js).
@@ -134,13 +134,14 @@ const config = {
     },
   },
   dmg: {
-    artifactName: 'Nus-${arch}.${ext}',
+    artifactName: 'JARVIS-${arch}.${ext}',
     contents: [
       { x: 130, y: 220 },
       { x: 410, y: 220, type: 'link', path: '/Applications' },
     ],
   },
-  publish: [{ provider: 'github', owner: 'potlakai', repo: 'nus-desktop' }],
+  // Releases come from the operator's own fork, not upstream's.
+  publish: [{ provider: 'github', owner: 'omsenjalia', repo: 'nus-desktop' }],
 };
 
 if (azure) console.log('[electron-builder] Azure Trusted Signing is configured; the Windows installer will be signed.');

@@ -1,0 +1,29 @@
+{
+  "about": "Held-out set, written 2026-11-11 after the rules were built and scored once before any change to them. Same labels as asks.json.",
+  "asks": [
+    { "text": "what's this about", "want": "screen" },
+    { "text": "can you tell me what this article says", "want": "screen" },
+    { "text": "whats wrong with my code", "want": "screen" },
+    { "text": "translate this into english", "want": "screen" },
+    { "text": "what does this word mean", "want": "screen" },
+    { "text": "do these numbers look right to you", "want": "screen" },
+    { "text": "explain the graph", "want": "screen" },
+    { "text": "summarise the email I have open", "want": "screen" },
+    { "text": "what is this popup asking me", "want": "screen" },
+    { "text": "can you look at this and tell me what's going on", "want": "screen" },
+    { "text": "read out the instructions", "want": "screen" },
+    { "text": "so what is happening on my screen right now", "want": "screen" },
+    { "text": "what's the difference between RAM and storage", "want": "general" },
+    { "text": "explain how compound interest works", "want": "general" },
+    { "text": "what year did the berlin wall fall", "want": "general" },
+    { "text": "give me a summary of hamlet", "want": "general" },
+    { "text": "how do I attach a file in gmail", "want": "guide" },
+    { "text": "where's the print button", "want": "guide" },
+    { "text": "how do i get rid of this popup", "want": "guide" },
+    { "text": "show me how to share this doc", "want": "guide" },
+    { "text": "open chrome", "want": "do" },
+    { "text": "type thank you so much", "want": "do" },
+    { "text": "help me", "want": "clarify" },
+    { "text": "uh", "want": "clarify" }
+  ]
+}

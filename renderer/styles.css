@@ -1,11 +1,13 @@
 :root {
-  --ink: #0a0c11;
-  --rail: #0f1118;
-  --paper: #f1eee6;
-  --paper-2: #e9e5db;
-  --line: rgba(25, 29, 42, .13);
-  --muted: #777a83;
-  --blue: #3549e5;
+  /* Colour comes from themes.css so one switch turns the whole window. The
+     fallbacks keep the sheet usable on its own. */
+  --ink: var(--ink-theme, #0a0c11);
+  --rail: var(--theme-panel, #0f1118);
+  --paper: var(--paper-theme, #f1eee6);
+  --paper-2: var(--paper-theme-2, #e9e5db);
+  --line: var(--line-theme, rgba(25, 29, 42, .13));
+  --muted: var(--muted-theme, #777a83);
+  --blue: var(--accent, #3549e5);
   --blue-soft: #dfe3ff;
   --red: #d95c53;
   --green: #2b8169;
@@ -310,7 +312,7 @@ p { line-height: 1.55; }
 /* ===== Hero orb: Knot state tinting (mirrors the Companion overlay) ===== */
 /* One custom property carries the state color, so changing state tweens the
    glow and edges instead of snapping between hardcoded classes. */
-.hero-orb { --knot-tint: 77,94,226; --knot-accent: #506CFF; transition: filter .9s ease; }
+.hero-orb { --knot-tint: 77,94,226; --knot-accent: var(--accent, #506CFF); transition: filter .9s ease; }
 .hero-orb[data-knot='listening'] { --knot-tint: 105,226,207; --knot-accent: #69E2CF; animation-duration: 2.6s; }
 .hero-orb[data-knot='thinking'] { --knot-tint: 140,150,255; --knot-accent: #8C96FF; animation-duration: 1.8s; }
 .hero-orb[data-knot='ready'] { --knot-tint: 105,226,160; --knot-accent: #7BD8A8; animation-duration: 4.4s; }
@@ -485,6 +487,15 @@ p { line-height: 1.55; }
 /* ---- Plan card, upgrade sheet, account chip (billing pass 2026-08-22) ---- */
 .setting-card > div { min-width: 0; flex: 1 1 auto; }
 .setting-card .status-badge { flex: none; margin-left: 16px; }
+
+/* Appearance: two buttons rather than a dropdown, because there are two and the
+   choice is worth seeing side by side. The chosen one carries the accent. */
+.theme-choices { display: flex; gap: 10px; margin-top: 14px; }
+.theme-choice { display: flex; flex-direction: column; gap: 2px; min-width: 132px; padding: 10px 14px; text-align: left; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); color: var(--ink); transition: border-color .15s, background .15s; }
+.theme-choice small { color: var(--muted); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+.theme-choice:hover { border-color: var(--blue); }
+.theme-choice.on { border-color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); }
+.theme-choice.on small { color: var(--blue); }
 .setting-card.flash { border-color: rgba(53,73,229,.55); box-shadow: 0 0 0 4px rgba(53,73,229,.12); }
 #auth-card .sheet-actions, .license-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
 .license-actions button, #auth-card .sheet-actions button { flex: none; }
@@ -541,7 +552,7 @@ aside.rail { position: relative; }
 .onboard-auth #ob-google { justify-content: center; padding: 12px 16px; background: #fff; color: #161923; font-size: 11.5px; }
 .onboard-auth #ob-google:hover { background: #e9ecff; }
 .onboard-auth .quiet-button { border: 1px solid rgba(110,130,255,.35); color: #cdd6ff; background: rgba(53,73,229,.14); }
-.onboard-knot { position: absolute; right: 34px; top: 50%; width: 300px; height: 300px; transform: translateY(-50%); pointer-events: none; z-index: 1; --knot-tint: 77,94,226; --knot-accent: #506CFF; }
+.onboard-knot { position: absolute; right: 34px; top: 50%; width: 300px; height: 300px; transform: translateY(-50%); pointer-events: none; z-index: 1; --knot-tint: 77,94,226; --knot-accent: var(--accent, #506CFF); }
 .onboard-knot canvas { width: 100%; height: 100%; display: block; }
 @media (max-width: 980px) { .onboard-knot { width: 200px; height: 200px; right: 10px; opacity: .55; } }
 

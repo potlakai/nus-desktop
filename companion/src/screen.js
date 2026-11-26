@@ -28,9 +28,14 @@ async function captureDisplay(displayId, opts = {}) {
   const display = (displayId != null && displays.find((d) => d.id === displayId)) || screen.getPrimaryDisplay();
   const scale = display.scaleFactor || 1;
   const pxWidth = Math.floor(display.size.width * scale), pxHeight = Math.floor(display.size.height * scale);
-  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: pxWidth, height: pxHeight } });
+  // opts.thumb: ask for the small picture directly instead of the whole screen
+  // and shrinking it here. Assignment mode's change frames, three a second,
+  // made the cursor stutter when each one was a full 2560 px grab (2026-09-21).
+  const tf = opts.thumb ? Math.min(1, maxSide / Math.max(pxWidth, pxHeight)) : 1;
+  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: Math.max(1, Math.round(pxWidth * tf)), height: Math.max(1, Math.round(pxHeight * tf)) } });
   if (!sources.length) return null;
   const src = sources.find((s) => String(s.display_id) === String(display.id)) || sources[0];
+  const syncStarted = performance.now();
   let img = src.thumbnail;
   if (!img || img.isEmpty()) return null;
   const size = img.getSize();
@@ -40,12 +45,19 @@ async function captureDisplay(displayId, opts = {}) {
     img = img.resize({ width: Math.round(size.width * f), height: Math.round(size.height * f), quality: 'good' });
   }
   const out = img.getSize();
-  return {
-    dataUrl: nativeImage ? img.toDataURL() : null,
+  const cap = {
+    // opts.dataUrl === false: the caller only wants `image` (assignment mode's
+    // change frames and JPEGs), so the PNG encode is skipped.
+    dataUrl: nativeImage && opts.dataUrl !== false ? img.toDataURL() : null,
     width: out.width, height: out.height,
     pxWidth: size.width, pxHeight: size.height,
     display: { id: display.id, bounds: display.bounds, workArea: display.workArea, scaleFactor: scale },
+    blockMs: performance.now() - syncStarted,
   };
+  // Kept for the "did the click change anything" hash, so the PNG is not
+  // decoded again. Not enumerable: it never travels with the capture.
+  Object.defineProperty(cap, 'image', { value: img, enumerable: false });
+  return cap;
 }
 
 module.exports = { captureScreenshot, captureDisplay };

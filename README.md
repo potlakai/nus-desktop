@@ -1,161 +1,177 @@
-# Nūs Desktop
+# J.A.R.V.I.S
 
-The semester organizer that runs on your own AI, on your own machine. Import a
-real syllabus, see your whole semester as a living map, and let Nūs propose the
-next move. Nothing is saved without your review, and your coursework never
-leaves your computer except through the calls you configure below (see
-[Privacy](#privacy) for the anonymous usage stats and how to turn them off).
+A personal desktop assistant that runs on this machine. It reads this screen,
+moves this mouse, types into these windows, opens these apps, drives this
+browser, and keeps this calendar — on your own AI keys, with nothing sent to
+anyone else's server.
 
-## You bring the AI (required)
+Address him as you would a butler: say what you want done. He answers as one —
+formal, brief, British — and asks before anything irreversible.
 
-Nūs has no server and no bundled model. It needs two keys, and they do
-different jobs:
+This is a personal build, cut down from the Nūs Desktop codebase. It is not
+distributed, has no accounts, no billing, no telemetry and no sign-in. See
+[What was removed](#what-was-removed) for exactly what was taken out and
+[License](#license) for the upstream notice, which is kept.
 
-**1. Claude, for the desktop app.** Reading syllabi, the Ask bar, and the chat
-thread all run on Anthropic's Claude, pinned to the mid-tier **Sonnet** model
-so a semester of use stays affordable.
-- If **Claude Code** is installed on your machine, Nūs finds it automatically
-  and uses your existing subscription. Nothing to paste.
-- Otherwise, get an **Anthropic API key** (console.anthropic.com) and paste it
-  in **Settings → AI provider**. It is encrypted on this device with your OS
-  keychain and only ever used to call Anthropic.
+## What he does
 
-**2. Gemini, for the Companion overlay.** The floating Knot that watches your
-screen and listens in meetings runs on its own key so live answers stay fast
-and cheap. Get a free **Google Gemini** key (aistudio.google.com/apikey) and
-paste it in **Settings → Companion AI key**, or in the Knot's own gear icon.
-The Gemini key covers the Companion's answers. Speech to text needs no key at
-all: Nūs transcribes on your own machine with whisper.cpp (see **Voice** below)
-and only falls back to a Gemini or OpenAI key if the local engine is missing.
-(OpenAI, Anthropic, and Nvidia keys also work for answering.)
+- **Answers, on your key.** Nine providers are wired: OpenAI, Anthropic,
+  Gemini, Groq, Nvidia, OpenRouter, Ollama (local, keyless), opencode, and any
+  OpenAI-compatible endpoint you point at with a base URL.
+- **Reads the screen.** A screen capture goes to the model with your question,
+  and the answer comes back pointing at the control you need. Password and
+  card fields are refused before a capture is sent.
+- **Uses the computer.** Hands is on: he plans a multi-step job, clicks, types
+  and reads the result back, for up to 40 steps and two minutes a step. Every
+  risky action — buy, pay, send, submit, delete, sign out, transfer, publish,
+  uninstall — stops for a confirmation card first. Unattended scheduled jobs
+  never auto-approve one.
+- **Keeps a calendar.** Courses, assignment due dates, tasks with sub-steps, and
+  automations on a schedule.
+- **Works on a schedule.** A rule can ask him to do something on cron time —
+  `0 9 * * 1-5` is "every weekday at nine". An unattended run may read, open and
+  look, but it never approves a card on your behalf: a step that would send, pay
+  or delete stops the run and tells you.
+- **Remembers.** Facts you tell him live in a local database and come back when
+  they are relevant.
+- **Speaks.** Push-to-talk with local whisper for transcription, and a local
+  Kokoro voice for replies. No audio leaves the machine.
 
-The first-run walkthrough points at both cards.
+The persona lives in `companion/src/persona.js` — name, honorific, tone and
+voice rules in one place, so changing who he is means changing one file. (The
+switchable Nūs / J.A.R.V.I.S appearance is still to come; today the rebrand is
+in the copy and the prompts, not the palette.)
+
+## Two looks
+
+He wears gold on deep blue-black by default. The original Nūs violet is still
+there if you prefer it: Settings, **How he looks**, or Ctrl+Shift+L from
+anywhere in the window. The setting is one preference, applied to all three
+windows, and it changes colour only.
+
+## You bring the AI
+
+There is no bundled model and no server in the middle. Set a provider in
+**Settings → AI provider**.
+
+Cheapest paths:
+
+- **Ollama**, fully local: `ollama pull qwen2.5vl` (a vision model, so screen
+  reading works), then provider `ollama`, base `http://localhost:11434/v1`, no
+  key.
+- **Anthropic**, if you already have Claude Code installed: he finds it and
+  uses the subscription, nothing to paste.
+- **Gemini** free tier, for the overlay's live answers.
+
+Keys are stored on this device only, encrypted with the OS keychain where one
+exists. Hands needs a vision-capable model — the provider picker says which of
+the nine can see a screenshot.
 
 ## Install and run
-
-Grab `Nus-Setup.exe` (installer) or `Nus-Portable.exe` (no install) on
-Windows, or `Nus-arm64.dmg` (Apple Silicon) / `Nus-x64.dmg` (Intel) on a Mac,
-from a release, or run from source:
 
 ```
 npm install
 npm start
 ```
 
-`npm test` runs the full assertion suite. `npm run smoke` boots and exits.
-`npm run tour` replays the walkthrough. `npm run dist` builds the installers.
-`npm run setup:voice` downloads the local speech engine (whisper.cpp plus the
-base English model, about 65 MB, once) into `vendor/`. The installers bundle the
-engine and fetch the model on first use, so only source builds need this step.
+| Command | What it does |
+|---|---|
+| `npm test` | Full assertion suite (1026 tests) |
+| `npm run smoke` | Boots and exits |
+| `npm run tour` | Replays the walkthrough |
+| `npm run dist` | Builds the Windows installer into `dist/` |
+| `npm run setup:voice` | Downloads whisper.cpp + the base English model (~65 MB) into `vendor/` |
 
-### Why Windows warns you about the download
+## Zen
 
-The installer is not code signed yet, so SmartScreen shows **"Windows
-protected your PC", Publisher: Unknown publisher** the first time you run
-`Nus-Setup.exe`. That is the absence of a certificate, not a detection. Click
-**More info**, then **Run anyway**. The build is reproducible from this repo,
-every release lists the SHA-512 of its artifacts in `latest.yml`, and Windows
-Defender scans it clean. Signing is wired and waiting on a certificate; see
-`docs/release.md`.
+He can read, click and fill in the tab you are looking at in Zen, through Zen's
+own remote control. It needs Zen restarted once with a port:
 
-### Why your Mac says it could not verify the app
+```
+zen --remote-debugging-port=9222
+```
 
-Same reason. The Mac build is not notarized yet, so the first open says
-**"Apple could not verify Nus is free of malware"**. Click **Done**, open
-**System Settings › Privacy & Security**, scroll to the Security section and
-press **Open Anyway** next to Nus, then confirm once. That is the only time
-it asks. The Mac build cannot update itself until it is notarized, so a new
-version means downloading the dmg again. Local voice (the on-device Whisper
-engine) is Windows-only for now; everything else is the same app.
+Then **Settings → Control Zen**. Zen is Firefox-based, so this speaks WebDriver
+BiDi, not Chrome's protocol; Chrome and Edge are still driven the way they were,
+by launching them and clicking the screen. Off until you turn it on. Details,
+limits and the error table are in [docs/browser-zen.md](docs/browser-zen.md).
 
-### Free and Pro
+`npm run dist` produces `JARVIS-Setup.exe` and the portable build. They are not
+code signed, so SmartScreen will say **"Windows protected your PC", Publisher:
+Unknown publisher** the first time. Click **More info → Run anyway**. That
+absence of a signature is not a detection; the build is from this repo.
 
-Nūs Free runs a whole semester with honest caps: 3 AI syllabus imports, 10
-questions a day, 1 connected account, 1 automation rule, 20 Companion minutes
-a day with 7 days of history, 512 MB of storage. Pro ($9.99 a month) lifts
-them. Caps are counted locally; the plan itself is tied to your Nūs account
-(your account is an email and a plan, nothing else) and paid through Stripe
-Checkout. Card details never touch this app.
-
-## What's inside
-
-- **Today**: your dashboard. The Ask bar takes plain requests ("push the calc
-  homework to Friday", "email my professor about an extension") and proposes
-  the exact change before anything is written.
-- **Voice**: click the Knot on Today and just talk. Speech to text runs locally
-  with whisper.cpp, so no key is needed and no audio leaves your computer. Your
-  words and the streamed reply appear under the Knot, which lights up as it
-  listens, thinks, and speaks. Files Nūs reads while thinking surface as stars
-  on the constellation. Talking over a spoken reply interrupts it.
-- **Map**: every course, source, and open task as a draggable knowledge graph.
-- **Calendar / Smart tasks / Semester**: deadlines, task breakdowns with
-  review, GPA projection that never guesses missing weights.
-- **Knot**: the Companion pane and a persistent chat thread that can create
-  tasks, move dates, and draft emails, each with a confirm step.
-- **Email**: a professor-email drafter that works with no connection at all.
-  Add your sending addresses and any draft opens pre-filled in Gmail with
-  **Open in Gmail** (no Gmail account connection needed). Outlook connects
-  read-only for the inbox brief and your writing style; sending through
-  Outlook is a separate opt-in.
-
-## The Companion
-
-The Knot floats on your desktop, keeps running after you close the dashboard,
-and comes back from the tray. **Turn off Companion** on the Knot pane removes
-it completely and releases the hotkeys until you turn it back on.
-
-Click the Knot and type what you need ("show me how to add a chart"), or hold
-the push-to-talk key and say it. The Knot reads the screen once, a strand runs
-to the one control to click, and a bubble at the tip says the step. Click it
-and the Knot re-reads the screen for the next step; Esc winds it back. When
-the task is done you can Keep the steps, and the same ask in the same app
-replays them without a model call.
-
-Point at a button, an error, or any spot on the Knot's display and press
-`Ctrl+Shift+T`: the strand runs to that control, you type a question about it,
-and the answer lands at the tip with "Walk me through it" to turn it into a
-step-by-step guide. Sensitive fields such as password boxes are refused.
-Pointing works on the display the Knot lives on; other monitors are next.
+## Keys
 
 | Keys | Action |
 |---|---|
-| `Ctrl+Shift+T` (Windows) | Point at what you need help with |
-| `Ctrl+Shift+Space` (`⌘⇧Space` on a Mac) | Hide or show the overlay |
-| `Ctrl+Shift+X` (`⌘⇧X`) | Panic: stop listening and vanish |
-| `Ctrl+Enter` (`⌘Enter`) | What should I do? (rebindable in Companion settings) |
+| `Ctrl+Shift+T` | Point at what you need help with |
+| `Ctrl+Shift+Space` | Show or hide the overlay |
+| `Ctrl+Shift+X` | Panic: stop listening and vanish |
+| `Ctrl+Enter` | "What should I do?" (rebindable) |
 
-The overlay is concealed from screen sharing and recordings: the Knot, the
-strand and the bubbles do not appear in what you share. Follow the rules of
-every meeting, class, interview, or assessment you are in.
+The overlay is invisible to screen shares and recorders. Follow the rules of
+any meeting, class, interview or assessment you are in.
+
+## Where things live
+
+- Database: `%APPDATA%\JARVIS\data\nus.db` — the file name is kept from
+  upstream on purpose, so an existing install's data still opens.
+- Settings: same folder. Keys such as `reportToNus` and
+  `shareNusContextWithProvider` also keep their original spelling for that
+  reason; they are only settings names, and they no longer report anything.
+- Logs: `%APPDATA%\JARVIS\logs\`.
 
 ## Privacy
 
-Local-first by design. The database lives at `%APPDATA%\Nus\data\nus.db`
-(`~/Library/Application Support/Nus/data/nus.db` on a Mac) and
-everything Nūs knows stays on this device. The outbound calls are the AI
-providers you configured, the integrations you explicitly connect, and, if you
-sign in, the Supabase account check (email and plan, never content) plus Stripe
-when you buy Pro. There is no cloud sync of your coursework.
+Nothing leaves this machine except the calls you configure: your AI provider,
+and any integration you connect yourself. There is no account, no billing, no
+analytics, and no outbound telemetry — `src/stats.js` and
+`companion/src/stats.js` are disabled at the source, and the toggles were
+removed from the UI rather than left as switches that do nothing.
 
-Anonymous usage stats (which features get used, on a random install id) help
-us see what works. Your coursework and what you type stay on your device. Turn
-it off in Settings. The full list of what is sent, where the install id lives,
-and how to switch it off is in [docs/stats.md](docs/stats.md).
+## What was removed
+
+Cut from the upstream codebase in this fork, each verified by the test suite:
+
+| Removed | How |
+|---|---|
+| Sign-in, accounts, plan checks | `src/auth.js` reports unconfigured; `src/license.js` always says personal |
+| Billing, Stripe, upsell | all checkout paths and UI gone |
+| Caps and paywalls | `src/limits.js` neutralised, and the gate sites no longer short-circuit |
+| Anonymous usage stats | both stats modules disabled; UI toggles removed |
+| The old owner's product identity | name, protocol, window titles, buyer links |
+
+The upstream MIT `LICENSE` and copyright notices are kept in full — that is a
+licence condition, and removing a product's identity is not the same as
+removing its notices.
+
+Also gone, because they pointed at the previous owner rather than at you:
+
+| Removed | Why |
+|---|---|
+| `companion/src/publik/` and its sign-in window | the paid answering account, and everything behind it |
+| `account.js`, `entitlement.js`, `account-link.js`, `account-offer.js` | the account, its plan and its settings sync; nothing outside their own tests used them |
+| the Account card and sign-in offer in the dashboard | markup only: their IPC channels were registered by nothing |
+| `updates.js`, `channel.js`, `one-click.js` | the updater read **his** GitHub releases; adopting one would have replaced this app with his |
+| the upstream Supabase URLs | feedback and usage rows now stay on this computer; the URLs are empty strings |
+
+Nothing in the tree contacts a server that is not one you configured yourself.
+`companion/src/reflex/jev.js` is the one third-party call left, and it only runs
+if you paste a TypeSafe key; leave the field blank and it never leaves.
 
 ## Stack
 
 Electron, vanilla JS, sql.js (WASM SQLite). One process, two windows: the
-Companion overlay ships inside the app, so there is one installer, one
-settings store, one runtime.
+Companion overlay ships inside the app, so there is one installer, one settings
+store and one runtime.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT, as upstream. See [LICENSE](LICENSE) — the original copyright notice is
+kept.
 
-The OAuth client IDs in `src/config.js` are gitignored but ship inside the
-installer, deliberately: Google documents desktop OAuth clients as public
-clients whose secret is not confidential, and Calendar and Outlook would not
-work for anyone without them. `src/shipped-secrets.test.js` is the tripwire
-that fails the build if a genuinely confidential credential ever lands in a
-packaged file. Bring your own credentials by creating that file locally;
-`docs/credentials-needed.md` walks through it.
+The OAuth client IDs described in `docs/credentials-needed.md` are the
+upstream's public desktop clients; `src/shipped-secrets.test.js` is the
+tripwire that fails the build if a genuinely confidential credential lands in
+a packaged file.

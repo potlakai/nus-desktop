@@ -1,0 +1,1435 @@
+{
+  "label": "v0.1.19",
+  "root": "C:\\Users\\prana\\AppData\\Local\\Temp\\claude\\61b50aee71c7b8c9\\545a98aa-f3c9-4b48-b0ce-132fda7a0850\\scratchpad\\before\\companion",
+  "at": "2026-11-12T00:06:42.799Z",
+  "runs": {
+    "handsOff": {
+      "total": 46,
+      "ok": 17,
+      "by": {
+        "screen": {
+          "n": 27,
+          "ok": 3
+        },
+        "general": {
+          "n": 6,
+          "ok": 5
+        },
+        "guide": {
+          "n": 7,
+          "ok": 7
+        },
+        "do": {
+          "n": 2,
+          "ok": 2
+        },
+        "clarify": {
+          "n": 4,
+          "ok": 0
+        }
+      },
+      "misses": [
+        {
+          "text": "summarize what is going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "his report"
+        },
+        {
+          "text": "sumamrize waht was going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "his report, his spelling, typed"
+        },
+        {
+          "text": "summarize what you see",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "his report"
+        },
+        {
+          "text": "Sutterize this text box.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:06, whisper for summarize"
+        },
+        {
+          "text": "Okay, summarize the output here.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:23"
+        },
+        {
+          "text": "I want you to summarize it for me.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:35"
+        },
+        {
+          "text": "What do you see here?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:52"
+        },
+        {
+          "text": "summerize this for me",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can you summarise whats on my screen",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "Summarize what's going on over here.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "explain this error",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what does this mean",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "Can you read what this says?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "is this right",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "is my answer correct",
+          "want": "screen",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what am I looking at",
+          "want": "screen",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "tell me about this",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "describe what's on my screen",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "explain what this code does",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "why is this red",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what does this error message mean",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what's going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can u explain whats on the screen rn",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "What's this chart showing?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "summarize the french revolution",
+          "want": "general",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "help",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can you help me",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "do the thing",
+          "want": "clarify",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "um so like",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        }
+      ],
+      "rows": [
+        {
+          "text": "summarize what is going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "his report"
+        },
+        {
+          "text": "sumamrize waht was going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "his report, his spelling, typed"
+        },
+        {
+          "text": "summarize what you see",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "his report"
+        },
+        {
+          "text": "Sutterize this text box.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:06, whisper for summarize"
+        },
+        {
+          "text": "Okay, summarize the output here.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:23"
+        },
+        {
+          "text": "I want you to summarize it for me.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:35"
+        },
+        {
+          "text": "What do you see here?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:52"
+        },
+        {
+          "text": "summerize this for me",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can you summarise whats on my screen",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "Summarize what's going on over here.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what is this page saying",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "summarize",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "explain this error",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what does this mean",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "read this to me",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "read",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "Can you read what this says?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "is this right",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "is my answer correct",
+          "want": "screen",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what am I looking at",
+          "want": "screen",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "tell me about this",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "describe what's on my screen",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "explain what this code does",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "why is this red",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what does this error message mean",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "give me the gist of this",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "summarize",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what's going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can u explain whats on the screen rn",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "What's this chart showing?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what's a pivot table",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "who wrote pride and prejudice",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how many ounces are in a cup",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "explain photosynthesis",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "summarize the french revolution",
+          "want": "general",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what's the capital of australia",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "where do I turn on dark mode",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how do I make a table",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how do I summarize this in Word",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "show me where the settings are",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "where is the submit button",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how can I change the font size here",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "walk me through attaching a file",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "open notepad and type hello",
+          "want": "do",
+          "got": "do",
+          "route": "reflex",
+          "why": "open_app+type_text",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "open spotify",
+          "want": "do",
+          "got": "do",
+          "route": "reflex",
+          "why": "open_app",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "help",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can you help me",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "do the thing",
+          "want": "clarify",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "um so like",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        }
+      ]
+    },
+    "handsOn": {
+      "total": 48,
+      "ok": 19,
+      "by": {
+        "screen": {
+          "n": 27,
+          "ok": 3
+        },
+        "general": {
+          "n": 6,
+          "ok": 5
+        },
+        "guide": {
+          "n": 7,
+          "ok": 7
+        },
+        "do": {
+          "n": 4,
+          "ok": 4
+        },
+        "clarify": {
+          "n": 4,
+          "ok": 0
+        }
+      },
+      "misses": [
+        {
+          "text": "summarize what is going on here",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": "his report"
+        },
+        {
+          "text": "sumamrize waht was going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "his report, his spelling, typed"
+        },
+        {
+          "text": "summarize what you see",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": "his report"
+        },
+        {
+          "text": "Sutterize this text box.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:06, whisper for summarize"
+        },
+        {
+          "text": "Okay, summarize the output here.",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:23"
+        },
+        {
+          "text": "I want you to summarize it for me.",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:35"
+        },
+        {
+          "text": "What do you see here?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:52"
+        },
+        {
+          "text": "summerize this for me",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can you summarise whats on my screen",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "Summarize what's going on over here.",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "explain this error",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what does this mean",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "Can you read what this says?",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "is this right",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "is my answer correct",
+          "want": "screen",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what am I looking at",
+          "want": "screen",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "tell me about this",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "describe what's on my screen",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "explain what this code does",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "why is this red",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what does this error message mean",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what's going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can u explain whats on the screen rn",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "What's this chart showing?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "summarize the french revolution",
+          "want": "general",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "help",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can you help me",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "do the thing",
+          "want": "clarify",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "um so like",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        }
+      ],
+      "rows": [
+        {
+          "text": "summarize what is going on here",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": "his report"
+        },
+        {
+          "text": "sumamrize waht was going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "his report, his spelling, typed"
+        },
+        {
+          "text": "summarize what you see",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": "his report"
+        },
+        {
+          "text": "Sutterize this text box.",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:06, whisper for summarize"
+        },
+        {
+          "text": "Okay, summarize the output here.",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:23"
+        },
+        {
+          "text": "I want you to summarize it for me.",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:35"
+        },
+        {
+          "text": "What do you see here?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": "route.log 23:48:52"
+        },
+        {
+          "text": "summerize this for me",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can you summarise whats on my screen",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "Summarize what's going on over here.",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what is this page saying",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "summarize",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "explain this error",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what does this mean",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "read this to me",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "read",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "Can you read what this says?",
+          "want": "screen",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "is this right",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "is my answer correct",
+          "want": "screen",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what am I looking at",
+          "want": "screen",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "tell me about this",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "describe what's on my screen",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "explain what this code does",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "why is this red",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what does this error message mean",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "give me the gist of this",
+          "want": "screen",
+          "got": "screen",
+          "route": "page",
+          "why": "summarize",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "what's going on here",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can u explain whats on the screen rn",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "What's this chart showing?",
+          "want": "screen",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what's a pivot table",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "who wrote pride and prejudice",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how many ounces are in a cup",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "explain photosynthesis",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "summarize the french revolution",
+          "want": "general",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "what's the capital of australia",
+          "want": "general",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "where do I turn on dark mode",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how do I make a table",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how do I summarize this in Word",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "show me where the settings are",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "where is the submit button",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "how can I change the font size here",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "walk me through attaching a file",
+          "want": "guide",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "open notepad and type hello",
+          "want": "do",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "open spotify",
+          "want": "do",
+          "got": "do",
+          "route": "reflex",
+          "why": "open_app",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "summarize this and email it to my professor",
+          "want": "do",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "open the pdf and summarize it",
+          "want": "do",
+          "got": "do",
+          "route": "hands",
+          "why": "",
+          "ok": true,
+          "real": ""
+        },
+        {
+          "text": "help",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "can you help me",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "do the thing",
+          "want": "clarify",
+          "got": "general",
+          "route": "plain",
+          "why": "",
+          "ok": false,
+          "real": ""
+        },
+        {
+          "text": "um so like",
+          "want": "clarify",
+          "got": "guide",
+          "route": "guide",
+          "why": "",
+          "ok": false,
+          "real": ""
+        }
+      ]
+    }
+  }
+}

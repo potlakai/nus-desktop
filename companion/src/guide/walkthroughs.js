@@ -14,8 +14,26 @@ const path = require('path');
 const { tokenOverlap } = require('./verify');
 
 const MAX_ENTRIES = 80;
-const MATCH_MIN = 0.6;
+// A near match replays with no model call, so it has to be near: the words
+// that carry the task (after "how do i", "the", "my"...) must agree three
+// quarters. "insert a table" and "insert a chart" used to match at 0.75 with
+// the filler counted; now they share one word in two and do not.
+const MATCH_MIN = 0.75;
 const BROWSERS = new Set(['chrome', 'msedge', 'firefox', 'brave', 'opera', 'arc', 'vivaldi']);
+const FILLER = new Set(['how', 'do', 'does', 'can', 'could', 'would', 'should', 'i', 'you', 'we', 'me', 'my', 'the', 'a', 'an', 'to', 'in', 'on', 'at', 'of', 'for', 'with', 'this', 'that', 'it', 'please', 'help', 'show', 'where', 'is', 'are', 'want', 'need', 'like', 'and', 'then', 'into', 'from', 'up', 'now']);
+
+function taskTerms(s) {
+  return new Set(String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter((t) => t.length > 1 && !FILLER.has(t)));
+}
+
+// Fraction of the asked task's meaningful words found in the saved one.
+function taskOverlap(saved, asked) {
+  const a = taskTerms(asked), b = taskTerms(saved);
+  if (!a.size || !b.size) return 0;
+  let hit = 0;
+  for (const t of a) if (b.has(t)) hit++;
+  return hit / Math.max(a.size, b.size);
+}
 
 function slug(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
@@ -90,7 +108,7 @@ function createWalkthroughs(opts = {}) {
     let best = null, bestScore = 0;
     for (const w of data.walkthroughs) {
       if (w.stale || w.app.process !== proc) continue;
-      let score = tokenOverlap(w.task, task);
+      let score = taskOverlap(w.task, task);
       // In a browser the process says nothing about the site: the tab title has to agree too.
       if (BROWSERS.has(proc) && title && w.app.title && tokenOverlap(w.app.title, title) < 0.5) score *= 0.5;
       if (score > bestScore) { best = w; bestScore = score; }
@@ -116,4 +134,4 @@ function createWalkthroughs(opts = {}) {
   return { record, find, miss, markStale, forget, list, forApp, get, keyFor, file };
 }
 
-module.exports = { createWalkthroughs, keyFor, slug, MATCH_MIN };
+module.exports = { createWalkthroughs, keyFor, slug, taskOverlap, MATCH_MIN };

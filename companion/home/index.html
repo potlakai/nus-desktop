@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en" data-theme-pending>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
+  <title>J.A.R.V.I.S Dashboard</title>
+  <!-- The look, chosen before the first paint. themes.css is a whole
+       palette on its own; themes.js picks which one. -->
+  <script src="../../renderer/themes.js"></script>
+  <link rel="stylesheet" href="../../renderer/themes.css" />
+  <link rel="stylesheet" href="home.css" />
+  <link rel="stylesheet" href="now.css" />
+  <link rel="stylesheet" href="mynus.css" />
+</head>
+<body>
+  <aside class="rail">
+    <canvas id="brand-knot" class="brand-mark" aria-hidden="true"></canvas><h1>NŪS</h1><small class="version">Version <span id="app-version"></span></small>
+    <nav aria-label="Main navigation">
+      <button data-view="start" id="nav-start" class="active" aria-current="page">Dashboard</button>
+      <button data-view="mynus" id="nav-mynus">Your week</button>
+      <button data-view="saved">Saved</button>
+      <button data-view="map">Map</button>
+      <button data-view="folders">Folders</button>
+      <button data-view="settings">Settings</button>
+      <button data-view="feedback" id="nav-feedback">Feedback</button>
+    </nav>
+    <div class="rail-foot"><span class="status-dot"></span><span id="companion-state">Starting the Knot</span><p>Close this window any time.<br>The Knot stays with you.</p><button id="tutorial" class="quiet">Quick tour</button></div>
+  </aside>
+  <main>
+    <header><div><h2 id="view-title">Dashboard</h2></div><button id="show-knot">Show the Knot</button></header>
+    <p id="notice" role="status" aria-live="polite"></p>
+    <p id="toast" role="status" aria-live="polite" hidden></p>
+    <section id="update-card" class="glass card" aria-label="New version" hidden>
+      <div class="stats-line"><p><strong id="update-title">A newer the Companion is out.</strong> <span class="muted" id="update-copy"></span></p><span class="row-actions"><button id="update-download" class="primary">Download</button><button id="update-later" class="quiet">Later</button></span></div>
+    </section>
+    <section id="contact-card" class="glass card" aria-label="News from J.A.R.V.I.S" hidden>
+      <form id="contact-form" class="stats-line" novalidate><p><strong id="contact-title"></strong> <span class="muted" id="contact-copy"></span></p><span class="row-actions"><input id="contact-email" type="email" maxlength="200" autocomplete="email" aria-label="Your email"><button id="contact-save" type="submit" class="primary"></button><button id="contact-no" type="button" class="quiet"></button></span></form>
+      <p id="contact-note" class="muted" role="status" aria-live="polite"></p>
+    </section>
+    <section id="stats-intro" class="glass card" aria-label="Anonymous usage stats" hidden>
+      <div class="stats-line"><p class="muted">J.A.R.V.I.S sends anonymous usage stats (which features get used, never your coursework or what you type). Turn off in Settings.</p><label class="check switch"><input id="send-stats-intro" type="checkbox">Send anonymous usage stats</label></div>
+      <div class="stats-source"><span>Where did you hear about J.A.R.V.I.S?</span><div class="source-row"><button data-source="instagram">Instagram</button><button data-source="friend">A friend</button><button data-source="reddit">Reddit</button><button data-source="x">X</button><button data-source="youtube">YouTube</button><button data-source="search">Search</button><button data-source="other">Other</button><button data-source="skipped" class="quiet">Skip</button></div></div>
+    </section>
+    <section id="view-map" class="view active" aria-label="Map">
+      <div class="view-intro"><p>Your folders, routines, and conversations, connected.<br><span class="muted">Drag to arrange. Scroll to zoom. Select a node to open it.</span></p><div class="map-tools"><button id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-label">100%</span><button id="zoom-in" aria-label="Zoom in">+</button><button id="map-fit">Fit</button></div></div>
+      <div id="map-stage"><div id="map-world"><svg id="map-edges" aria-hidden="true"></svg><div id="map-nodes"></div></div></div>
+    </section>
+    <section id="view-mynus" class="view" aria-label="Your week">
+      <div class="n-head"><div class="n-eyebrow">Your week with J.A.R.V.I.S</div><h2 class="n-title" id="n-title">Your <em>week.</em></h2><p class="n-sub">Worked out on this computer. Sent nowhere.</p></div>
+      <div class="n-stats" id="n-stats"></div>
+      <div class="n-eyebrow">This week</div>
+      <div class="n-week" id="n-week"></div>
+      <div class="n-lower">
+        <div><div class="n-eyebrow">What you use me for</div><ul class="n-list" id="n-uses"></ul></div>
+        <div><div class="n-eyebrow">Coming up</div><ul class="n-list" id="n-unlocks"></ul><div class="n-eyebrow" style="margin-top:22px">What I keep for you</div><ul class="n-list" id="n-kept"></ul><div class="n-acts"><button type="button" class="primary" id="n-share">Share my week</button></div><p class="muted" id="n-share-note" hidden>A picture of these numbers and the Knot. Never your screen or what you asked.</p></div>
+      </div>
+    </section>
+    <section id="view-start" class="view" aria-label="Dashboard">
+      <div class="d-scroll">
+        <div class="d-strip">
+          <div class="d-hello"><div id="d-greet"></div><div id="d-count"></div><div id="d-key"></div></div>
+          <button id="d-show-knot" hidden>Show the Knot</button>
+          <div id="d-pill" data-state="idle" aria-label="What the Knot is doing">
+            <div class="t"><div class="r"><i id="d-dot" aria-hidden="true"></i><b id="d-word">Ready</b></div><div id="d-step" hidden></div></div>
+            <div id="d-esc" hidden><kbd>Esc</kbd>to stop</div>
+            <div id="d-bar" hidden><i></i></div>
+            <div class="d-slot"><canvas id="d-knot" aria-hidden="true"></canvas></div>
+          </div>
+        </div>
+        <div class="d-grid">
+          <div>
+            <section class="d-sec" aria-label="Now">
+              <h3 class="d-h">Now</h3>
+              <article class="glass card tour-card" id="tour-card">
+                <div>
+                  <h3>Take the tour</h3>
+                  <p class="muted">A few minutes with the Knot: your mic, the talk key, three questions, where it lives, screen sharing, who answers, two demos on your screen, and this dashboard.</p>
+                  <p id="tour-state" class="start-note" role="status"></p>
+                </div>
+                <div class="start-actions"><button id="tour-start" class="primary">Start the tour</button><button id="tour-skip" class="quiet">Skip for now</button></div>
+              </article>
+              <div id="d-now" class="d-cards"></div>
+            </section>
+          </div>
+          <div>
+            <section class="d-sec" aria-label="Projects"><h3 class="d-h">Projects</h3><div id="d-projects" class="d-list"></div></section>
+            <section class="d-sec" aria-label="Recent asks"><h3 class="d-h">Recent asks <button id="d-all-asks" type="button">All in Saved</button></h3><div id="d-asks" class="d-list"></div></section>
+          </div>
+        </div>
+        <div id="start-foot"></div>
+      </div>
+      <div id="d-quick" role="group" aria-label="Quick options"></div>
+    </section>
+    <section id="view-saved" class="view" aria-label="Saved">
+      <div class="view-intro"><p>Everything you chose to keep.</p><button id="capture-toggle" hidden>Start listening</button></div>
+      <section id="reminders-card" class="glass card reminders-card" aria-label="Reminders"><h3 class="card-label">Reminders</h3><div id="reminder-list"></div></section>
+      <div class="saved-tabs" role="tablist"><button data-saved="history" class="active" role="tab">History</button><button data-saved="keeps" role="tab">Keeps</button><button data-saved="routines" role="tab">Routines</button><button data-saved="notes" role="tab">Notes</button><button data-saved="activity" role="tab">Activity</button></div>
+      <div id="saved-history" class="saved-view active"><div class="history-list"><label for="history-search">Search transcripts</label><input id="history-search" type="search" placeholder="Find something you heard…"><div id="history-sessions"></div></div><article id="history-detail" class="glass card"><p class="empty">Select a conversation to read it here.</p></article></div>
+      <div id="saved-keeps" class="saved-view"></div><div id="saved-routines" class="saved-view"></div><div id="saved-notes" class="saved-view"></div><div id="saved-activity" class="saved-view"></div>
+      <div id="saved-foot"></div>
+    </section>
+    <section id="view-folders" class="view" aria-label="Folders">
+      <div class="view-intro"><p>A little context goes a long way.<br><span class="muted">Add PDF, Word, text, Markdown, and calendar files.</span></p><button id="add-folder" class="primary">+ Add folder</button></div>
+      <p class="info">Enabled folders provide excerpts to TypeSafe for matching and to your answer provider. Turn a folder off to stop using it. Up to 200 files per folder, 2 MB per file.</p><p id="indexing-status" role="status"></p><div id="folder-list"></div>
+    </section>
+    <section id="view-feedback" class="view" aria-label="Feedback">
+      <div class="view-intro"><p>Pranav builds J.A.R.V.I.S and reads every note.<br><span class="muted">What broke, what was confusing, what it should do next. One line is plenty.</span></p></div>
+      <form id="feedback-form" class="glass card feedback-card">
+        <div class="source-row" role="radiogroup" aria-label="Kind of note"><button type="button" data-kind="bug" role="radio" aria-checked="false">Something broke</button><button type="button" data-kind="idea" role="radio" aria-checked="false">An idea</button><button type="button" data-kind="other" role="radio" aria-checked="true" class="on">Something else</button></div>
+        <label for="feedback-message">Your note</label>
+        <textarea id="feedback-message" rows="6" maxlength="3000" placeholder="It should..."></textarea>
+        <label for="feedback-email">Want a reply? Your email (optional)</label>
+        <input id="feedback-email" type="email" maxlength="200" autocomplete="email" placeholder="Your email">
+        <div class="feedback-send"><p class="muted">Only these words go, with the app version and Windows version. Nothing from your screen, your files, or your chats.</p><button type="submit" id="feedback-send" class="primary">Send to Pranav</button></div>
+        <p id="feedback-note" class="muted" role="status" aria-live="polite"></p>
+      </form>
+      <article class="glass card feedback-ways"><h3>Faster ways, any time</h3><ul><li>Say or type <strong>"tell Pranav ..."</strong> to the Knot. It shows you the note before it goes.</li><li>Tray icon, then <strong>Send feedback to Pranav</strong>.</li><li>Now and then the Knot asks "Was that answer useful?" One tap, at most once a day. "Do not ask again" ends it.</li></ul></article>
+    </section>
+    <section id="view-settings" class="view" aria-label="Settings">
+      <div class="settings-grid">
+        <article class="glass card" id="keys-card"><div class="card-heading"><h3>Keys</h3></div><p class="muted">Keys are optional when publik answers. Stored on this device, encrypted. Saved keys are never shown here.</p>
+          <label class="check" id="publik-row" hidden><input id="use-own-key" type="checkbox">Use my own key or Claude Code <small>Off, publik answers with your publik account and no key is needed. On, the key or Claude Code below answers instead. Voice commands and reminders work either way.</small></label>
+          <div id="publik-account" hidden><p class="muted"><span id="publik-who">Signed in with publik.</span> <span id="publik-signout-hint" hidden>J.A.R.V.I.S restarts and asks you to sign in again. To use a different publik account, sign out of publikhq.com in your browser first.</span></p><span class="row-actions"><button id="publik-signout" class="quiet" type="button">Sign out of publik</button><button id="publik-signout-cancel" class="quiet" type="button" hidden>Cancel</button></span></div>
+          <form id="key-form">
+          <div class="check-step"><div><strong>Voice commands</strong><small class="muted">Open apps, type, search, save routines. Works with no key.</small></div><span id="step-voice" class="badge set">Ready</span></div>
+          <div class="key-row"><label for="key-typesafe-home">TypeSafe <small>Optional. TypeSafe, a second way to match voice commands</small></label><span id="typesafe-state" class="badge">Not set</span><button type="button" class="link" data-url="https://typesafe.ai">Get a key ↗</button><input id="key-typesafe-home" type="password" autocomplete="off" placeholder="Paste a new key"><span class="row-actions"><button type="button" data-test="typesafe" class="quiet">Test</button><button type="button" data-clear="typesafe" class="quiet">Clear</button></span></div>
+          <div class="check-step"><div><strong>Answers, pointing, assignment mode</strong><small class="muted">Any one of these. Gemini and Nvidia have free keys; Claude Code needs no key at all.</small></div><span id="step-answers" class="badge">Not set</span></div>
+          <div class="key-row"><label for="key-gemini-home">Gemini <small>Answers and speech fallback, about 20 free asks a day</small></label><span id="gemini-state" class="badge">Not set</span><button type="button" class="link" data-url="https://aistudio.google.com/apikey">Get a key ↗</button><input id="key-gemini-home" type="password" autocomplete="off" placeholder="Paste a new key"><span class="row-actions"><button type="button" data-test="gemini" class="quiet">Test</button><button type="button" data-clear="gemini" class="quiet">Clear</button></span></div>
+          <div class="key-row"><label for="key-nvidia-home">Nvidia <small>Answers, free developer credits from build.nvidia.com</small></label><span id="nvidia-state" class="badge">Not set</span><button type="button" class="link" data-url="https://build.nvidia.com/settings/api-keys">Get a key ↗</button><input id="key-nvidia-home" type="password" autocomplete="off" placeholder="Paste a new key"><span class="row-actions"><button type="button" data-test="nvidia" class="quiet">Test</button><button type="button" data-clear="nvidia" class="quiet">Clear</button></span></div>
+          <div class="key-row"><label for="key-anthropic-home">Anthropic <small>Claude, pay as you go, $3 daily cap in assignment mode</small></label><span id="anthropic-state" class="badge">Not set</span><button type="button" class="link" data-url="https://console.anthropic.com">Get a key ↗</button><input id="key-anthropic-home" type="password" autocomplete="off" placeholder="Paste a new key"><span class="row-actions"><button type="button" data-test="anthropic" class="quiet">Test</button><button type="button" data-clear="anthropic" class="quiet">Clear</button></span></div>
+          <div class="key-row"><label>Claude Code <small>Detected on this computer, signed in, no key</small></label><span id="cli-state" class="badge">Not found</span><span></span><p id="claude-status" class="muted cli-note"></p><span class="row-actions"><button type="button" data-test="cli" class="quiet">Test</button></span></div>
+          <p id="assignment-spend" class="muted"></p><p id="test-note" class="muted" role="status"></p><button class="primary" type="submit">Save keys</button></form>
+        </article>
+        <article class="glass card"><h3>Voice</h3><p id="voice-status"></p><label for="ptt-input">Live talk key</label><strong id="ptt-live" class="key-live"></strong><form id="ptt-form"><input id="ptt-input" placeholder="Control+Alt" aria-label="New talk shortcut"><button type="submit">Rebind</button></form><small class="muted">Ctrl+Alt held together is the default. Typed chords also work: Ctrl+Alt+Space, Ctrl+Shift+M, Alt+Shift+Space, Ctrl+Alt+M.</small><label for="mic-select">Microphone</label><div class="mic-row"><select id="mic-select" aria-label="Microphone"></select><button type="button" id="mic-test" class="quiet">Test</button></div><div id="mic-meter" class="mic-meter" hidden><i></i></div><small id="mic-note" class="muted" role="status">The Knot listens with this one. Plug in a new one and it shows up here.</small><label class="check"><input id="open-mic" type="checkbox">Open mic <small>Press once to listen, again to stop.</small></label><label class="check"><input id="speak-replies-home" type="checkbox">Speak replies <small>Answers are read aloud.</small></label><label class="check"><input id="own-voice" type="checkbox">The Knot's own voice <small id="own-voice-note">Fable, a soft British voice that comes with J.A.R.V.I.S and runs on this computer. Nothing leaves your machine. Off, the Windows voice speaks.</small></label><p id="own-voice-progress" class="muted" role="status" hidden></p><label class="check"><input id="speech-model" type="checkbox">Larger speech model <small id="speech-model-note">Parakeet by NVIDIA (CC-BY-4.0), a larger model that runs on this computer and writes down each finished sentence. One download of about 465 MB the first time, about 640 MB on disk. It uses about 800 MB of memory while loaded and lets go after 5 quiet minutes. Nothing leaves your machine. Off, the built-in Whisper model does it.</small></label><p id="speech-model-progress" class="muted" role="status" hidden></p><label class="check"><input id="dictation" type="checkbox">Dictation <small>Hold Ctrl and Win in any text box, speak, let go, and your words are typed in. It runs on this computer, works offline, and never counts against your asks.</small></label><label class="check"><input id="draw-on-screen" type="checkbox">Draw on the screen <small>When the Knot explains what is on your screen, it underlines and circles the things it is talking about, right where they are. The marks go when the answer does.</small></label><label class="check"><input id="sounds" type="checkbox">Sound cues <small>Short quiet tones when it hears you, finishes, or hits an error. Never while the mic is live.</small></label><label class="check"><input id="focus-guard" type="checkbox">Focus guard <small>Closes feed tabs while a focus session you asked for is on.</small></label><details class="more"><summary>More</summary><p class="muted">Say "keep me off Reels for 20 minutes" or "block TikTok until I close Word". Until then, a browser tab whose title names a feed is closed and the Knot says so. Say "ok let me back" to end it and reopen the tab. Off until you first ask; turning it off here stops it.</p></details><label class="check"><input id="hands" type="checkbox">Hands <small>Lets the Knot click and type for you. It asks before anything that sends, buys or deletes.</small></label><details class="more"><summary>More</summary><p class="muted">Ask the Knot to do something, like "open Notepad and write my to-do list", and it clicks, types and opens things for you while you watch. It asks first before anything that sends, buys, deletes or submits, and never touches a password field. Press Esc or say "stop" to end it. Off until you turn it on.</p></details><label class="check"><input id="control-browser" type="checkbox">Control Zen <small>Read the page in Zen, click it and fill it in, through Zen's own remote control. It asks before anything that sends, buys or deletes.</small></label><details class="more"><summary>More</summary><p class="muted">Zen has to be started with a remote-control port before this can work, and that cannot be added to a browser already running: quit Zen, then start it with <code>--remote-debugging-port=9222</code>. Session restore brings your tabs back. While it is on, this app can read and act on the tab you are looking at; turning it off closes the connection at once. It speaks WebDriver BiDi, which is what Zen (Firefox) provides. Off until you turn it on.</p></details><label class="field wide">Zen remote-control port<input id="browser-port" placeholder="9222" inputmode="numeric" aria-label="Zen remote-control port"></label><small class="muted">The port you started Zen with. 9222 is the usual one.</small><label class="check"><input id="tasks" type="checkbox">Task list (beta) <small>Each Hands ask becomes a task you can see, pause and pick up again. In island mode the bar unfolds into the list.</small></label><div class="memory-import"><button type="button" id="tasks-delete" class="quiet">Delete all tasks and projects</button></div><small class="muted">Tasks keep what you asked and the window titles, file paths and links they used, on this computer only. Finished ones go after 30 days, and only the latest 200 stay. Deleting also removes the Hands log, and a running task stops first.</small><p id="tasks-delete-note" class="muted" role="status" hidden></p><label class="field wide">Feed titles<input id="focus-feeds" placeholder="Instagram, Reels, TikTok, Shorts" aria-label="Feed titles the focus guard closes"></label><small class="muted">Comma separated words that mark a feed tab in the window title. Only browser tabs, only while the guard is on.</small></article>
+        <article class="glass card"><h3>Shortcuts</h3><dl id="hotkeys"></dl></article>
+        <article class="glass card"><h3>Messages from J.A.R.V.I.S</h3><label class="check"><input id="start-with-windows" type="checkbox">Start with Windows <small>The Knot is ready each time your PC starts, quietly, without this dashboard.</small></label><label class="check"><input id="channel-messages" type="checkbox">Let the Knot tell me about new versions and short news <small>At most one a day, each only once. Plain words and a J.A.R.V.I.S link; it can never run anything or change a setting. New versions still show on this dashboard when this is off.</small></label></article>
+        <article class="glass card"><h3>Privacy</h3><label class="check"><input id="hide-from-capture" type="checkbox">Hidden from screen sharing <small>Asks Windows to leave the Knot out of shares and recordings. Off by default; the dashboard always shows. Best effort. <span id="protection-state"></span></small></label><details class="more"><summary>More</summary><p class="muted disclosure">This asks Windows to leave the Knot out of screen shares and recordings; the dashboard is never hidden. It is best effort, not a guarantee: some capture tools ignore the flag, a phone pointed at the screen sees everything, and the tray icon still shows in a full-desktop share. Using a hidden assistant in a proctored exam, an interview, or a recorded call can break rules and consent laws. It is built for notes, study, and accessibility. Turn it off to record a demo of the Companion.</p></details><label class="check"><input id="persist-transcripts-home" type="checkbox">Save transcripts</label><label class="check"><input id="save-audio-home" type="checkbox">Save session audio</label><label class="check"><input id="send-stats" type="checkbox">Send anonymous usage stats <small id="stats-state">Which features get used, on a random install id. Never your coursework or what you type.</small></label><label class="field">Audio retention days<input id="retention-days" type="number" min="1" max="365"></label><label class="check"><input id="knot-island" type="checkbox">Island mode <small>The Knot lives in a small black bar at the top centre of the screen, and what it hears and says shows there. Off, it floats free wherever you drop it.</small></label><p class="muted">Drag the Knot anywhere on the screen. It stays where you drop it, per display. In island mode it stays in the bar.</p><label class="field">Move the Knot to<select id="knot-move"><option value="">Choose a corner</option><option value="tl">Top left</option><option value="tr">Top right</option><option value="bl">Bottom left</option><option value="br">Bottom right</option></select></label><label class="field">Display<select id="knot-display"></select></label></article>
+        <article class="glass card" id="memory-card"><h3>What J.A.R.V.I.S knows about you</h3><p class="muted">Facts the Knot uses to answer like someone who knows you: your name, school, courses, how you like to be helped. Kept on this device. Say "remember ..." to add one, "forget ..." to drop one. Card and identity numbers are kept private and never put in a prompt.</p>
+          <div id="memory-list"></div>
+          <form id="memory-add" class="memory-form"><select id="memory-key" aria-label="Kind"><option value="note">Note</option><option value="name.full">Name</option><option value="school">School</option><option value="major">Major</option><option value="year">Year</option><option value="email">Email</option></select><input id="memory-value" placeholder="I take CS 2110 with Professor Lee" aria-label="Fact" maxlength="500"><button type="submit">Add</button></form>
+          <details><summary>Bring what ChatGPT or Claude already knows</summary><p class="muted">Copy the prompt, paste it into your assistant, then paste its answer here.</p><div class="memory-import"><button type="button" id="memory-prompt" class="quiet">Copy the prompt</button><select id="memory-source" aria-label="Source"><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="gemini">Gemini</option></select></div><textarea id="memory-paste" rows="4" placeholder="name: ...&#10;school: ...&#10;one fact per line"></textarea><div class="memory-import"><button type="button" id="memory-import">Import</button><button type="button" id="memory-forget-source" class="quiet">Remove imported</button></div></details>
+          <p id="memory-note" class="muted" role="status"></p>
+          <section class="recall" aria-labelledby="recall-title"><h4 id="recall-title">Your notes and AI chats</h4><p class="muted">Searched on this computer when you ask: "what's in my vault about pricing", "what did I ask Claude about eigenvalues", "what's my brief". Only the few passages an ask needs go to your AI with it. Nothing here is added to the facts above.</p>
+            <dl id="recall-counts" class="recall-counts"></dl>
+            <div class="memory-import"><button type="button" id="recall-vault">Choose notes folder</button><button type="button" id="recall-import-folder">Import chats from notes folder</button><button type="button" id="recall-import-file" class="quiet">Import an export file</button></div>
+            <div class="memory-import"><button type="button" id="recall-forget" class="quiet">Forget all imported chats</button></div>
+            <label class="check"><input type="checkbox" id="recall-watch">Import exports from Downloads by itself<small>When a ChatGPT, Claude, Google Takeout (Gemini, Keep) or Apple Notes export ZIP lands in Downloads, J.A.R.V.I.S reads it and says how many it imported. The ZIP stays where it is.</small></label>
+            <div class="memory-import"><button type="button" id="recall-watch-folder" class="quiet">Also watch a folder</button><span id="recall-watch-where" class="muted"></span></div>
+            <p id="recall-note" class="muted" role="status"></p></section></article>
+        <article class="glass card" id="topics-card"><h3>Topics <span class="badge">beta</span></h3><p class="muted">Your imported chats grouped by topic, newest first in each group. Open a group to see its chats. Grouped by meaning once J.A.R.V.I.S has read them all, by keywords until then.</p>
+          <div class="memory-import"><button type="button" id="topics-refresh">Show topics</button><span id="topics-method" class="muted"></span></div>
+          <div id="topics-list"></div></article>
+        <article class="glass card limits"><h3>Limits</h3><ul><li>No undo yet.</li><li>A miss on close tab or typing costs a hand step.</li><li>Keystrokes are dropped when the target window did not land.</li><li>Voice commands run on local rules first; TypeSafe or the model answers when they are unsure.</li></ul><details><summary>Commands you can say</summary><dl id="intent-list"></dl></details><button class="link" data-url="https://github.com/omsenjalia/nus-desktop/releases">Releases and help ↗</button></article>
+      </div>
+    </section>
+  </main>
+  <script src="../renderer/knot-spec.js"></script><script src="../renderer/knot-engine.js"></script>
+  <script src="../renderer/mac-words.js"></script><script src="../renderer/task-panel.js"></script><script src="../renderer/quick-options.js"></script><script src="../renderer/mic-devices.js"></script><script src="now.js"></script>
+  <script src="share.js"></script><script src="map.js"></script><script src="home.js"></script>
+</body>
+</html>

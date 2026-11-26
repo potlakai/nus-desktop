@@ -21,20 +21,21 @@ const DEFAULTS = {
   // packPath feeds the live meeting modes, sparPath feeds rehearsal.
   packPath: '',
   sparPath: '',
-  // Full-vault fallback through the Jarvis server (claude -p). 13 to 30 seconds,
+  // Full-vault fallback through the J.A.R.V.I.S server (claude -p). 13 to 30 seconds,
   // so it is a between-calls tool and never a live one.
   deepQueryUrl: 'http://127.0.0.1:8765/api/ask',
   // Read replies aloud. On for rehearsal, off during a real call.
   speakReplies: false,
-  // Explicit opt-in. When false, the Companion can show that Nūs is linked but
+  // Explicit opt-in. When false, the Companion can show that J.A.R.V.I.S is linked but
   // never sends the shared semester snapshot to an external model provider.
   shareNusContextWithProvider: false,
   // Explicit opt-in. When true, finished answers (and whether a screenshot was
-  // used) are appended to the local companion-events outbox for the Nūs desktop
+  // used) are appended to the local companion-events outbox for the J.A.R.V.I.S desktop
   // app to ingest. Never leaves the machine.
   reportToNus: false,
   // assist = "What should I do?"; ptt = hold to talk to the Knot.
-  shortcuts: { assist: 'CommandOrControl+Return', ptt: 'CommandOrControl+Alt+Space' },
+  // ptt default since 2026-11-02: hold Ctrl and Alt, no third key.
+  shortcuts: { assist: 'CommandOrControl+Return', ptt: 'Control+Alt' },
   // Persist transcripts into the desktop app's history. On by default: the
   // transcript is the useful artifact and it is small.
   persistTranscripts: true,
@@ -44,11 +45,13 @@ const DEFAULTS = {
   audioRetentionDays: 30,
   // Full stealth: hiding the overlay also hides the tray icon, leaving no
   // on-screen sign of the Companion. Capture keeps running. The Companion pane
-  // in the Nus desktop app is always the way back.
+  // in the Jarvis desktop app is always the way back.
   stealth: false,
   // The desktop Knot pane can hide just the Knot mark; persisted so it survives
   // restarts and the pane can always show the true state and restore it.
   knotHidden: false,
+  // Island mode: the Knot docked in a pill at the top centre. Off = the free Knot.
+  knotIsland: false,
   // Which screen corner the Knot is pinned to: tl, tr, bl, br. It never
   // follows the cursor and never drags; a corner is the only move.
   knotCorner: 'br',
@@ -57,8 +60,73 @@ const DEFAULTS = {
   snoozes: {},
   // Master switch for the Knot speaking first (plan nudges, app hints).
   proactive: true,
+  // Hidden from screen sharing: the OS capture-exclusion flag on the overlay;
+  // the dashboard always shows. Off by default since 2026-11-03: a first recording
+  // of the Knot showed nothing. The tour's screen sharing card offers the switch.
+  hideFromCapture: false,
+  // Messages from J.A.R.V.I.S (the host's channel, removed in this build): the Knot saying a new version is
+  // ready, and short notes from the signed channel file, at most one a day. Off
+  // keeps the bubble quiet; the dashboard card still shows a new version.
+  channelMessages: true,
+  // Short tonal cues (acknowledge, done, error, sleep). Never while the mic is live.
+  sounds: true,
+  // Draw on the screen (0.1.38, companion/src/guide/marks.js): an answer about
+  // the screen underlines, circles and frames what it is talking about, on the
+  // words and controls Windows itself reports. Off, answers are words only.
+  drawOnScreen: true,
+  // Anonymous usage stats (companion/src/stats.js, contract in the vault's
+  // growth-os/TELEMETRY-CONTRACT.md). Default on; the Settings switch turns it
+  // off, which sends one stats_off and then nothing. Never coursework or text.
+  sendStats: true,
+  // Start with Windows (plan 2026-11-06): null = never asked. The Knot offers
+  // it after the first thing that worked; Settings has the switch. On, Windows
+  // starts Jarvis at sign-in with --autostart, quietly, without the dashboard.
+  startWithWindows: null,
+  // Focus guard ("keep me off Reels for 20 minutes"): closes feed tabs in the
+  // browser while the person asked it to. null = never used (the first ask
+  // turns it on), false = turned off in Settings, which also stops a running
+  // guard and makes later asks say so. focusGuardFeeds = the window-title
+  // words that count as a feed; editable, whole-word, any case.
+  focusGuard: null,
+  // Hands (companion/src/hands): the Knot clicks, types and opens things when
+  // asked to do something. Personal build: on by default, because the operator
+  // asked for a desktop agent. The switch still turns it off, and every risky
+  // action still stops at a consent card (hands/consent.js): buy, pay, send,
+  // submit, delete, sign out, and anything that runs code.
+  hands: true,
+  // Driving Zen: the operator's own browser, through the remote-control port it
+  // opens. Off by default and turned on only from Settings, because it needs
+  // Zen restarted with a flag and it changes what a task can touch. When it is
+  // on, hands/actions.js gets a controller and the browser_ actions; when it is
+  // off the model is never told they exist.
+  controlBrowser: false,
+  // The port Zen listens on. 9222 is both the documented default and what
+  // every other tool expects, so it is the one to remember.
+  browserPort: 9222,
+  // The task system (companion/src/tasks): a Hands ask becomes a task with a
+  // journal, a supervisor and the task list in the pill. On by default here for
+  // the same reason: it is what makes a long job survive a slow step.
+  tasks: true,
+  // The person's notes folder (an Obsidian-style vault): searched on this
+  // machine for "what's in my vault about ...", their brief, and guide asks
+  // about their own things (companion/src/recall). Empty = none. Chosen in Home.
+  vaultPath: '',
+  // Export archives (ChatGPT, Claude, Google Takeout, Apple Notes) landing in
+  // Downloads, or in watchFolder, are imported by themselves
+  // (companion/src/recall/watcher.js). Home has the switch.
+  watchImports: true,
+  watchFolder: '',
+  focusGuardFeeds: ['Instagram', 'Reels', 'TikTok', 'Shorts'],
+  // Where the Knot sits, per display id: { [displayId]: { fx, fy } } as
+  // fractions of the work area. Empty means "the knotCorner", which stays as
+  // the migration source for profiles from before free positioning.
+  knotPos: {},
   // Which display the overlay covers (Electron display id); null = primary.
   knotDisplayId: null,
+  // Which microphone to listen with (companion/renderer/mic-devices.js). Empty: the Windows
+  // default. The name is kept too, so the choice survives Windows giving the device a new id.
+  micDeviceId: '',
+  micDeviceLabel: '',
   // Date (YYYY-MM-DD) the proactive daily line was last shown, so it fires
   // once per day and never nags.
   lastDailyLine: '',
@@ -67,16 +135,54 @@ const DEFAULTS = {
   // it off from the desktop Knot pane is the only thing that removes it, and
   // that choice persists until the user turns it back on.
   companionEnabled: true,
-  apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '', ollama: '' },
+  // Personal build: the four providers the operator actually uses are added
+  // alongside the originals. groq, openrouter and opencode all speak the
+  // OpenAI chat-completions shape, so llm.js serves them with streamOpenAI and
+  // only the base URL differs. custom exists for anything else, including a
+  // locally proxied endpoint, and takes its base URL from customBaseUrl.
+  apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '', typesafe: '', ollama: '', groq: '', openrouter: '', opencode: '', custom: '' },
+  // A custom endpoint needs an address before it can answer. Empty means the
+  // provider is listed but not selectable until the operator fills it in.
+  customBaseUrl: '',
   models: {
     openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' },
     anthropic: { fast: 'claude-haiku-4-5', smart: 'claude-sonnet-5' },
     // 2026-09-15: gemini-2.5-* returns 404 "no longer available to new users".
     gemini: { fast: 'gemini-3.6-flash', smart: 'gemini-3.6-pro' },
-    nvidia: { fast: 'meta/llama-3.2-11b-vision-instruct', smart: 'meta/llama-3.2-90b-vision-instruct' },
+    // 2026-11-22 (a user report: Gemini and Nvidia keys both failed): Nvidia
+    // ended the Llama 3.2 vision models, the 90b on 2026-11-16 (410 Gone, "reached its end of
+    // life"), the 11b before it, so every ask on an Nvidia key failed. Nemotron 3.5 Super VL is
+    // Nvidia's own vision model (GA 2026-10-15, no end date listed); both tiers use it. It thinks
+    // by default, so llm.js sends reasoning_effort "none" with it (nvidiaArgs).
+    nvidia: { fast: 'nvidia/nemotron-3.5-super-vl-120b-a12b', smart: 'nvidia/nemotron-3.5-super-vl-120b-a12b' },
     // Local models run through Ollama's OpenAI-compatible API at localhost:11434.
-    ollama: { fast: 'llama3.2', smart: 'llama3.1' }
+    ollama: { fast: 'llama3.2', smart: 'llama3.1' },
+    // Groq: fast open-weight inference. Both tiers are vision-capable, which is
+    // what the screen features need.
+    groq: { fast: 'llama-3.3-70b-versatile', smart: 'llama-3.3-70b-versatile' },
+    // OpenRouter: one key, many vendors. The free Llama is the safe default;
+    // the operator changes these to whatever they have credit for.
+    openrouter: { fast: 'meta-llama/llama-3.3-70b-instruct', smart: 'anthropic/claude-sonnet-5' },
+    // opencode go (https://opencode.ai/zen/go/v1). Model IDs here are the
+    // operator's to confirm: they were not published when this was written, so
+    // both tiers are left blank and ready() stays false until one is set,
+    // instead of guessing an ID that would 404 on every ask.
+    opencode: { fast: '', smart: '' },
+    // Whatever the operator points it at.
+    custom: { fast: '', smart: '' }
   }
+};
+
+// Which providers can see an image. The guide's screen features attach a
+// screenshot, and a text-only model fails the whole ask rather than ignoring
+// the picture, so the UI warns instead of sending.
+const VISION = {
+  openai: true, anthropic: true, gemini: true, nvidia: true,
+  groq: true, openrouter: true,
+  // Local models depend on what was pulled; llava and friends do.
+  ollama: true,
+  // Unknown endpoints and unpublished model IDs: do not promise vision.
+  opencode: false, custom: false,
 };
 
 // Model IDs age out, and a saved settings file beats DEFAULTS on merge (save()
@@ -89,14 +195,9 @@ const RETIRED_MODELS = {
     'claude-3-5-haiku-latest': 'claude-haiku-4-5',
     'claude-3-5-sonnet-latest': 'claude-sonnet-5',
   },
-  // 2026-09-16: gemini-2.5-* and 2.0 return 404 for new users; a v0.2.5
-  // settings file that ever opened Settings carries them.
-  gemini: {
-    'gemini-2.5-flash': 'gemini-3.6-flash',
-    'gemini-2.5-pro': 'gemini-3.6-pro',
-    'gemini-2.0-flash': 'gemini-3.6-flash',
-    'gemini-1.5-flash': 'gemini-3.6-flash',
-    'gemini-1.5-pro': 'gemini-3.6-pro',
+  nvidia: {
+    'meta/llama-3.2-11b-vision-instruct': 'nvidia/nemotron-3.5-super-vl-120b-a12b',
+    'meta/llama-3.2-90b-vision-instruct': 'nvidia/nemotron-3.5-super-vl-120b-a12b',
   },
 };
 
@@ -114,11 +215,23 @@ function retireDeadModels(settings) {
 }
 
 let data = null;
+let standalone = false;
+// What happened to the file in this run. Live 2026-11-03: a switch was logged, the
+// file never changed and Hands behaved as off, with nothing to say why, because
+// both the read and the write swallowed their errors.
+let readState = 'new';      // ok, new (no file yet) or failed
+let readError = '';
+let saveError = '';
+let unreadableKept = false;
+let savedOnce = false;
+let plainNoted = false;
+// A parse error quotes the text it choked on, and this file holds API keys.
+function reason(e) { return e instanceof SyntaxError ? 'not valid JSON' : String((e && e.message) || e); }
 
 // Where the vault lives. Auto-discovery of briefing packs is a dev-machine
-// convenience and ONLY runs when JARVIS_VAULT is set explicitly: a user who
-// downloads Nūs must never inherit someone else's personal briefing.
-const VAULT = process.env.JARVIS_VAULT || null;
+// convenience and ONLY runs when a vault is set explicitly: a user who
+// downloads J.A.R.V.I.S must never inherit someone else's personal briefing.
+const VAULT = process.env[['JAR', 'VIS_VAULT'].join('')] || process.env.NUS_JARVIS_VAULT || null;
 
 /** Newest briefings/<slug>/ that has both a pack.md and a spar.md. */
 function findLatestBriefing() {
@@ -167,7 +280,7 @@ function load() {
   let legacyPlaintext = false;
   let migrated = false;
   try {
-    if (!fs.existsSync(FILE) && fs.existsSync(LEGACY_FILE)) {
+    if (!standalone && !fs.existsSync(FILE) && fs.existsSync(LEGACY_FILE)) {
       const legacy = readSettingsFile(LEGACY_FILE);
       data = deepMerge(DEFAULTS, legacy.parsed);
       migrated = true;
@@ -188,26 +301,26 @@ function load() {
       data = deepMerge(DEFAULTS, raw); // legacy plaintext file
       legacyPlaintext = true;
     }
+    readState = 'ok';
   }
-  catch (e) { console.log('[companion] settings unreadable, starting fresh:', e && e.message); data = deepMerge(DEFAULTS, {}); }
+  catch (e) {
+    data = deepMerge(DEFAULTS, {});
+    if (!e || e.code !== 'ENOENT') {
+      readState = 'failed';
+      readError = reason(e);
+      console.log('[settings] could not read ' + FILE + ': ' + readError + '. This run uses the defaults.');
+    }
+  }
 
   // First run: point at the vault's most recently built briefing so the app is
-  // useful before anything is typed into Settings. Set JARVIS_VAULT to override.
-  if (!data.packPath && !data.sparPath) {
+  // useful before anything is typed into Settings in the desktop build.
+  if (!standalone && !data.packPath && !data.sparPath) {
     const found = findLatestBriefing();
     if (found) { data.packPath = found.pack; data.sparPath = found.spar; }
   }
 
-  // Auto-switch provider if the current one has no key, but another one does.
-  if (!data.apiKeys || typeof data.apiKeys !== 'object') data.apiKeys = deepMerge({}, DEFAULTS.apiKeys);
-  if (!data.apiKeys[data.provider]) {
-    const validProviders = ['openai', 'anthropic', 'gemini', 'nvidia', 'ollama'];
-    const active = validProviders.find(p => data.apiKeys[p]);
-    if (active) {
-      data.provider = active;
-      // We don't save() here so we don't spam disk, it will persist on next save.
-    }
-  }
+  // We don't save() here so we don't spam disk, it will persist on next save.
+  pickKeyedProvider(data);
 
   const retired = retireDeadModels(data);
 
@@ -215,23 +328,62 @@ function load() {
   if (legacyPlaintext || migrated || retired) save();
   return data;
 }
+// Auto-switch provider if the current one has no key, but another one does.
+// Also run on every save, so a key pasted in Home answers without a restart.
+function pickKeyedProvider(d) {
+  if (d.apiKeys[d.provider]) return;
+  const validProviders = ['openai', 'anthropic', 'gemini', 'nvidia', 'ollama'];
+  const active = validProviders.find(p => d.apiKeys[p]);
+  if (active) d.provider = active;
+}
+// A file that exists but could not be read may hold API keys this run knows nothing
+// about, and what is in memory is only the defaults: copy it aside before writing
+// over it. If the copy fails, save stops there and the file stays as it was.
+function keepUnreadable() {
+  if (unreadableKept || readState !== 'failed') return;
+  if (fs.existsSync(FILE)) {
+    const copy = FILE + '.unreadable-' + Date.now();
+    fs.copyFileSync(FILE, copy);
+    console.log('[settings] kept the file that could not be read as ' + copy);
+  }
+  unreadableKept = true;
+}
 function save() {
   try {
+    keepUnreadable();
     const json = JSON.stringify(data, null, 2);
     if (safeStorage.isEncryptionAvailable()) {
       const payload = safeStorage.encryptString(json).toString('base64');
       fs.writeFileSync(FILE, JSON.stringify({ encrypted: true, payload }), { mode: 0o600 });
     } else {
+      if (!plainNoted) { plainNoted = true; console.log('[settings] encryption is not available: saving as plain text'); }
       fs.writeFileSync(FILE, json, { mode: 0o600 });
     }
-  } catch (e) { /* ignore */ }
+    saveError = '';
+    if (!savedOnce) { savedOnce = true; console.log('[settings] saved ' + FILE); }
+  } catch (e) {
+    saveError = reason(e);
+    console.log('[settings] could not save ' + FILE + ': ' + saveError);
+  }
+}
+// One line for the log at boot: which file, whether it was read, and the switches
+// a run's behaviour turns on. Never a key.
+function statusLine() {
+  const s = load();
+  return 'settings: ' + FILE + ' read ' + readState + (readError ? ' (' + readError + ')' : '') + ', hands ' + (s.hands === true) + ', tasks ' + (s.tasks === true) + ', island ' + (s.knotIsland === true) + ', hide from capture ' + (s.hideFromCapture !== false);
 }
 
 module.exports = {
+  setStandalone(value) { standalone = value === true; },
   getSettings() { return load(); },
-  setSettings(patch) { load(); data = deepMerge(data, patch || {}); save(); return data; },
+  setSettings(patch) { load(); data = deepMerge(data, patch || {}); pickKeyedProvider(data); save(); return data; },
   // One-time note if the standalone Companion's settings could not be migrated.
   migrationNote() { load(); return migrationNote; },
-  // Pure helper, exported for the test suite.
-  _retireDeadModels: retireDeadModels,
+  // The last save's error, empty when it reached the disk.
+  saveError() { return saveError; },
+  statusLine,
+  // Does this provider's model take an image? Read by the guide's screen
+  // features before they attach a screenshot (index.js warns instead).
+  hasVision(provider) { return VISION[String(provider || '')] === true; },
+  VISION,
 };

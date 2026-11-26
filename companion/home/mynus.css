@@ -1,0 +1,30 @@
+/* My Nūs: the page's layout in the dashboard's own colours and fonts (home.css
+   tokens). The Night look that first carried these rules waits for a later
+   release. */
+#view-mynus .n-head { margin-bottom: 6px; }
+body.mynus-view #view-title { visibility: hidden; }
+.n-eyebrow { font: 600 11px var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--tx-mut); margin-top: 6px; }
+.n-title { font: 600 40px/1.05 var(--font); letter-spacing: -.02em; margin: 10px 0 6px; color: var(--tx-1); }
+.n-title em { font-style: normal; color: var(--accent); }
+.n-sub { color: var(--stone); font-size: 14px; margin: 0; }
+.n-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 26px 0 24px; border-top: 1px solid var(--bd-hair); }
+.n-stat { padding: 18px 18px 0 0; min-width: 0; }
+.n-stat + .n-stat { padding-left: 18px; border-left: 1px solid var(--bd-hair); }
+.n-stat b { display: block; white-space: nowrap; font: 600 36px/1 var(--font); letter-spacing: -.02em; color: var(--tx-1); }
+.n-stat span { display: block; margin-top: 8px; color: var(--tx-2); font-size: 13px; }
+.n-stat small { display: block; margin-top: 6px; font-size: 11px; color: var(--tx-mut); }
+.n-week { position: relative; height: 56px; margin: 12px 4px 0; }
+.n-week::before { content: ""; position: absolute; left: 6px; right: 6px; top: 14px; height: 1px; background: var(--bd-strong); }
+.n-day { position: absolute; top: 8px; width: 28px; margin-left: -14px; text-align: center; }
+.n-day i { display: block; width: 13px; height: 13px; margin: 0 auto; border-radius: 50%; background: #000; border: 1px solid var(--bd-strong); }
+.n-day.used i { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px rgba(144,165,255,.7); }
+.n-day.today i { outline: 1px solid var(--accent-hi); outline-offset: 4px; }
+.n-day.future i { opacity: .45; }
+.n-day span { display: block; margin-top: 10px; font-size: 11px; color: var(--tx-mut); }
+.n-lower { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 18px; }
+.n-list { margin: 12px 0 0; padding: 0; list-style: none; }
+.n-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--bd-hair); font-size: 14px; color: var(--tx-2); margin: 0; }
+.n-list li span:last-child { font-size: 12px; color: var(--tx-mut); white-space: nowrap; }
+.n-list li b { font-weight: 500; }
+.n-acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+@media (max-width: 950px) { .n-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .n-stat:nth-child(3) { border-left: 0; padding-left: 0; } .n-lower { grid-template-columns: 1fr; } .n-title { font-size: 34px; } }
