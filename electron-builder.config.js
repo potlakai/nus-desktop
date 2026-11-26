@@ -64,7 +64,6 @@ const config = {
     '!docs/**',
     '!companion/test/**',
     '!scripts/**',
-    '!supabase/**',
     '!electron-builder.config.js',
   ],
   // nus-desktop:// carries the OAuth callback, the billing return, and the

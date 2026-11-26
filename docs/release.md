@@ -152,4 +152,6 @@ darwin early-return in `src/updater.js`.
 - Pushing to GitHub and creating the release. A release is public the moment
   it exists, so it stays a human command. The Mac workflow follows the same
   rule: artifacts only, never a release upload.
-- Flipping Supabase or Stripe secrets. See `docs/billing-setup.md`.
+- Anything to do with billing or accounts. There are none in this build: the
+  Supabase and Stripe setup, the checkout script and its guide were removed
+  along with the commercial layer.

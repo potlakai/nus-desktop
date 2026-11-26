@@ -128,38 +128,8 @@ const quotedList = (text, regex) => {
   return [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
 };
 
-test('schema, track function and client agree on event names and props keys', () => {
-  const { EVENT_NAMES, PROP_KEYS } = require('./stats');
-  const schema = read('supabase/schema.sql');
-  const track = read('supabase/functions/track/index.ts');
-  const section = schema.slice(schema.indexOf('create table if not exists public.install_events'));
-  const schemaNames = quotedList(section, /name\s+text not null\s+check \(name in \(([\s\S]*?)\)\)/);
-  const tsNames = quotedList(track, /const NAMES = new Set\(\[([\s\S]*?)\]\)/);
-  const tsKeys = quotedList(track, /const PROP_KEYS = new Set\(\[([\s\S]*?)\]\)/);
-  // The server is shared with the Companion, which sends names and keys the
-  // desktop never does (update channel 2026-11-04, Companion 0.1.16): schema and
-  // track agree exactly, and every desktop name and key is one they accept.
-  assert.deepEqual(schemaNames, tsNames);
-  for (const name of EVENT_NAMES) assert.ok(tsNames.includes(name), `server accepts desktop name ${name}`);
-  for (const key of PROP_KEYS) assert.ok(tsKeys.includes(key), `server accepts desktop key ${key}`);
-  assert.match(section, /alter table public\.install_events enable row level security/);
-  assert.doesNotMatch(section, /create policy[^;]*on public\.install_events/, 'no client policies, service role only');
-  assert.match(section, /create unique index if not exists \w+\s+on public\.install_events \(install_id, name, day\)\s+where name in \('app_open'\)/);
-  assert.match(section, /pg_column_size\(new\.props\) > 1024/);
-  assert.match(section, /create index if not exists \w+\s+on public\.install_events \(name, day\)/);
-  assert.match(section, /create index if not exists \w+\s+on public\.install_events \(install_id, day\)/);
-});
-
-test('both stats functions skip the JWT gate and daily-metrics checks METRICS_TOKEN', () => {
-  const config = read('supabase/config.toml');
-  assert.match(config, /\[functions\.track\]\s+verify_jwt = false/);
-  assert.match(config, /\[functions\.daily-metrics\]\s+verify_jwt = false/);
-  const metrics = read('supabase/functions/daily-metrics/index.ts');
-  assert.match(metrics, /Deno\.env\.get\('METRICS_TOKEN'\)/);
-  assert.match(metrics, /day < current_date|install_daily_metrics/, 'completed days come from the SQL rollup');
-  const track = read('supabase/functions/track/index.ts');
-  assert.match(track, /RATE_LIMIT_PER_DAY = 200/);
-  assert.match(track, /MAX_PROPS_BYTES = 1024/);
-  assert.match(track, /reply\(204\)/);
-  assert.match(track, /reply\(429/);
-});
+// The two checks that compared the desktop's event names against the server's
+// schema lived here. There is no server in this build: supabase/ was removed
+// with the commercial layer, and nothing is sent anywhere. The client-side
+// contract checks above are what still matter, because they describe what the
+// desktop would send if a server ever existed.
