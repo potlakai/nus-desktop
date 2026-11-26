@@ -972,6 +972,12 @@ async function renderAuthState() {
 }
 
 let licenseState = null;
+// Refresh re-reads the plan from main. It cannot change (there is one plan),
+// so the card is repainted and nothing is announced.
+$('#license-refresh')?.addEventListener('click', async () => {
+  renderLicenseState(await api.licenseRefresh());
+});
+
 async function renderLicenseState(nextState) {
   if (!api.licenseStatus) return;
   const plan = nextState || await api.licenseStatus().catch(() => null);
@@ -990,102 +996,6 @@ async function renderLicenseState(nextState) {
   if (usage) usage.innerHTML = '<div class="usage-meter unlimited"><span>Operating locally</span><i style="--p:100%"></i><b>no limits</b></div>';
 }
 
-// ---- Plan card: personal build ----
-// There is no Free tier and nothing to buy. The card reports the one true thing
-// (everything is uncapped); the upgrade sheet, Stripe checkout and billing
-// portal are gone from the DOM and from this file.
-//
-// A handful of call sites still ask "was that a plan refusal?" before falling
-// back to an ordinary error toast. They keep working: nothing can refuse now,
-// so the predicates answer no and every error takes the ordinary path.
-function closeUpgradeSheet() {}
-function handleLimit() { return false; }
-
-$('#license-refresh')?.addEventListener('click', async () => {
-  renderLicenseState(await api.licenseRefresh());
-});
-
-// Optional setup code from the download page: campaign labels only, no
-// identity. Applied at most once per install; the main process enforces that.
-(async () => {
-  if (!api.acquisitionStatus) { $('#acq-card')?.setAttribute('hidden', ''); return; }
-  const applied = (dims) => {
-    $('#acq-title').textContent = 'Setup code applied';
-    $('#acq-copy').textContent = `This install is linked to ${dims?.utm_campaign || 'a campaign'}. Thanks, that's all it does.`;
-    $('#acq-form')?.classList.add('hidden');
-    const badge = $('#acq-badge'); if (badge) badge.textContent = 'Linked';
-  };
-  try { const dims = await api.acquisitionStatus(); if (dims && dims.acq_action_id) applied(dims); } catch {}
-  $('#acq-redeem')?.addEventListener('click', async () => {
-    const input = $('#acq-token');
-    const note = $('#acq-result');
-    const token = String(input?.value || '').trim();
-    if (!token) { if (note) note.textContent = 'Paste the code first.'; return; }
-    let result;
-    try { result = await api.acquisitionRedeem(token); } catch { result = { ok: false, reason: 'error' }; }
-    if (result?.ok) { applied(result.dims); showToast('Setup code applied.'); }
-    else if (note) {
-      note.textContent = result?.reason === 'already_assigned' ? 'This install is already linked to a code.'
-        : result?.reason === 'no_secret' ? 'This build cannot verify codes yet.'
-        : 'That code is not valid or has expired.';
-    }
-  });
-})();
-
-// Anonymous usage stats (TELEMETRY-CONTRACT.md): the Settings switch, and the
-// one-click "Where did you hear about Nūs?" row shown once after install.
-let statsState = null;
-function paintStatsState(status) {
-  statsState = status || statsState;
-  const toggle = $('#stats-toggle');
-  const label = $('#stats-label');
-  const badge = $('#stats-badge');
-  const note = $('#stats-status');
-  if (!toggle || !statsState) return;
-  toggle.checked = Boolean(statsState.enabled);
-  const on = Boolean(statsState.enabled);
-  label.textContent = on ? 'Anonymous usage stats are on' : 'Anonymous usage stats are off';
-  if (badge) { badge.textContent = on ? 'On' : 'Off'; badge.classList.toggle('good', on); }
-  if (note) note.textContent = statsState.envDisabled ? 'Nothing is sent from this build (NUS_STATS or a dev run).' : '';
-  // Keep the onboarding switch, if it is on screen, in step with Settings.
-  const onboardSwitch = $('#ob-stats-toggle'); if (onboardSwitch) onboardSwitch.checked = on;
-}
-async function renderStatsState() {
-  if (!api.statsStatus) { $('#stats-card')?.setAttribute('hidden', ''); return; }
-  try { paintStatsState(await api.statsStatus()); } catch {}
-}
-async function setStatsEnabled(enabled) {
-  if (!api.statsSetEnabled) return;
-  try { paintStatsState(await api.statsSetEnabled(Boolean(enabled))); }
-  catch { await renderStatsState(); }
-  if (!enabled) hideSourceAsk();
-}
-$('#stats-toggle')?.addEventListener('change', (event) => { setStatsEnabled(event.target.checked); });
-renderStatsState();
-
-function hideSourceAsk() {
-  const row = $('#source-ask');
-  if (!row || row.classList.contains('hidden')) return;
-  if (reducedMotion) { row.classList.add('hidden'); return; }
-  row.classList.add('leaving');
-  setTimeout(() => { row.classList.add('hidden'); row.classList.remove('leaving'); }, 260);
-}
-async function maybeShowSourceAsk() {
-  const row = $('#source-ask');
-  if (!row || !api.statsStatus) return;
-  let status = null;
-  try { status = await api.statsStatus(); } catch { return; }
-  if (!status || !status.askSource) return;
-  row.classList.remove('hidden');
-}
-$('#source-ask')?.addEventListener('click', async (event) => {
-  const button = event.target.closest('[data-source]');
-  if (!button) return;
-  $$('#source-ask button').forEach((b) => { b.disabled = true; });
-  try { await api.statsSourceAnswer?.(button.dataset.source); } catch {}
-  hideSourceAsk();
-  if (button.dataset.source !== 'skipped') showToast('Thanks. That is all it is used for.');
-});
 // Personal build: there is no billing to return from and no plan to activate,
 // so these listeners are gone. renderLicenseState() still runs at start so the
 // Settings card can say what it really is.
@@ -2398,8 +2308,6 @@ async function start(){
     const auth=await needsAuthStep();
     openOnboarding(()=>{if(auth)renderAuthStep();else renderFocusPicker();});
   }
-  // One row, one click, once per install: where they heard about Nūs.
-  maybeShowSourceAsk();
 }
 start().catch((error)=>{console.error(error);showToast('Nūs could not read the local semester.');});
 
