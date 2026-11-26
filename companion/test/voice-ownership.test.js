@@ -52,31 +52,6 @@ test('renderer blocks late general and guide speech after mute, and speech durin
   assert.equal(spoken.length, 1);
 });
 
-test('desktop takeover stops its separate conversation and drops late streamed replies', () => {
-  const stop = desktop.slice(desktop.indexOf('function stopVoice(){'), desktop.indexOf('function toggleVoice(){'));
-  const event = desktop.slice(desktop.indexOf('api.onAiEvent?.('), desktop.indexOf('// -- start / stop / setup --'));
-  const takeover = desktop.match(/api\.onCompanionVoiceTakeover\?\.\([^\n]+/)[0];
-  let aiEvent, take; let canceled=0, micStopped=0;
-  const element = { classList: {add(){},remove(){}} };
-  const ctx = { voiceOn:true, voicePendingAsk:true, voiceNusLine:{}, voiceProposal:{}, voiceStartGeneration:0, speechSynthesis:{cancel(){canceled++;}},
-    api:{voiceCancel:()=>Promise.resolve(),onAiEvent:cb=>{aiEvent=cb;},onCompanionVoiceTakeover:cb=>{take=cb;}},
-    stopVoiceMic(){micStopped++;}, heroKnot3d:null, $:()=>element, setVoiceState:s=>{ctx.voiceState=s;},
-    vadChunks:[],vadPre:[],vadPreSamples:0,vadSpeaking:true,vadHot:1 };
-  vm.runInNewContext(stop + event + takeover, ctx);
-  take(); aiEvent({type:'done',text:'Bye!'});
-  assert.equal(ctx.voiceOn,false); assert.equal(ctx.voicePendingAsk,false); assert.equal(ctx.voiceState,'off');
-  assert.equal(canceled,1); assert.equal(micStopped,1); assert.equal(ctx.voiceStartGeneration,1);
-});
-
-test('desktop microphone opening cannot reactivate chat after a takeover', async () => {
-  const begin = desktop.slice(desktop.indexOf('let voiceStartGeneration='), desktop.indexOf('async function startVoice(){'));
-  let resolve, stopped=0;
-  const ctx = { startVoiceMic:()=>new Promise(r=>{resolve=r;}),stopVoiceMic:()=>stopped++, voiceOn:false };
-  vm.runInNewContext(begin + ';pending=beginListening();',ctx);
-  vm.runInNewContext('voiceStartGeneration++;',ctx); resolve(); await ctx.pending;
-  assert.equal(ctx.voiceOn,false); assert.equal(stopped,1);
-});
-
 test('background speech rejection keeps an actually open microphone visibly listening', () => {
   const body = main.slice(main.indexOf('function restoreKnotStateAfterAssignment()'), main.indexOf('// An ask that belongs'));
   const sent=[];

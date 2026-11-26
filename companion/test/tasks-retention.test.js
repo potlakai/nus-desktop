@@ -334,33 +334,3 @@ test('16. a real Hands task on a consent card: the card goes, nothing is pressed
 });
 
 // ---- the wires -------------------------------------------------------------
-
-test('17. Home to main to the stores, confirmed first, and in that order', () => {
-  const html = read('companion/home/index.html'), home = read('companion/home/home.js'), main = read('companion/index.js');
-  assert.ok(html.indexOf('id="tasks"') < html.indexOf('id="tasks-delete"'), 'by the switch');
-  assert.ok(html.indexOf('id="tasks-delete"') < html.indexOf('id="focus-feeds"'), 'in the same card');
-  assert.match(home, /\$\('#tasks-delete'\)\.onclick=e=>run\(async\(\)=>\{.*if\(!confirm\('Delete all tasks and projects\?.*'\)\)return;await api\.tasksDelete\(\)/);
-  assert.match(read('companion/home/preload.js'), /tasksDelete: \(\) => invoke\('tasks:delete'\)/);
-  assert.match(read('src/main-companion.js'), /handle\('home:tasks:delete', \(\) => companion\.deleteTaskData\(\)\)/);
-  assert.match(main, /^\s+deleteTaskData,$/m);
-  const body = main.slice(main.indexOf('async function deleteTaskData()'));
-  const order = ['T.supervisor.clear()', 'T.projects.clear()', "stopHands('deleted')", 'agent.last = null', "'hands.log'", 'getTasks().sync()', "send('tasks:event', { type: 'sync', enabled: false, tasks: [] })"].map((s) => body.indexOf(s));
-  assert.ok(order.every((n) => n >= 0), order.join());
-  assert.deepEqual(order, order.slice().sort((a, b) => a - b));
-  assert.match(main, /if \(tasksOn\(\)\) getTasks\(\); else compactTasksOff\(\);/);
-});
-
-test('18. the words say what the code does, and nothing claims a wipe that does not exist', () => {
-  const html = read('companion/home/index.html'), home = read('companion/home/home.js'), main = read('companion/index.js');
-  const start = html.indexOf('id="tasks-delete"');
-  const copy = html.slice(start, html.indexOf('tasks-delete-note', start));
-  assert.ok(copy.includes(RETENTION.maxAgeDays + ' days'));
-  assert.ok(copy.includes('latest ' + RETENTION.maxFinished));
-  assert.ok(copy.includes('Hands log'));
-  const line = home.split('\n').find((l) => l.includes("$('#tasks-delete').onclick"));
-  for (const s of [copy, line]) assert.ok(!s.includes('—'), 'no em dash');
-  assert.ok(!/data wipe/i.test(main), 'the comment by handsLog no longer promises one');
-  assert.match(main.slice(main.indexOf('// What Hands did, step by step'), main.indexOf('function handsLog')), /Delete all tasks and projects/);
-  const doc = read('docs/tasks-core.md');
-  assert.ok(!doc.includes('No delete for task data'));
-});

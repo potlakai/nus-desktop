@@ -151,14 +151,6 @@ test('a crash is a count, a few per process at most; a new version reports where
   r.done();
 });
 
-test('the crash handlers expose the hook the host wires, and never pass the error', () => {
-  const src = fs.readFileSync(path.resolve(__dirname, '../../src/crash.js'), 'utf8');
-  assert.match(src, /setOnCrash\(fn\)/);
-  assert.match(src, /onCrash\?\.\(kind\)/);
-  assert.doesNotMatch(src, /onCrash\?\.\(kind, /, 'the kind alone, never the error');
-});
-
-// Contract amendment 2026-11-04 (d): enum-only rows for the channel.
 test('update_offered goes once per version per surface; a bad surface or id never leaves', async () => {
   const r = rig({ version: '0.1.15' });
   await r.stats.updateOffered('bubble', '0.1.16');

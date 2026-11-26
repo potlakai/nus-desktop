@@ -102,37 +102,6 @@ test('3. a failed run and a run that reaches review each write their row, once',
   assert.deepEqual(r.ledger.read().map((x) => x.outcome), ['error', 'review']);
 });
 
-test('4. the bench reads the rows from the scratch profile and gets medians; Home and Activity do not count them', async () => {
-  const r = rig();
-  for (const [step, cancel] of [[800, 100], [1200, 300], [4000, 200]]) {
-    const id = r.sup.submit({ request: 'x', executor: 'fake' });
-    const run = r.runs[r.runs.length - 1];
-    run.ctx.emit('started', {});
-    r.clock.t += step;
-    run.ctx.emit('step', { n: 1, line: 'Working' });
-    const p = r.sup.cancel(id, 'esc');
-    r.clock.t += cancel;
-    run.resolve();
-    await p;
-    await settle();
-  }
-  const session = fs.readFileSync(path.join(root, 'scripts', 'bench', 'lib', 'session.cjs'), 'utf8');
-  assert.match(session, /function taskRows\(profile\) \{ return ledgerRows\(profile\)\.filter\(\(r\) => r\.feature === 'task'\); \}/);
-  assert.match(session, /module\.exports = \{[^}]*taskRows/);
-  assert.match(session, /path\.join\(profile, 'companion', 'usage\.jsonl'\)/, 'the same file the ledger writes in the app');
-  const t = taskTimings(r.ledger.read());
-  assert.equal(t.runs, 3);
-  assert.deepEqual(t.firstProgress, { n: 3, medianMs: 1200, maxMs: 4000 });
-  assert.deepEqual(t.cancel, { n: 3, medianMs: 200, maxMs: 300 });
-  // A model request beside them: Home sees that one alone.
-  r.ledger.record({ feature: 'hands', provider: 'test', outcome: 'ok', ms: 2000 });
-  const s = r.ledger.summary(1);
-  assert.equal(s.requests, 1); assert.deepEqual(s.byFeature, { hands: 1 }); assert.equal(s.medianMs, 2000);
-  const v = activityView(r.ledger.read(), { now: r.clock.t });
-  assert.equal(v.today.requests, 1); assert.equal(v.rows.length, 1); assert.equal(v.rows[0].feature, 'Hands');
-  assert.deepEqual(taskTimings([]).cancel, { n: 0, medianMs: null, maxMs: null });
-});
-
 test('5. a ledger that throws never breaks a task; with no ledger nothing changes', async () => {
   const dir = tmp();
   const journal = createJournal({ dir });

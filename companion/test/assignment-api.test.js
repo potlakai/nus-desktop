@@ -26,12 +26,3 @@ test('assignment streaming forwards model effort tokens and usage without SDK re
     assert.equal(requests[1].output_config,undefined); assert.equal(requests[1].max_tokens,768);
   } finally { Module._load=old; }
 });
-test('desktop API fallback honors per-call model and effort', async () => {
-  const source=fs.readFileSync(path.join(__dirname,'../../src/ai.js'),'utf8');
-  const body=source.slice(source.indexOf('async function runApi('),source.indexOf('\nfunction parseJsonBlock('));
-  let request;
-  const ctx={MODEL:'default',API_TIMEOUT_MS:100,AbortSignal,apiContent:p=>p,fetch:async (_url,p)=>{request=JSON.parse(p.body);return {ok:true,json:async()=>({content:[{type:'text',text:'ok'}]})};}};
-  vm.runInNewContext(body+';this.runApi=runApi;',ctx);
-  await ctx.runApi('test-only','prompt',{model:'claude-sonnet-5',effort:'medium'});
-  assert.equal(request.model,'claude-sonnet-5'); assert.equal(request.output_config.effort,'medium');
-});

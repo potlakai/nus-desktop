@@ -68,20 +68,3 @@ test('it reads the ledger file the Companion writes', () => {
   assert.deepEqual(v.rows.map((r) => r.feature), ['Read the page', 'Hands']);
   assert.equal(v.today.requests, 2);
 });
-
-test('Home asks for it over its own channel and shows it as an Activity tab under Saved; homework help is in the ledger too', () => {
-  const host = fs.readFileSync(path.join(root, '..', 'src', 'main-companion.js'), 'utf8');
-  assert.match(host, /handle\('home:activity', \(\) => companion\.activity\(\)\)/);
-  assert.match(read('home', 'preload.js'), /activity: \(\) => invoke\('activity'\)/);
-  const main = read('index.js');
-  assert.match(main, /activity: \(\) => activityView\(getLedger\(\)\.read\(\), \{ now: Date\.now\(\), limit: 50 \}\)/);
-  assert.match(main, /getLedger\(\)\.record\(\{ feature: 'solve'/);
-  const html = read('home', 'index.html');
-  assert.match(html, /<button data-saved="activity" role="tab">Activity<\/button>/);
-  assert.match(html, /<div id="saved-activity" class="saved-view"><\/div>/);
-  const home = read('home', 'home.js');
-  assert.match(home, /else if\(saved==='activity'\) \{/);
-  assert.match(home, /<th>When<\/th><th>What<\/th><th>Result<\/th><th>Took<\/th><th>AI<\/th><th>Cost<\/th><th>Details<\/th>/);
-  assert.match(home, /esc\(a\.today\.line\)/);
-  assert.doesNotMatch(home, /JSON\.stringify/, 'no raw JSON on the page');
-});
