@@ -196,6 +196,27 @@ test('a risky click shows a card; Not now stops the task; a spoken yes lets it t
   assert.equal(last(yes.sent, 'guide:bubble').kicker, 'done');
 });
 
+test('unattended: a scheduled run stops at the card instead of approving it for the operator', async () => {
+  // The autonomy rule, as a test: no one is at the screen, so a step that needs
+  // approval ends the run. It must not press yes on the operator's behalf, and
+  // it must not silently click either.
+  const g = agentRig(['Submitting it. [DO:click {"id": 2}] [DONE]']);
+  await g.agent.run('submit lab 3', 'schedule', { unattended: true });
+  const card = last(g.sent, 'guide:bubble');
+  assert.match(card.text, /needs you to approve it/);
+  assert.match(card.text, /running on a schedule/);
+  assert.equal(g.agent.asking(), false, 'it did not sit waiting for an answer that can never come');
+  assert.equal(g.r.hands.calls.length, 0, 'and nothing was clicked');
+  assert.equal(g.agent.status().state, 'idle');
+});
+
+test('unattended: a run with nothing risky in it finishes normally, so a schedule can still be useful', async () => {
+  const g = agentRig(['Reading it. [DO:click {"id": 1}] [DONE]']);
+  await g.agent.run('open lab 3 and tell me the due date', 'schedule', { unattended: true });
+  assert.equal(g.r.hands.calls[0].op, 'mouse.click');
+  assert.equal(last(g.sent, 'guide:bubble').kicker, 'done');
+});
+
 test('done after a click that changed nothing is sent back; the same action three times stops the chain; a stop mid-run ends it', async () => {
   const g = agentRig([
     'Clicking it. [DO:click {"id": 1}] [DONE]',

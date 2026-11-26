@@ -27,7 +27,11 @@ distributed, has no accounts, no billing, no telemetry and no sign-in. See
   uninstall — stops for a confirmation card first. Unattended scheduled jobs
   never auto-approve one.
 - **Keeps a calendar.** Courses, assignment due dates, tasks with sub-steps, and
-  automations on a schedule. Tasks and cron-style automation are both on.
+  automations on a schedule.
+- **Works on a schedule.** A rule can ask him to do something on cron time —
+  `0 9 * * 1-5` is "every weekday at nine". An unattended run may read, open and
+  look, but it never approves a card on your behalf: a step that would send, pay
+  or delete stops the run and tells you.
 - **Remembers.** Facts you tell him live in a local database and come back when
   they are relevant.
 - **Speaks.** Push-to-talk with local whisper for transcription, and a local

@@ -669,7 +669,69 @@ function renderAutomations() {
 const automationScrim=$('#automation-scrim');
 $('#new-automation').addEventListener('click',()=>automationScrim.classList.remove('hidden'));
 $('#automation-close').addEventListener('click',()=>automationScrim.classList.add('hidden'));
-$('#automation-save').addEventListener('click',async()=>{const title=$('#automation-title').value.trim();if(!title)return showToast('Name the recurring task.');const trigger=$('#automation-trigger').value;const next=new Date();next.setDate(next.getDate()+(trigger==='daily'?1:7));const result=await api.addAutomation({name:title,trigger_type:trigger,trigger:{timezone:Intl.DateTimeFormat().resolvedOptions().timeZone},action_type:'create_task',action:{title,estimated_minutes:Number($('#automation-minutes').value)||45},next_run_at:next.toISOString()});if(result?.error)return reportAiError(result);automationScrim.classList.add('hidden');await load();showToast('Local automation approved.');});
+// A rule is either a local task or a scheduled ask. The fields that do not apply
+// are hidden rather than shown and ignored, so what is saved is what was seen.
+function automationKind(){
+  const kind=$('#automation-kind').value;
+  const cron=kind==='ask_ai'&&$('#automation-trigger').value==='cron';
+  $('#automation-cron-row').classList.toggle('hidden',!cron);
+  $('#automation-ask-row').classList.toggle('hidden',kind!=='ask_ai');
+  $('#automation-minutes').closest('.field').classList.toggle('hidden',kind==='ask_ai');
+  $('#automation-cron-note').textContent=cron?'Five fields: minute hour day month weekday. 0 9 * * 1-5 is every weekday at nine.':'';
+  return {kind,cron};
+}
+$('#automation-kind').addEventListener('change',automationKind);
+$('#automation-trigger').addEventListener('change',automationKind);
+$('#automation-cron').addEventListener('input',()=>{
+  const expr=$('#automation-cron').value.trim();
+  if(!expr){$('#automation-cron-note').textContent='';return;}
+  try{const c=cronPreview(expr);$('#automation-cron-note').textContent=c;$('#automation-cron-note').classList.remove('error');}
+  catch(e){$('#automation-cron-note').textContent='Five fields: minute hour day month weekday. 0 9 * * 1-5 is every weekday at nine.';$('#automation-cron-note').classList.add('error');}
+});
+// The parser lives in src/cron.js, which the renderer cannot require. A tiny
+// check here is enough to catch a typo before saving; the main process runs the
+// real parser and refuses anything it does not like.
+function cronPreview(expr){
+  const parts=String(expr||'').trim().split(/\s+/);
+  if(parts.length!==5) throw new Error('five fields');
+  const bounds=[[0,59,'minute'],[0,23,'hour'],[1,31,'day'],[1,12,'month'],[0,7,'weekday']];
+  parts.forEach((p,idx)=>{
+    const [lo,hi,label]=bounds[idx];
+    String(p).split(',').forEach(one=>{
+      const [range,step]=one.split('/');
+      if(step!==undefined&&(!/^\d+$/.test(step)||Number(step)<1))throw new Error('bad step');
+      const bad=v=>!/^\d+$/.test(v)||Number(v)<lo||Number(v)>hi;
+      if(range!=='*'){for(const v of range.split('-'))if(bad(v))throw new Error('bad '+label);}
+    });
+  });
+  const [m,h]=parts;
+  return 'Runs at '+(!/^\d+$/.test(m)||!/^\d+$/.test(h)?'the minutes you named':String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'))+'. Checked again when saved.';
+}
+$('#automation-save').addEventListener('click',async()=>{
+  const title=$('#automation-title').value.trim();
+  if(!title)return showToast('Name the recurring task.');
+  const kind=$('#automation-kind').value;
+  const trigger=$('#automation-trigger').value;
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if(kind==='ask_ai'){
+    const ask=$('#automation-ask').value.trim();
+    if(!ask)return showToast('Say what to ask J.A.R.V.I.S.');
+    const action={ask};
+    if(trigger==='cron'){
+      action.cron=$('#automation-cron').value.trim();
+      try{cronPreview(action.cron);}catch{return showToast('That schedule does not read: five fields, like 0 9 * * 1-5.');}
+    }
+    const result=await api.addAutomation({name:title,trigger_type:trigger,trigger:{timezone:tz},action_type:'ask_ai',action,next_run_at:null});
+    if(result?.error==='bad_schedule')return showToast(result.message||'That schedule does not read.');
+    if(result?.error)return reportAiError(result);
+    automationScrim.classList.add('hidden');await load();showToast('Scheduled.');
+    return;
+  }
+  const next=new Date();next.setDate(next.getDate()+(trigger==='daily'?1:7));
+  const result=await api.addAutomation({name:title,trigger_type:trigger,trigger:{timezone:tz},action_type:'create_task',action:{title,estimated_minutes:Number($('#automation-minutes').value)||45},next_run_at:next.toISOString()});
+  if(result?.error)return reportAiError(result);
+  automationScrim.classList.add('hidden');await load();showToast('Local automation approved.');
+});
 
 function courseStatus(course){
   const pending=state.data.assignments.filter((item)=>item.course_id===course.id&&item.status==='pending');

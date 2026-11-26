@@ -9,6 +9,8 @@ else if (dataDirFromArgv()) app.setPath('userData', path.resolve(dataDirFromArgv
 const { open, api, setSaveStateListener } = require('./db');
 const logic = require('./logic');
 const { decomposeTask, nextScheduledAt, parseIcs } = require('./smart');
+const { createScheduler } = require('./scheduled-ai');
+const { nextRunIso } = require('./cron');
 const secrets = require('./secrets');
 const config = require('./config');
 const auth = require('./auth');
@@ -380,10 +382,49 @@ function addDefaultReminder(taskId, dueDate) {
   api.addReminder({ task_id: taskId, fire_at: reminderAt.toISOString() });
 }
 
+// One scheduled ask, routed to the Companion the same way a typed ask is. The
+// unattended flag travels with it: hands/agent.js stops rather than approving a
+// consent card, which is the autonomy rule for anything on a timer.
+async function runScheduledAsk(ask, { row } = {}) {
+  if (!companion || typeof companion.ask !== 'function') return { ok: false, summary: 'the Companion is not running' };
+  try {
+    const r = await companion.ask(ask, { unattended: true, source: 'schedule', automation: row && row.name });
+    if (r && r.ok === false) return { ok: false, summary: String(r.summary || r.error || 'refused') };
+    return { ok: true, summary: String((r && (r.summary || r.say)) || 'done') };
+  } catch (e) {
+    return { ok: false, summary: 'failed: ' + String(e && e.message || e).slice(0, 200) };
+  }
+}
+let scheduler = null;
+function getScheduler() {
+  if (!scheduler) scheduler = createScheduler({ run: runScheduledAsk, log: (m) => console.log('[schedule] ' + m), markRun: (id, lastRun, next) => api.markAutomationRun(id, lastRun, next) });
+  return scheduler;
+}
+
+// A cron ask must arrive with a next time, or the tick would never see it as due.
+// The form leaves next_run_at null for a schedule and the parser here fills it,
+// so a hand-edited or scripted row cannot sneak in an unparseable expression.
+function withCronNext(automation) {
+  if (!automation || automation.action_type !== 'ask_ai') return automation;
+  let action = automation.action;
+  if (typeof action === 'string') { try { action = JSON.parse(action); } catch { action = {}; } }
+  const expr = action && action.cron;
+  if (!expr) return automation;
+  const next = nextRunIso(expr);          // throws CronError on a bad expression
+  automation.action = action;
+  automation.action_json = JSON.stringify(action);
+  automation.trigger_json = JSON.stringify(automation.trigger || {});
+  automation.next_run_at = next;
+  return automation;
+}
+
 function runDueAutomations() {
   const now = new Date();
   for (const automation of api.dueAutomations(now.toISOString())) {
     const action = safeJson(automation.action_json);
+    // A scheduled ask is not a task: it is work for the model, run through the
+    // scheduler so only one can be in flight and the consent rule is enforced.
+    if (automation.action_type === 'ask_ai') continue;
     if (automation.action_type === 'create_task' && action.title) {
       const taskId = api.addTask({
         title: action.title,
@@ -751,6 +792,11 @@ app.whenReady().then(async () => {
         api.markFired(reminder.id);
       }
       runDueAutomations();
+      // ask_ai rows, from the same tick. Not awaited: a scheduled ask can take
+      // minutes and the reminder loop must keep its minute.
+      Promise.resolve(api.dueAutomations(new Date().toISOString()))
+        .then((rows) => getScheduler().tick(rows))
+        .catch((error) => console.error('[schedule] tick failed', error));
       ingestCompanionEvents();
     } catch (error) {
       console.error('[nus] background tick failed', error);
@@ -1011,7 +1057,16 @@ const handlers = {
   'integrations:list': () => api.listIntegrations(),
   'automations:list': () => api.listAutomations(),
   'automations:add': (_event, automation) => {
-    return mutate(api.addAutomation)(automation);
+    // A bad cron expression must reach the form as a sentence, not create a row
+    // that never fires.
+    try { return mutate(api.addAutomation)(withCronNext(automation)); }
+    catch (e) { if (e && e.name === 'CronError') return { error: 'bad_schedule', message: e.message }; throw e; }
+  },
+  'automations:cron-check': (_event, expression) => {
+    // The renderer cannot require src/cron.js, so the real parser runs here and
+    // the answer is what the form shows.
+    try { const { describe } = require('./cron'); return { ok: true, next: nextRunIso(expression), text: describe(expression) }; }
+    catch (e) { return { ok: false, error: String(e && e.message || e).slice(0, 200) }; }
   },
   'automations:update': (_event, id, fields) => mutate(api.updateAutomation)(id, fields),
   'automations:run': (_event, id) => {

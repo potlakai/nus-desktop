@@ -4870,8 +4870,11 @@ function noteAiReady() {
   Promise.resolve(hooks.tourAi()).then((a) => { hooks.onAiReady(a && a.key ? 'key' : a && a.cli ? 'claude_code' : 'none'); }).catch(() => {});
 }
 
-async function routeUtterance(text, source, heard, uttId, assignmentAlreadyChecked) {
+async function routeUtterance(text, source, heard, uttId, assignmentAlreadyChecked, opts) {
   const heardAt = heard || Date.now();
+  // A scheduled ask runs with nobody at the screen. The flag reaches the agent,
+  // which stops at a consent card rather than approving it.
+  const unattended = !!(opts && opts.unattended);
   if (tour && tour.hear && String(text || '').trim()) { tourHeard(text, source); return; }
   // The Knot's own line heard back is nobody's ask. With a card up, words answer the card.
   if (source !== 'typed' && heardBack(text) && !(agent && agent.asking())) { routeLog('heard back, nothing: "' + String(text).slice(0, 40) + '"'); restoreKnotState(); return; }
@@ -5161,7 +5164,7 @@ function routeAnswer(kind, text, source, heardAt) {
     // With the task system on, the ask is a task: journaled, supervised, and in
     // the pill's list. Off, Hands takes it straight, as it always has.
     if (tasksOn()) { submitHandsTask(kind.text, source); return; }
-    getAgent().run(kind.text, source === 'typed' ? 'typed' : 'voice', { askedAt: heardAt }); return;
+    getAgent().run(kind.text, source === 'typed' ? 'typed' : 'voice', { askedAt: heardAt, unattended }); return;
   }
   flash('"' + text.slice(0, 60) + '"', 2500);
   // A general question ("what's a pivot table") needs no screenshot: it is
@@ -5948,7 +5951,11 @@ function initCompanion(providedHooks = {}) {
     speechInstall: () => getParakeet().install().then((st) => { if (st.installed) applySettingsPatch({ speechModel: 'parakeet' }); return getParakeet().status(); }),
     // Get started: arm the talk key try, and send the first real ask as if it
     // were typed to the Knot (the same route a spoken one takes).
-    ask: (text) => { forceShow(); routeUtterance(String(text || '').slice(0, 500), 'typed').catch((e) => console.log('[companion] ask failed: ' + e.message)); return companionStatus(); },
+    // opts.unattended: a scheduled run. Returns a summary so the scheduler can
+    // record what happened; a person's own ask ignores the return value.
+    ask: (text, opts) => { forceShow(); return routeUtterance(String(text || '').slice(0, 2000), 'typed', undefined, undefined, undefined, { unattended: !!(opts && opts.unattended) })
+      .then(() => companionStatus())
+      .catch((e) => { console.log('[companion] ask failed' + (opts && opts.unattended ? ' (scheduled)' : '') + ': ' + e.message); return companionStatus(); }); },
     unregisterShortcuts: () => globalShortcut.unregisterAll(),
     channelTick,
     channelProgress,

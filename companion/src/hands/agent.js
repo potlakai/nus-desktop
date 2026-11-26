@@ -141,7 +141,7 @@ class HandsAgent {
     const gen = ++this.gen;
     this.runId++;
     const t0 = this.d.now();
-    this.task = { request: text, goal: opts.goal || text, source: source || 'typed', askedAt: opts.askedAt || t0, history: Array.isArray(opts.history) ? opts.history.slice() : [], steps: 0, spoke: false, apps: new Set(), openGrace: 0, repeats: new Map(), budget: this.d.maxSteps, rejections: 0, lastSig: null, sameScreen: 0, files: null, outcome: 'ok', note: '' };
+    this.task = { request: text, goal: opts.goal || text, source: source || 'typed', askedAt: opts.askedAt || t0, unattended: opts.unattended === true, history: Array.isArray(opts.history) ? opts.history.slice() : [], steps: 0, spoke: false, apps: new Set(), openGrace: 0, repeats: new Map(), budget: this.d.maxSteps, rejections: 0, lastSig: null, sameScreen: 0, files: null, outcome: 'ok', note: '' };
     this.setState('running');
     this.d.log('run: ' + text);
     try { await this.loop(gen); }
@@ -283,6 +283,14 @@ class HandsAgent {
 
   // The card by the Knot: Yes or Not now, or a spoken answer. Resolves true on yes.
   async askFirst(card, action, gen) {
+    // Unattended (a scheduled task, a cron run): there is no one at the screen
+    // to answer, and approving on their behalf is exactly what the autonomy
+    // policy forbids. Stop the run and say why, rather than pressing Yes.
+    if (this.task && this.task.unattended) {
+      this.d.log('card needed while unattended: ' + (card.title || 'risky action'));
+      this.finish('stopped', 'I stopped there: that step needs you to approve it, and I was running on a schedule.');
+      return false;
+    }
     const T = this.task;
     this.setState('asking');
     const spoken = card.title + (card.detail ? ' ' + card.detail : '') + (card.firm ? ' Press Yes to go ahead.' : ' Say yes to go ahead.');
